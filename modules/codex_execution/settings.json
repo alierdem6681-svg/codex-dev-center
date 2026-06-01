@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "unattended_execution_enabled": false,
+  "require_approval_before_run": true,
+  "require_task_workspace": true,
+  "require_log_capture": true,
+  "require_output_guard": true,
+  "require_test_before_done": true,
+  "require_report_before_done": true,
+  "require_handover_update": true,
+  "allow_direct_production_changes": false,
+  "allow_secret_read": false,
+  "allow_gcloud_mutation_without_approval": false,
+  "max_runtime_seconds": 1800
+}

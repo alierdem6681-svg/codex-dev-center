@@ -1,0 +1,25 @@
+{
+  "actions": [
+    {
+      "id": "prepare_codex_task",
+      "label": "Codex Görev Alanı Hazırla",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false
+    },
+    {
+      "id": "request_codex_execution_approval",
+      "label": "Codex Execution Onayı İste",
+      "risk": "high",
+      "enabled": true,
+      "requires_approval": true
+    },
+    {
+      "id": "run_codex_task",
+      "label": "Codex Görevini Çalıştır",
+      "risk": "high",
+      "enabled": false,
+      "requires_approval": true
+    }
+  ]
+}

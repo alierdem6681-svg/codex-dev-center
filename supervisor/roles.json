@@ -1,0 +1,33 @@
+{
+  "supervisor": {
+    "name": "CTO/Supervisor",
+    "responsibilities": [
+      "Read mandatory memory files before work starts",
+      "Create task ids and route tasks to workers",
+      "Keep logs, reports, state and handover current",
+      "Apply Telegram output guard and deploy risk gates"
+    ]
+  },
+  "workers": [
+    {
+      "id": "worker-1",
+      "name": "Backend and infrastructure",
+      "scope": "APIs, data models, local services and backend scripts"
+    },
+    {
+      "id": "worker-2",
+      "name": "Frontend and panel",
+      "scope": "Web panel, UI state screens and operator experience"
+    },
+    {
+      "id": "worker-3",
+      "name": "DevOps and deploy",
+      "scope": "Service files, staging, rollback plans and deployment checks"
+    },
+    {
+      "id": "worker-4",
+      "name": "Test and quality",
+      "scope": "Validation, audit checks, reports and regression coverage"
+    }
+  ]
+}

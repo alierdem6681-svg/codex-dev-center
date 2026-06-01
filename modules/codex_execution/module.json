@@ -1,0 +1,9 @@
+{
+  "id": "codex_execution",
+  "name": "Codex Safe Task Execution",
+  "status": "framework_ready_locked",
+  "risk": "high",
+  "description": "Codex CLI ile görev yürütme için güvenli, loglu, approval-gated çalışma altyapısı.",
+  "enabled": false,
+  "requires_approval": true
+}

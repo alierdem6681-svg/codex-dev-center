@@ -1,0 +1,69 @@
+{
+  "updated_at": "2026-06-01T09:59:49.730713+00:00",
+  "profiles": [
+    {
+      "id": "worker-1",
+      "name": "Backend / Infrastructure Worker",
+      "enabled": true,
+      "role": "Backend ve altyapı",
+      "skills": [
+        "python",
+        "api",
+        "database_schema",
+        "backend_services",
+        "infrastructure_files"
+      ],
+      "risk_limit": "medium",
+      "can_use_codex_cli": false,
+      "can_modify_production": false
+    },
+    {
+      "id": "worker-2",
+      "name": "Frontend / Dashboard Worker",
+      "enabled": true,
+      "role": "Frontend ve panel",
+      "skills": [
+        "html",
+        "css",
+        "javascript",
+        "dashboard",
+        "ux"
+      ],
+      "risk_limit": "medium",
+      "can_use_codex_cli": false,
+      "can_modify_production": false
+    },
+    {
+      "id": "worker-3",
+      "name": "DevOps / Services Worker",
+      "enabled": true,
+      "role": "DevOps, servis ve deploy iskeleti",
+      "skills": [
+        "systemd",
+        "docker",
+        "logs",
+        "backup",
+        "staging"
+      ],
+      "risk_limit": "medium",
+      "can_use_codex_cli": false,
+      "can_modify_production": false
+    },
+    {
+      "id": "worker-4",
+      "name": "QA / Security Worker",
+      "enabled": true,
+      "role": "Test, kalite ve güvenlik denetimi",
+      "skills": [
+        "testing",
+        "lint",
+        "audit",
+        "risk_review",
+        "output_guard"
+      ],
+      "risk_limit": "medium",
+      "can_use_codex_cli": false,
+      "can_modify_production": false
+    }
+  ]
+}

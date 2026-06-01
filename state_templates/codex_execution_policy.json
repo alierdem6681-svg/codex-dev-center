@@ -1,0 +1,20 @@
+{
+  "enabled": false,
+  "unattended_execution_enabled": false,
+  "requires_task_isolation": true,
+  "requires_output_guard": true,
+  "requires_test_before_done": true,
+  "requires_report_before_done": true,
+  "requires_handover_update": true,
+  "allowed_risk_without_approval": [
+    "low",
+    "medium"
+  ],
+  "blocked_until_step": "safe_codex_execution_integration",
+  "updated_at": "2026-06-01T10:14:59.191121+00:00",
+  "safe_execution_framework_ready": true,
+  "workspace_isolation_ready": true,
+  "approval_before_run_required": true,
+  "output_guard_required": true,
+  "test_before_done_required": true
+}

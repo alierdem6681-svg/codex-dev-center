@@ -1,0 +1,13 @@
+{
+  "all_features_must_be_modular": true,
+  "all_packages_must_be_modular": true,
+  "all_modules_must_be_independent": true,
+  "dashboard_registration_required": true,
+  "settings_required": true,
+  "actions_required": true,
+  "tests_required": true,
+  "logs_required": true,
+  "handover_required": true,
+  "audit_required": true,
+  "updated_at": "2026-06-01T10:10:33.882873+00:00"
+}

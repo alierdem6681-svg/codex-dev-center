@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "require_handover_update": true,
+  "require_roadmap_update": true,
+  "require_project_memory_update": true,
+  "require_system_state_update": true,
+  "require_report": true,
+  "require_system_log": true,
+  "require_audit_log": true,
+  "require_agent_onboarding_when_relevant": true,
+  "require_anayasa_when_user_rule_changes": true,
+  "updated_at": "2026-06-01T10:38:49.548247+00:00"
+}

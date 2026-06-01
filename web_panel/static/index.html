@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codex Dev Center</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --line: #d8dee8;
+        --accent: #0f766e;
+        --warn: #b45309;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        padding: 18px 24px;
+      }
+      h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+      main {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        padding: 18px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        min-height: 180px;
+      }
+      h2 { margin: 0 0 12px; font-size: 15px; }
+      dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin: 0; }
+      dt { color: var(--muted); }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .worker, .task {
+        border-top: 1px solid var(--line);
+        padding: 10px 0;
+      }
+      .badge {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #e8f3f1;
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .risk { color: var(--warn); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Codex Dev Center</h1>
+    </header>
+    <main>
+      <section>
+        <h2>Sistem</h2>
+        <dl id="system"></dl>
+      </section>
+      <section>
+        <h2>Worker Durumu</h2>
+        <div id="workers"></div>
+      </section>
+      <section>
+        <h2>Görev Kuyruğu</h2>
+        <div id="tasks"></div>
+      </section>
+      <section>
+        <h2>Güvenlik Kapıları</h2>
+        <dl>
+          <dt>Production</dt><dd class="risk">Kapalı</dd>
+          <dt>Onay gerekir</dt><dd>Deploy, migration, veri silme, secret, DNS, maliyet</dd>
+          <dt>Telegram</dt><dd>Raw input passthrough ve output guard aktif iskelet</dd>
+        </dl>
+      </section>
+    </main>
+    <script>
+      async function loadStatus() {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        const state = data.system_state || {};
+        document.getElementById('system').innerHTML = [
+          ['Faz', state.phase || '-'],
+          ['Supervisor', String(Boolean(state.supervisor_created))],
+          ['Workers', String(Boolean(state.workers_created))],
+          ['Web panel', String(Boolean(state.web_panel_created))],
+          ['Telegram', String(Boolean(state.telegram_connected))],
+          ['Production deploy', String(Boolean(state.production_deploy_enabled))]
+        ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+
+        const workers = (data.workers && data.workers.workers) || [];
+        document.getElementById('workers').innerHTML = workers.map((worker) => (
+          `<div class="worker"><strong>${worker.id}</strong> <span class="badge">${worker.status}</span><br>${worker.current_task || 'Görev yok'}</div>`
+        )).join('') || 'Worker kaydı yok';
+
+        const tasks = (data.tasks && data.tasks.tasks) || [];
+        document.getElementById('tasks').innerHTML = tasks.slice(-8).reverse().map((task) => (
+          `<div class="task"><strong>${task.id}</strong> <span class="badge">${task.status}</span><br>${task.title}<br><small>${task.assigned_worker} / ${task.risk_level}</small></div>`
+        )).join('') || 'Kuyruk boş';
+      }
+      loadStatus();
+      setInterval(loadStatus, 10000);
+    </script>
+  </body>
+</html>

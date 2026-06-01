@@ -1,0 +1,47 @@
+{
+  "cto_full_gcloud_authority_target": true,
+  "actual_gcloud_authority_granted": false,
+  "authority_mode": "policy_defined_not_yet_granted",
+  "approval_required_for": [
+    "iam_owner_or_editor_grant",
+    "secret_read_or_write",
+    "production_deploy",
+    "database_migration",
+    "data_delete",
+    "dns_change",
+    "firewall_public_exposure",
+    "cost_increasing_cloud_operation",
+    "google_ads_api_mutate",
+    "billing_or_payment_changes"
+  ],
+  "risk_approval_levels": {
+    "low": {
+      "auto_execute": true,
+      "approval_count": 0,
+      "audit_required": true
+    },
+    "medium": {
+      "auto_execute": true,
+      "approval_count": 0,
+      "audit_required": true
+    },
+    "high": {
+      "auto_execute": false,
+      "approval_count": 1,
+      "audit_required": true
+    },
+    "critical": {
+      "auto_execute": false,
+      "approval_count": 2,
+      "audit_required": true,
+      "rollback_plan_required": true
+    },
+    "catastrophic": {
+      "auto_execute": false,
+      "approval_count": 3,
+      "audit_required": true,
+      "rollback_plan_required": true
+    }
+  },
+  "updated_at": "2026-06-01T10:10:33.882649+00:00"
+}

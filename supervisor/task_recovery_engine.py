@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+import json, os, time, subprocess
+from pathlib import Path
+from datetime import datetime, timezone
+
+APP = Path("/opt/codex-dev-center")
+STATE = APP / "state"
+REPORTS = APP / "reports"
+LOGS = APP / "logs"
+
+EXPECTED = [
+    "PLAN.md",
+    "CHANGE_PROPOSAL.md",
+    "TEST_PLAN.md",
+    "RISK_REVIEW.md",
+    "LIVING_DOCS_CHECKLIST.md",
+    "WORKER_SUMMARY.md",
+]
+
+PREFIXES = ("CTO-ACTION-", "CTO-AUTO-", "CTO-P0R", "CTO-P1", "RECOVERY-")
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+def load_json(path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text())
+    except Exception:
+        pass
+    return default
+
+def save_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = now()
+    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(path)
+
+def safe_id(value):
+    out = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(value))
+    return out[:120] or "TASK"
+
+def codex_lines():
+    try:
+        p = subprocess.run(
+            ["bash", "-lc", "ps -eo pid,ppid,stat,etime,cmd | grep '[c]odex exec' || true"],
+            cwd=str(APP),
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        return p.stdout.splitlines()
+    except Exception:
+        return []
+
+def task_has_process(task_id):
+    return any(task_id in line for line in codex_lines())
+
+def find_workspace(task_id, worker):
+    matches = []
+    sid = safe_id(task_id)
+    if worker:
+        matches += list((APP / "workspaces").glob(f"worker_{worker}_{sid}_*"))
+    matches += list((APP / "workspaces").glob(f"worker_*_{sid}_*"))
+    return sorted(set(matches))[-1] if matches else None
+
+def created_files(workspace):
+    if not workspace or not Path(workspace).exists():
+        return []
+    return [name for name in EXPECTED if (Path(workspace) / name).exists()]
+
+def tail_text(path, limit=1200):
+    try:
+        p = Path(path)
+        if p.exists():
+            return p.read_text(errors="replace")[-limit:]
+    except Exception:
+        pass
+    return ""
+
+def classify_failure(workspace):
+    if not workspace:
+        return "workspace_missing"
+    ws = Path(workspace)
+    text = (tail_text(ws / "codex.out") + "\n" + tail_text(ws / "codex.err")).lower()
+    if not text.strip():
+        return "empty_output"
+    if "timeout" in text or "return code: 124" in text:
+        return "timeout"
+    if "permission denied" in text:
+        return "permission_denied"
+    if "reading additional input from stdin" in text and not tail_text(ws / "codex.out").strip():
+        return "codex_no_final_output"
+    if len(created_files(ws)) == 0:
+        return "no_proposal_files"
+    if len(created_files(ws)) < 4:
+        return "partial_proposal"
+    return "unknown"
+
+def choose_worker(title):
+    text = str(title).lower()
+    if any(x in text for x in ["dashboard", "panel", "ui", "frontend"]):
+        return "worker-2"
+    if any(x in text for x in ["watcher", "staging", "rollback", "service", "devops"]):
+        return "worker-3"
+    if any(x in text for x in ["quality", "test", "risk", "gate", "simulation"]):
+        return "worker-4"
+    return "worker-1"
+
+def retry_description(task, reason):
+    title = task.get("title") or task.get("id")
+    return (
+        f"Recovery retry for: {title}. "
+        f"Previous failure reason: {reason}. "
+        "Use smaller scope. In isolated workspace create exactly: "
+        "PLAN.md, CHANGE_PROPOSAL.md, TEST_PLAN.md, RISK_REVIEW.md, "
+        "LIVING_DOCS_CHECKLIST.md, WORKER_SUMMARY.md. "
+        "Do not modify main repo. Do not deploy. Do not use IAM, secret, database, DNS, firewall, billing, or GCloud mutate."
+    )
+
+def main():
+    qpath = STATE / "task_queue.json"
+    wpath = STATE / "workers.json"
+    spath = STATE / "system_state.json"
+
+    queue = load_json(qpath, {"tasks": []})
+    workers = load_json(wpath, {"workers": []})
+    state = load_json(spath, {})
+
+    tasks = queue.setdefault("tasks", [])
+    existing = {t.get("id") for t in tasks}
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+    recovered = 0
+    stale = 0
+    retry_created = 0
+    details = []
+
+    for task in list(tasks):
+        tid = str(task.get("id", ""))
+        if not tid.startswith(PREFIXES):
+            continue
+
+        status = str(task.get("status", ""))
+        worker = task.get("assigned_worker")
+        title = task.get("title") or tid
+
+        workspace = task.get("workspace") or ""
+        if not workspace:
+            found = find_workspace(tid, worker)
+            workspace = str(found) if found else ""
+
+        files = created_files(workspace)
+        active = task_has_process(tid)
+
+        if len(files) >= 4:
+            task["status"] = "PROPOSAL_DONE"
+            task["result"] = "proposal_done_not_applied_not_production"
+            task["delivery_level"] = "PROPOSAL_DONE"
+            task["workspace"] = workspace
+            task["repo_applied"] = False
+            task["staging_deployed"] = False
+            task["production_deployed"] = False
+            task["updated_at"] = now()
+            recovered += 1
+            details.append(f"{tid}|PROPOSAL_DONE|files={len(files)}")
+            continue
+
+        if status in ["RUNNING", "ASSIGNED"] and not active:
+            task["status"] = "FAILED_NO_PROPOSAL"
+            task["result"] = "stale_without_active_codex_process"
+            task["delivery_level"] = "FAILED_NO_PROPOSAL"
+            task["repo_applied"] = False
+            task["staging_deployed"] = False
+            task["production_deployed"] = False
+            task["updated_at"] = now()
+            stale += 1
+            status = "FAILED_NO_PROPOSAL"
+            details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
+
+        if status in ["FAILED", "FAILED_NO_PROPOSAL"]:
+            reason = classify_failure(workspace)
+            task["failure_class"] = reason
+            task["delivery_level"] = "FAILED_NO_PROPOSAL"
+            task["repo_applied"] = False
+            task["staging_deployed"] = False
+            task["production_deployed"] = False
+
+            retries = int(task.get("recovery_retry_count", 0) or 0)
+            if retries < 2 and retry_created < 6:
+                retry_id = f"RECOVERY-{run_id}-{safe_id(tid)}-R{retries + 1}"
+                if retry_id not in existing:
+                    retry_worker = choose_worker(title)
+                    tasks.append({
+                        "id": retry_id,
+                        "title": "Recovery: " + str(title)[:80],
+                        "description": retry_description(task, reason),
+                        "source": "cto_recovery_engine",
+                        "parent_task": tid,
+                        "status": "PENDING",
+                        "risk": "medium",
+                        "assigned_worker": retry_worker,
+                        "created_at": now(),
+                        "updated_at": now(),
+                        "delivery_level": "BACKLOG",
+                        "repo_applied": False,
+                        "staging_deployed": False,
+                        "production_deployed": False,
+                        "failure_class": reason,
+                    })
+                    existing.add(retry_id)
+                    task["recovery_retry_count"] = retries + 1
+                    task["recovery_retry_task"] = retry_id
+                    retry_created += 1
+                    details.append(f"{tid}|RETRY_CREATED|{retry_id}|reason={reason}")
+
+    for w in workers.get("workers", []):
+        if w.get("status") in ["IDLE", "SLEEPING"] and w.get("current_task"):
+            w["current_task"] = None
+            w["note"] = "recovery_engine_cleanup"
+            w["last_seen"] = now()
+
+    queue["updated_at"] = now()
+    save_json(qpath, queue)
+    save_json(wpath, workers)
+
+    state.update({
+        "phase": "step_23a_task_recovery_engine_active",
+        "task_recovery_engine_active": True,
+        "task_recovery_last_run": now(),
+        "task_recovery_recovered_to_proposal_done": recovered,
+        "task_recovery_normalized_stale": stale,
+        "task_recovery_retry_created": retry_created,
+        "production_deployed": False,
+        "repo_changes_applied": False,
+        "staging_deployed": False,
+        "updated_at": now(),
+    })
+    save_json(spath, state)
+
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    report = REPORTS / "STEP_23A_TASK_RECOVERY_ENGINE_LAST_REPORT.md"
+    report.write_text(
+        "STEP 23A TASK RECOVERY ENGINE REPORT\n\n"
+        f"Recovered to proposal done: {recovered}\n"
+        f"Stale normalized: {stale}\n"
+        f"Retry tasks created: {retry_created}\n"
+        "Production deployed: false\n"
+        "Repo applied: false\n"
+        "Staging deployed: false\n\n"
+        + "\n".join(details[:120]) + "\n",
+        encoding="utf-8",
+    )
+
+    LOGS.mkdir(parents=True, exist_ok=True)
+    with (LOGS / "task_recovery_engine.log").open("a", encoding="utf-8") as f:
+        f.write(now() + f" recovered={recovered} stale={stale} retry={retry_created}\n")
+
+    try:
+        subprocess.run(["python3", "supervisor/supervisor_cli.py", "dispatch"], cwd=str(APP), timeout=30, text=True, capture_output=True)
+        subprocess.run(["python3", "supervisor/lifecycle_manager.py", "wake-now"], cwd=str(APP), timeout=30, text=True, capture_output=True)
+    except Exception:
+        pass
+
+    print("RECOVERY=OK")
+    print("RECOVERED_TO_PROPOSAL_DONE=" + str(recovered))
+    print("NORMALIZED_STALE=" + str(stale))
+    print("RETRY_CREATED=" + str(retry_created))
+    print("PHASE=" + state["phase"])
+
+if __name__ == "__main__":
+    main()

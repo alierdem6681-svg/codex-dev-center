@@ -1,0 +1,12 @@
+{
+  "actions": [
+    {
+      "id": "validate_living_documentation",
+      "label": "Living Documentation Doğrula",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false
+    }
+  ],
+  "updated_at": "2026-06-01T10:38:49.548373+00:00"
+}

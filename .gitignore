@@ -1,0 +1,39 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*secret*
+*token*
+*credential*
+*credentials*
+*service-account*.json
+
+# Runtime state and generated data
+state/
+logs/
+workspaces/
+backups/
+tmp/
+*.tmp
+*.log
+*.ndjson
+*.sqlite
+*.db
+
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Archives / large artifacts
+*.tar.gz
+*.zip
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,9 @@
+{
+  "id": "agent_onboarding",
+  "name": "Agent Onboarding / Project Learning Map",
+  "status": "active",
+  "risk": "low",
+  "description": "Hafızasız yeni ajanın projeyi öğrenmesi için başlangıç haritası ve prompt.",
+  "enabled": true,
+  "dashboard_visible": true
+}

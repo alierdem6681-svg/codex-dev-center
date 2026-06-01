@@ -1,0 +1,64 @@
+{
+  "updated_at": "2026-06-01T09:59:49.684783+00:00",
+  "global": {
+    "new_modules_must_register_in_dashboard": true,
+    "new_modules_must_have_settings": true,
+    "new_modules_must_have_actions": true,
+    "new_modules_must_write_audit_log": true,
+    "new_modules_must_update_handover": true,
+    "new_modules_must_update_roadmap": true
+  },
+  "dashboard": {
+    "live_update": true,
+    "poll_seconds": 2,
+    "show_settings_buttons": true,
+    "show_action_buttons": true
+  },
+  "supervisor": {
+    "auto_dispatch_low_risk": true,
+    "auto_dispatch_medium_risk": true,
+    "high_risk_requires_approval": true,
+    "critical_risk_requires_approval": true
+  },
+  "workers": {
+    "worker_count": 4,
+    "restart_on_failure": true,
+    "safe_mode": true,
+    "codex_execution_enabled": false
+  },
+  "telegram": {
+    "enabled": false,
+    "raw_input_passthrough": true,
+    "non_mutating_output_guard": true,
+    "send_long_code_outputs": false,
+    "send_terminal_dumps": false,
+    "send_diff_outputs": false,
+    "token_configured": false
+  },
+  "codex_execution": {
+    "enabled": false,
+    "unattended_execution_enabled": false,
+    "requires_task_isolation": true,
+    "requires_log_capture": true,
+    "requires_output_guard": true,
+    "requires_test_before_done": true
+  },
+  "deploy_pipeline": {
+    "staging_enabled": false,
+    "production_enabled": false,
+    "production_requires_explicit_approval": true,
+    "rollback_required": true,
+    "database_migration_requires_approval": true
+  },
+  "backup_recovery": {
+    "manual_backup_enabled": true,
+    "auto_backup_before_package": true,
+    "verify_backup_after_create": true
+  },
+  "security_approval": {
+    "approval_gate_enabled": true,
+    "high_risk_approval_required": true,
+    "critical_risk_approval_required": true,
+    "three_word_confirmation_required": true
+  }
+}

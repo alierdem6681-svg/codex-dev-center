@@ -1,0 +1,224 @@
+{
+  "updated_at": "2026-06-01T10:39:55.700706+00:00",
+  "modules": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard / Control Center",
+      "status": "active",
+      "risk": "low",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Canlı izleme, ayarlar ve kontrol paneli.",
+      "actions": [
+        "refresh_dashboard",
+        "update_dashboard_settings",
+        "restart_panel"
+      ]
+    },
+    {
+      "id": "supervisor",
+      "name": "CTO / Supervisor",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Görev kuyruğu, worker dağıtımı ve sistem koordinasyonu.",
+      "actions": [
+        "add_task",
+        "dispatch_tasks",
+        "view_status"
+      ]
+    },
+    {
+      "id": "workers",
+      "name": "Worker Fleet",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "worker-1..4 servisleri, görev işleme ve log üretimi.",
+      "actions": [
+        "start_worker",
+        "stop_worker",
+        "restart_worker",
+        "view_worker_logs"
+      ]
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram Bridge",
+      "status": "planned",
+      "risk": "high",
+      "settings_enabled": true,
+      "actions_enabled": false,
+      "dashboard_visible": true,
+      "description": "Raw input passthrough ve non-mutating output guard ile Telegram bağlantısı.",
+      "actions": [
+        "connect_telegram",
+        "test_telegram",
+        "toggle_telegram_notifications"
+      ]
+    },
+    {
+      "id": "codex_execution",
+      "name": "Codex Task Execution",
+      "status": "framework_ready_locked",
+      "risk": "high",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Codex CLI görev yürütme framework hazır; çalıştırma onay kapısına bağlı.",
+      "actions": [
+        "run_codex_task",
+        "review_codex_output",
+        "approve_codex_execution"
+      ]
+    },
+    {
+      "id": "deploy_pipeline",
+      "name": "Deploy Pipeline",
+      "status": "planned_locked",
+      "risk": "critical",
+      "settings_enabled": true,
+      "actions_enabled": false,
+      "dashboard_visible": true,
+      "description": "Staging, test, production deploy ve rollback.",
+      "actions": [
+        "deploy_staging",
+        "request_production_approval",
+        "deploy_production",
+        "rollback"
+      ]
+    },
+    {
+      "id": "backup_recovery",
+      "name": "Backup / Recovery",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Yedekleme, geri dönüş ve devir teslim arşivleri.",
+      "actions": [
+        "create_backup",
+        "list_backups",
+        "verify_backup"
+      ]
+    },
+    {
+      "id": "security_approval",
+      "name": "Security / Approval Gates",
+      "status": "active",
+      "risk": "critical",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Yüksek riskli işlemler için onay kapıları.",
+      "actions": [
+        "create_approval_request",
+        "approve_action",
+        "reject_action"
+      ]
+    },
+    {
+      "id": "cto_authority",
+      "name": "CTO Full GCloud Authority",
+      "status": "policy_defined_locked",
+      "risk": "critical",
+      "settings_enabled": true,
+      "actions_enabled": false,
+      "dashboard_visible": true,
+      "description": "CTO GCloud genel yetki hedefi. Gercek IAM yetkisi henuz verilmedi."
+    },
+    {
+      "id": "modular_architecture",
+      "name": "Modular Architecture Enforcement",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Tum ozellikleri bagimsiz moduller halinde gelistirme standardi."
+    },
+    {
+      "id": "worker_lifecycle",
+      "name": "Worker Sleep/Wake Lifecycle",
+      "status": "policy_defined",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Workerlari kuyruk bosken uyutma, is gelince uyandirma politikasi."
+    },
+    {
+      "id": "drift_control",
+      "name": "Drift Control / Goal Alignment",
+      "status": "policy_defined",
+      "risk": "high",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Worker sapmasini, kotu kodu ve hedef disina cikmayi engelleme politikasi."
+    },
+    {
+      "id": "codex_quality_gate",
+      "name": "Codex Quality Gate",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Codex çalışmadan önce preflight, test suite ve diff raporu üretir.",
+      "actions": [
+        "codex_preflight",
+        "codex_test_suite",
+        "codex_diff_report",
+        "codex_gate_status"
+      ]
+    },
+    {
+      "id": "agent_onboarding",
+      "name": "Agent Onboarding / Project Learning Map",
+      "status": "active",
+      "risk": "low",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Yeni ajan başlangıç haritası ve ilk prompt.",
+      "actions": [
+        "validate_agent_onboarding",
+        "copy_new_agent_prompt"
+      ]
+    },
+    {
+      "id": "service_recovery",
+      "name": "Service Recovery / Self-Healing",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "VM reboot ve servis arızalarında sistemi otomatik ayağa kaldırır.",
+      "actions": [
+        "run_service_health_check",
+        "restart_failed_services"
+      ]
+    },
+    {
+      "id": "living_documentation_guard",
+      "name": "Living Documentation Guard",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Her geliştirme paketi sonunda yaşayan dokümantasyonun güncel tutulmasını zorunlu kılar.",
+      "actions": [
+        "validate_living_documentation"
+      ]
+    }
+  ]
+}

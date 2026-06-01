@@ -1,0 +1,10 @@
+{
+  "staging_enabled": false,
+  "production_enabled": false,
+  "production_requires_explicit_approval": true,
+  "rollback_required": true,
+  "database_migration_requires_approval": true,
+  "dns_change_requires_approval": true,
+  "secret_access_requires_approval": true,
+  "updated_at": "2026-06-01T10:02:50.938486+00:00"
+}

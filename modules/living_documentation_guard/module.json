@@ -1,0 +1,10 @@
+{
+  "id": "living_documentation_guard",
+  "name": "Living Documentation Guard",
+  "status": "active",
+  "risk": "medium",
+  "description": "Her geliştirme paketi sonunda yaşayan dokümantasyonun güncel tutulmasını zorunlu kılar.",
+  "enabled": true,
+  "dashboard_visible": true,
+  "updated_at": "2026-06-01T10:38:49.548030+00:00"
+}
