@@ -18,6 +18,8 @@ SYSTEM_STATE_PATH = STATE / "system_state.json"
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
 POLL_SECONDS = 5
 SLEEP_AFTER_IDLE_CYCLES = 4
+ACTIVE_TASK_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
+APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -81,10 +83,17 @@ def update_worker_state(worker_id, status, note=""):
 def queue_counts():
     q = read_json(QUEUE_PATH, {"tasks": []})
     tasks = q.get("tasks", [])
-    pending = [t for t in tasks if t.get("status") in ("PENDING", "QUEUED", "ASSIGNED")]
-    running = [t for t in tasks if t.get("status") == "RUNNING"]
+    worker_tasks = [t for t in tasks if is_worker_eligible_task(t)]
+    pending = [t for t in worker_tasks if str(t.get("status", "")).upper() in ("PENDING", "QUEUED", "ASSIGNED")]
+    running = [t for t in worker_tasks if str(t.get("status", "")).upper() == "RUNNING"]
     active = pending + running
     return len(pending), len(running), len(active)
+
+def is_worker_eligible_task(task):
+    status = str(task.get("status", "")).upper()
+    source = str(task.get("source", "")).lower()
+    risk = str(task.get("risk") or task.get("risk_level") or "low").upper()
+    return status in ACTIVE_TASK_STATUSES and source != "telegram" and risk not in APPROVAL_RISKS
 
 def dispatch():
     try:

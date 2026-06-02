@@ -19,6 +19,8 @@ SERVICES = [
     "codex-worker-3",
     "codex-worker-4",
 ]
+ACTIVE_TASK_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
+APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -64,7 +66,13 @@ def write_json(path, data):
 
 def queue_has_active_tasks():
     q = read_json(STATE / "task_queue.json", {"tasks": []})
-    return any(t.get("status") in ("PENDING", "QUEUED", "ASSIGNED", "RUNNING") for t in q.get("tasks", []))
+    return any(is_worker_eligible_task(t) for t in q.get("tasks", []))
+
+def is_worker_eligible_task(task):
+    status = str(task.get("status", "")).upper()
+    source = str(task.get("source", "")).lower()
+    risk = str(task.get("risk") or task.get("risk_level") or "low").upper()
+    return status in ACTIVE_TASK_STATUSES and source != "telegram" and risk not in APPROVAL_RISKS
 
 def lifecycle(command):
     rc, out, err = run(["python3", "supervisor/lifecycle_manager.py", command], timeout=60)

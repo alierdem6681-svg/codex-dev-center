@@ -214,7 +214,10 @@ Eklenenler:
 - Deploy ve VM smoke workflow'larında worker lifecycle kapısı.
 
 Yeni davranis:
-- Kuyrukta aktif görev varsa en az bir worker servisinin aktif olması zorunludur.
-- Kuyruk boşsa worker servislerinin sleeping/inactive olması beklenen idle davranış olarak kabul edilir.
+- Kuyrukta worker-eligible aktif görev varsa en az bir worker servisinin aktif olması zorunludur.
+- `source=telegram` görevleri CTO tarafına ayrıldığı için worker uyandırma sebebi sayılmaz.
+- Yüksek/kritik risk görevleri approval beklediği için worker uyandırma sebebi sayılmaz.
+- Kuyrukta worker-eligible görev yoksa worker servislerinin sleeping/inactive olması beklenen idle davranış olarak kabul edilir.
+- Deploy smoke kapısı gerekirse recovery + lifecycle wake dener ve tekrar ölçer.
 - `IDLE`, `SLEEPING` veya `STOPPED` worker üstünde `current_task` dolu kalırsa kapı fail olur.
 - `RUNNING` worker current_task taşırken servis aktif değilse kapı fail olur.
