@@ -194,3 +194,11 @@ Eklenenler:
 Amaç:
 - CTO task-to-deploy zinciri için güvenli, küçük ve non-destructive bir dashboard/pipeline marker değişikliğini PR/merge/deploy akışından geçirmek.
 - Son deploy run ID, commit, runner, smoke, backup ve zincir test sonucunu dashboard görünürlüğüne almak.
+
+Canli dogrulama:
+- Deploy run: `26814905600` PASS.
+- Post-deploy smoke run: `26814934445` PASS.
+- Public health: `http://34.185.153.184:8080/health` 200.
+- Login page: `http://34.185.153.184:8080/login` 200.
+- Dashboard `Pipeline Gözlemi`: PASS.
+- Runtime marker: `pipeline_status.task_to_deploy_test=PASS`.
