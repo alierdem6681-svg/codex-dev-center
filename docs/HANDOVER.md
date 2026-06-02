@@ -161,3 +161,19 @@ Beklenen sonuc:
 - Local/controller production deploy denemesi GitHub Actions disinda `github_actions_workflow_required` blocker'i ile durur.
 - GitHub Actions workflow'u backup, validate, runtime sync, service restart ve smoke check adimlarini self-hosted runner uzerinden yurutur.
 - Bu paket production deploy calistirmadi; sadece repo, policy ve workflow hazirligi yapildi.
+
+---
+
+## Panel First User Bootstrap Workflow v1
+
+Tarih: 2026-06-02
+
+Eklenenler:
+- `.github/workflows/bootstrap-panel-user.yml`
+
+Yeni davranis:
+- Ilk panel kullanicisi VM'ye SSH kullanmadan GitHub Actions self-hosted runner uzerinden olusturulur.
+- Workflow adi `Bootstrap Panel User`.
+- Confirm alani `BOOTSTRAP-PANEL-USER` ister.
+- Kullanici adi ve sifre repo'ya yazilmaz; `CODEX_PANEL_BOOTSTRAP_USERNAME` ve `CODEX_PANEL_BOOTSTRAP_PASSWORD` GitHub Secrets uzerinden okunur.
+- Workflow auth state'i runtime `state/panel_auth.json` icinde PBKDF2 hash olarak olusturur, `codex-panel` servisini restart eder ve login smoke check calistirir.

@@ -1,0 +1,130 @@
+name: Bootstrap Panel User
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type BOOTSTRAP-PANEL-USER to create the first panel user"
+        required: true
+        type: string
+
+concurrency:
+  group: codex-dev-center-panel-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Bootstrap panel user on codex-dev-center-01
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    env:
+      CONFIRM_PHRASE: BOOTSTRAP-PANEL-USER
+      VM_TARGET: codex-dev-center-01
+      RUNTIME_DIR: /opt/codex-dev-center
+      DASHBOARD_URL: http://127.0.0.1:8080
+      PANEL_USERNAME: ${{ secrets.CODEX_PANEL_BOOTSTRAP_USERNAME }}
+      PANEL_PASSWORD: ${{ secrets.CODEX_PANEL_BOOTSTRAP_PASSWORD }}
+
+    steps:
+      - name: Confirm bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirm }}" != "$CONFIRM_PHRASE" ]; then
+            echo "Confirmation text is wrong. Bootstrap stopped."
+            exit 1
+          fi
+
+      - name: Validate runner target
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="$(hostname)"
+          echo "Runner name: ${RUNNER_NAME:-unknown}"
+          echo "Host: $host"
+          if [ "${RUNNER_NAME:-}" != "$VM_TARGET" ] && [ "$host" != "$VM_TARGET" ]; then
+            echo "This workflow must run on $VM_TARGET."
+            exit 1
+          fi
+
+      - name: Validate bootstrap secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PANEL_USERNAME"
+          test -n "$PANEL_PASSWORD"
+          if [ "${#PANEL_PASSWORD}" -lt 8 ]; then
+            echo "Bootstrap password is too short."
+            exit 1
+          fi
+
+      - name: Create first user
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNTIME_DIR"
+          python3 - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path(os.environ["RUNTIME_DIR"]).resolve()
+          sys.path.insert(0, str(root / "web_panel"))
+          import auth  # noqa: E402
+
+          expected_username = os.environ["PANEL_USERNAME"].strip()
+          if auth.AUTH_FILE.exists():
+              state = auth.public_auth_state()
+              if state.get("username") == expected_username:
+                  print("panel_user=already_configured")
+                  raise SystemExit(0)
+              raise SystemExit("auth_already_configured_with_different_username")
+
+          auth.setup_user(expected_username, os.environ["PANEL_PASSWORD"])
+          print("panel_user=created")
+          PY
+
+      - name: Restart panel service
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo systemctl restart codex-panel
+          systemctl is-active codex-panel
+
+      - name: Login smoke check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          payload = json.dumps(
+              {
+                  "username": os.environ["PANEL_USERNAME"],
+                  "password": os.environ["PANEL_PASSWORD"],
+              }
+          ).encode("utf-8")
+          request = urllib.request.Request(
+              os.environ["DASHBOARD_URL"] + "/api/auth/login",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              body = response.read().decode("utf-8", errors="replace")
+              if response.status != 200:
+                  raise SystemExit(f"login_status={response.status}")
+              data = json.loads(body)
+              if not data.get("ok"):
+                  raise SystemExit("login_not_ok")
+          print("login_smoke=PASS")
+          PY
+
+      - name: Health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 5 "$DASHBOARD_URL/health" >/tmp/codex-panel-health.json
+          cat /tmp/codex-panel-health.json
