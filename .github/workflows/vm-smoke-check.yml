@@ -6,6 +6,9 @@ on:
 jobs:
   smoke:
     runs-on: [self-hosted, Linux, X64]
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      RUNTIME_DIR: /opt/codex-dev-center
 
     steps:
       - name: Checkout repository
@@ -51,3 +54,36 @@ jobs:
           curl -fsS --max-time 10 http://127.0.0.1:8080/login >/tmp/codex-smoke-login.html
           grep -q "Kullanıcı adı" /tmp/codex-smoke-login.html
           grep -q "Şifre" /tmp/codex-smoke-login.html
+
+      - name: Record smoke status
+        run: |
+          set -e
+          mkdir -p "$RUNTIME_DIR/state"
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          state = Path(os.environ["RUNTIME_DIR"]) / "state"
+          now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+          path = state / "github_actions_status.json"
+          try:
+              payload = json.loads(path.read_text(encoding="utf-8-sig"))
+          except Exception:
+              payload = {}
+          payload.update(
+              {
+                  "updated_at": now,
+                  "runner_name": os.environ.get("RUNNER_NAME", ""),
+                  "last_smoke_status": "PASS",
+                  "last_smoke_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+                  "last_smoke_run_url": f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}",
+                  "last_smoke_commit": os.environ.get("GITHUB_SHA", ""),
+                  "last_smoke_at": now,
+              }
+          )
+          tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+          tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          tmp.replace(path)
+          PY

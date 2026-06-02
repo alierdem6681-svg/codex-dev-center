@@ -106,6 +106,24 @@ def json_validation(results: dict[str, Any]) -> None:
     record(results, "json_validation", not errors and checked > 0, {"checked": checked, "errors": errors})
 
 
+def yaml_workflow_validation(results: dict[str, Any]) -> None:
+    errors: list[dict[str, str]] = []
+    checked = 0
+    workflow_dir = ROOT / ".github" / "workflows"
+    if workflow_dir.exists():
+        for path in sorted(workflow_dir.glob("*.yml")):
+            checked += 1
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if "\t" in text:
+                errors.append({"file": str(path.relative_to(ROOT)), "error": "tab_character"})
+            for key in ["name:", "on:", "jobs:"]:
+                if key not in text:
+                    errors.append({"file": str(path.relative_to(ROOT)), "error": f"missing_{key.rstrip(':')}"})
+            if "runs-on:" not in text:
+                errors.append({"file": str(path.relative_to(ROOT)), "error": "missing_runs_on"})
+    record(results, "yaml_validation", checked > 0 and not errors, {"checked": checked, "errors": errors})
+
+
 def import_smoke(results: dict[str, Any]) -> None:
     errors = []
     modules = [
@@ -179,6 +197,9 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Deploy Komutları",
         "Kalite Kapıları",
         "Çıkış",
+        "Pipeline Gözlemi",
+        "Runner",
+        "Run ID",
     ]
     missing = [item for item in required_text if item not in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
@@ -340,6 +361,7 @@ def run_suite() -> dict[str, Any]:
     unit_and_integration(results)
     python_compile(results)
     json_validation(results)
+    yaml_workflow_validation(results)
     import_smoke(results)
     required_file_regression(results)
     worker_queue_recovery(results)

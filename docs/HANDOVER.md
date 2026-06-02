@@ -177,3 +177,20 @@ Yeni davranis:
 - Confirm alani `BOOTSTRAP-PANEL-USER` ister.
 - Kullanici adi ve sifre repo'ya yazilmaz; `CODEX_PANEL_BOOTSTRAP_USERNAME` ve `CODEX_PANEL_BOOTSTRAP_PASSWORD` GitHub Secrets uzerinden okunur.
 - Workflow auth state'i runtime `state/panel_auth.json` icinde PBKDF2 hash olarak olusturur, `codex-panel` servisini restart eder ve login smoke check calistirir.
+
+---
+
+## Pipeline Observability + QA Hardening v1
+
+Tarih: 2026-06-02
+
+Eklenenler:
+- Dashboard `Pipeline Gözlemi` bölümü.
+- Runtime `state/github_actions_status.json` ve `state/pipeline_status.json` okuma desteği.
+- Deploy workflow YAML sanity, forbidden executable scan, backup file validation, public health/login, unauthorized/authorized API behavior check ve runtime pipeline state yazımı.
+- VM Smoke Check workflow runtime smoke state yazımı.
+- Production readiness suite `yaml_validation` kapısı.
+
+Amaç:
+- CTO task-to-deploy zinciri için güvenli, küçük ve non-destructive bir dashboard/pipeline marker değişikliğini PR/merge/deploy akışından geçirmek.
+- Son deploy run ID, commit, runner, smoke, backup ve zincir test sonucunu dashboard görünürlüğüne almak.
