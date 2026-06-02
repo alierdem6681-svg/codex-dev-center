@@ -11,9 +11,10 @@ from typing import Any
 try:
     from .cto_task_router import normalize_queue
     from .task_status_constants import (
-        ACTIVE_TASK_STATUSES,
-        append_audit,
-        atomic_write_json,
+    ACTIVE_TASK_STATUSES,
+    TERMINAL_TASK_STATUSES,
+    append_audit,
+    atomic_write_json,
         is_worker_eligible_task,
         normalize_status,
         read_json,
@@ -23,9 +24,10 @@ try:
 except ImportError:
     from cto_task_router import normalize_queue
     from task_status_constants import (
-        ACTIVE_TASK_STATUSES,
-        append_audit,
-        atomic_write_json,
+    ACTIVE_TASK_STATUSES,
+    TERMINAL_TASK_STATUSES,
+    append_audit,
+    atomic_write_json,
         is_worker_eligible_task,
         normalize_status,
         read_json,
@@ -71,9 +73,39 @@ def queue_summary(root: Path) -> dict[str, Any]:
     }
 
 
+def reconcile_workers(root: Path, fix: bool = False) -> dict[str, Any]:
+    queue = read_json(root / "state" / "task_queue.json", {"tasks": []})
+    workers = read_json(root / "state" / "workers.json", {"workers": []})
+    task_by_id = {task.get("id"): task for task in queue.get("tasks", []) if isinstance(task, dict)}
+    stale = []
+    for worker in workers.get("workers", []):
+        task_id = worker.get("current_task")
+        if not task_id:
+            continue
+        task = task_by_id.get(task_id)
+        status = normalize_status(task.get("status")) if task else ""
+        if not task or status in TERMINAL_TASK_STATUSES:
+            stale.append(
+                {
+                    "worker": worker.get("id"),
+                    "current_task": task_id,
+                    "task_status": status or "missing",
+                }
+            )
+            if fix:
+                worker["status"] = "IDLE"
+                worker["current_task"] = None
+                worker["note"] = "cto_doctor_reconciled_terminal_task"
+                worker["last_seen"] = utc_now()
+    if fix and stale:
+        atomic_write_json(root / "state" / "workers.json", workers)
+    return {"stale_worker_task_refs": stale, "fixed": bool(fix and stale)}
+
+
 def evaluate(root: Path, fix: bool = False) -> dict[str, Any]:
     normalize_result = normalize_queue(root, fix=fix)
     summary = queue_summary(root)
+    worker_reconcile = reconcile_workers(root, fix=fix)
     services = {name: service_status(name) for name in [*CORE_SERVICES, *WORKER_SERVICES]}
     router_state = read_json(root / "state" / "cto_router_state.json", {})
     telegram_config = read_json(root / "state" / "telegram_config.json", {})
@@ -88,6 +120,8 @@ def evaluate(root: Path, fix: bool = False) -> dict[str, Any]:
         warnings.append("runtime_has_git_metadata")
     if summary["lowercase_statuses"]:
         warnings.append("queue_has_lowercase_statuses")
+    if worker_reconcile["stale_worker_task_refs"]:
+        warnings.append("worker_stale_terminal_task_refs")
     if telegram_config.get("enabled") is False and telegram_config.get("direct_cto_mode") is True:
         warnings.append("telegram_enabled_false_but_direct_cto_mode_true")
 
@@ -98,6 +132,7 @@ def evaluate(root: Path, fix: bool = False) -> dict[str, Any]:
         "fix": fix,
         "normalize_result": normalize_result,
         "queue": summary,
+        "worker_reconcile": worker_reconcile,
         "services": services,
         "router_state": router_state,
         "runtime_git_metadata_present": has_git_metadata,

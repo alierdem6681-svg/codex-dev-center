@@ -138,7 +138,20 @@ def finish_task(task_id: str, worker_id: str, status: str, result: str, report_p
 
     queue["updated_at"] = now()
     write_json(QUEUE_PATH, queue)
-    update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {status}")
+
+    workers = read_json(WORKERS_PATH, {"workers": []})
+    found_executor = False
+    for worker in workers.get("workers", []):
+        if worker.get("id") == worker_id:
+            found_executor = True
+        if worker.get("id") == worker_id or worker.get("current_task") == task_id:
+            worker["status"] = "IDLE"
+            worker["current_task"] = None
+            worker["last_seen"] = now()
+            worker["note"] = f"Last task {task_id}: {status}"
+    write_json(WORKERS_PATH, workers)
+    if not found_executor:
+        update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {status}")
 
 def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str]:
     import subprocess
