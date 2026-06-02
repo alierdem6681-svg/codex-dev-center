@@ -124,4 +124,4 @@ Faz 19B-10A Model Policy
 - [x] Deploy workflow unauthorized/authorized API davranisini dogrular.
 - [x] Runtime `github_actions_status.json` ve `pipeline_status.json` state dosyalari dashboard'a baglandi.
 - [x] Production readiness suite `yaml_validation` kapisi eklendi.
-- [ ] Bu paket PR/merge/deploy akisi ile canli dashboard'da dogrulandi.
+- [x] Bu paket PR/merge/deploy akisi ile canli dashboard'da dogrulandi.
