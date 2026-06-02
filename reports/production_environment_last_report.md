@@ -1,10 +1,10 @@
 # Production Environment Last Report
 
-Generated at: 2026-06-02T08:45:21+00:00
-Kind: rollback
+Generated at: 2026-06-02T08:46:45+00:00
+Kind: smoke_test
 Status: PASS
 Scope: production
-Dry run: True
+Dry run: False
 
 ## Safety
 - Secret/IAM/database/DNS/firewall/billing/Google Ads mutate performed: false
