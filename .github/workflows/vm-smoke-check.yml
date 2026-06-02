@@ -34,9 +34,9 @@ jobs:
         run: |
           set -e
           echo "===== SERVICES ====="
-          systemctl is-active codex-panel || true
-          systemctl is-active codex-lifecycle || true
-          systemctl is-active codex-watchdog || true
+          systemctl is-active codex-panel
+          systemctl is-active codex-lifecycle
+          systemctl is-active codex-watchdog
           systemctl is-active codex-worker-1 || true
           systemctl is-active codex-worker-2 || true
           systemctl is-active codex-worker-3 || true
@@ -46,4 +46,8 @@ jobs:
         run: |
           set -e
           echo "===== LOCAL DASHBOARD ====="
-          curl -I http://127.0.0.1:8080 || true
+          curl -fsS --max-time 5 http://127.0.0.1:8080/health >/tmp/codex-smoke-health.json
+          cat /tmp/codex-smoke-health.json
+          curl -fsS --max-time 10 http://127.0.0.1:8080/login >/tmp/codex-smoke-login.html
+          grep -q "Kullanıcı adı" /tmp/codex-smoke-login.html
+          grep -q "Şifre" /tmp/codex-smoke-login.html
