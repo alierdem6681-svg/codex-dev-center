@@ -14,6 +14,8 @@ from typing import Any
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
+DEFAULT_SOURCE_ROOT = Path("/home/alierdem6681/codex-dev-center-github-export")
+SOURCE_ROOT = Path(os.environ.get("CODEX_DEV_CENTER_SOURCE", DEFAULT_SOURCE_ROOT)).resolve()
 STATE = ROOT / "state"
 REPORTS = ROOT / "reports"
 
@@ -69,6 +71,18 @@ def run_cmd(cmd: list[str], timeout: int = 120) -> dict[str, Any]:
         return {"ok": False, "returncode": 1, "stdout": "", "stderr": str(exc), "cmd": " ".join(cmd)}
 
 
+def source_path(rel: str) -> Path:
+    runtime_path = ROOT / rel
+    if runtime_path.exists():
+        return runtime_path
+    candidate = SOURCE_ROOT / rel
+    return candidate if candidate.exists() else runtime_path
+
+
+def path_exists(rel: str) -> bool:
+    return source_path(rel).exists()
+
+
 def iter_repo_text_files():
     for path in ROOT.rglob("*"):
         if not path.is_file():
@@ -109,18 +123,18 @@ def json_validation(results: dict[str, Any]) -> None:
 def yaml_workflow_validation(results: dict[str, Any]) -> None:
     errors: list[dict[str, str]] = []
     checked = 0
-    workflow_dir = ROOT / ".github" / "workflows"
+    workflow_dir = source_path(".github/workflows")
     if workflow_dir.exists():
         for path in sorted(workflow_dir.glob("*.yml")):
             checked += 1
             text = path.read_text(encoding="utf-8", errors="replace")
             if "\t" in text:
-                errors.append({"file": str(path.relative_to(ROOT)), "error": "tab_character"})
+                errors.append({"file": str(path.relative_to(workflow_dir.parent.parent)), "error": "tab_character"})
             for key in ["name:", "on:", "jobs:"]:
                 if key not in text:
-                    errors.append({"file": str(path.relative_to(ROOT)), "error": f"missing_{key.rstrip(':')}"})
+                    errors.append({"file": str(path.relative_to(workflow_dir.parent.parent)), "error": f"missing_{key.rstrip(':')}"})
             if "runs-on:" not in text:
-                errors.append({"file": str(path.relative_to(ROOT)), "error": "missing_runs_on"})
+                errors.append({"file": str(path.relative_to(workflow_dir.parent.parent)), "error": "missing_runs_on"})
     record(results, "yaml_validation", checked > 0 and not errors, {"checked": checked, "errors": errors})
 
 
@@ -171,7 +185,7 @@ def required_file_regression(results: dict[str, Any]) -> None:
         "state_templates/github_safe_flow_policy.json",
         "web_panel/static/index.html",
     ]
-    missing = [item for item in required if not (ROOT / item).exists()]
+    missing = [item for item in required if not path_exists(item)]
     record(results, "regression_test", not missing, {"missing": missing})
 
 
@@ -314,7 +328,7 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     ]
     missing_commands = [key for key in required_commands if not commands.get(key)]
     execute_default = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", ""))
-    workflow = ROOT / ".github/workflows/deploy-vm.yml"
+    workflow = source_path(".github/workflows/deploy-vm.yml")
     workflow_text = workflow.read_text(encoding="utf-8", errors="replace") if workflow.exists() else ""
     workflow_ok = (
         "name: Deploy to VM" in workflow_text

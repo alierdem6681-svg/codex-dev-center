@@ -3,6 +3,25 @@ import json, os, time, subprocess
 from pathlib import Path
 from datetime import datetime, timezone
 
+try:
+    from .task_status_constants import (
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_PENDING,
+        TASK_STATUS_PROPOSAL_DONE,
+        normalize_queue_payload,
+        normalize_status,
+    )
+except ImportError:
+    from task_status_constants import (
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_PENDING,
+        TASK_STATUS_PROPOSAL_DONE,
+        normalize_queue_payload,
+        normalize_status,
+    )
+
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 REPORTS = APP / "reports"
@@ -125,6 +144,7 @@ def main():
     spath = STATE / "system_state.json"
 
     queue = load_json(qpath, {"tasks": []})
+    queue, _changes = normalize_queue_payload(queue)
     workers = load_json(wpath, {"workers": []})
     state = load_json(spath, {})
 
@@ -142,7 +162,7 @@ def main():
         if not tid.startswith(PREFIXES):
             continue
 
-        status = str(task.get("status", ""))
+        status = normalize_status(task.get("status", ""))
         worker = task.get("assigned_worker")
         title = task.get("title") or tid
 
@@ -155,9 +175,9 @@ def main():
         active = task_has_process(tid)
 
         if len(files) >= 4:
-            task["status"] = "PROPOSAL_DONE"
+            task["status"] = TASK_STATUS_PROPOSAL_DONE
             task["result"] = "proposal_done_not_applied_not_production"
-            task["delivery_level"] = "PROPOSAL_DONE"
+            task["delivery_level"] = TASK_STATUS_PROPOSAL_DONE
             task["workspace"] = workspace
             task["repo_applied"] = False
             task["staging_deployed"] = False
@@ -168,21 +188,21 @@ def main():
             continue
 
         if status in ["RUNNING", "ASSIGNED"] and not active:
-            task["status"] = "FAILED_NO_PROPOSAL"
+            task["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
             task["result"] = "stale_without_active_codex_process"
-            task["delivery_level"] = "FAILED_NO_PROPOSAL"
+            task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
             task["repo_applied"] = False
             task["staging_deployed"] = False
             task["production_deployed"] = False
             task["updated_at"] = now()
             stale += 1
-            status = "FAILED_NO_PROPOSAL"
+            status = TASK_STATUS_FAILED_NO_PROPOSAL
             details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
 
-        if status in ["FAILED", "FAILED_NO_PROPOSAL"]:
+        if status in [TASK_STATUS_FAILED, TASK_STATUS_FAILED_NO_PROPOSAL]:
             reason = classify_failure(workspace)
             task["failure_class"] = reason
-            task["delivery_level"] = "FAILED_NO_PROPOSAL"
+            task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
             task["repo_applied"] = False
             task["staging_deployed"] = False
             task["production_deployed"] = False
@@ -198,7 +218,7 @@ def main():
                         "description": retry_description(task, reason),
                         "source": "cto_recovery_engine",
                         "parent_task": tid,
-                        "status": "PENDING",
+                        "status": TASK_STATUS_PENDING,
                         "risk": "medium",
                         "assigned_worker": retry_worker,
                         "created_at": now(),

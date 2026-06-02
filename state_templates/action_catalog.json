@@ -91,6 +91,24 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false
+    },
+    {
+      "id": "cto_doctor_check",
+      "label": "CTO Doktor Kontrolü",
+      "module": "cto_router",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/cto_doctor.py --json"
+    },
+    {
+      "id": "cto_doctor_fix",
+      "label": "CTO Kuyruk Normalizasyonu",
+      "module": "cto_router",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/cto_doctor.py --fix --json"
     }
   ]
 }

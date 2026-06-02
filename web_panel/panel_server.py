@@ -138,6 +138,8 @@ def status_payload():
         "last_smoke_test": read_json(STATE / "last_smoke_test_status.json", {}),
         "deploy_commands": deploy_commands(),
         "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),
+        "cto_router": read_json(STATE / "cto_router_state.json", {}),
+        "cto_doctor": read_json(STATE / "cto_doctor_status.json", {}),
         "reports": sorted([p.name for p in REPORTS.glob("*.md")]) if REPORTS.exists() else [],
         "report_text": {
             "readiness": read_text(REPORTS / "production_readiness_last_report.md"),
@@ -280,6 +282,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if action == "github_safe_flow_dry_run":
             self.send_json(run_cmd([sys.executable, "supervisor/github_safe_flow.py", "dry-run"], 180))
+            return
+        if action == "cto_doctor_check":
+            self.send_json(run_cmd([sys.executable, "supervisor/cto_doctor.py", "--json"], 120))
+            return
+        if action == "cto_doctor_fix":
+            self.send_json(run_cmd([sys.executable, "supervisor/cto_doctor.py", "--fix", "--json"], 120))
             return
         if action == "rollback_simulation":
             self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "rollback", "--dry-run"], 120))

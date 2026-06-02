@@ -10,6 +10,15 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from cto_task_router import submit_task, trigger_lifecycle
+    from task_status_constants import redact_sensitive_text
+except ImportError:
+    submit_task = None
+    trigger_lifecycle = None
+    def redact_sensitive_text(value):
+        return str(value or "")
+
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -256,18 +265,20 @@ def is_long_task_message(text):
 
     return False
 
-def start_async_job(chat_id, raw_text):
+def start_async_job(chat_id, raw_text, router_task_id=None):
     import subprocess
     JOBS = STATE / "direct_cto_jobs"
     JOBS.mkdir(parents=True, exist_ok=True)
     job_id = datetime.now(timezone.utc).strftime("JOB-%Y%m%d-%H%M%S-%f")
     job_file = JOBS / (job_id + ".json")
-    meta = classify_job_metadata(raw_text)
+    safe_text = redact_sensitive_text(raw_text)
+    meta = classify_job_metadata(safe_text)
     job = {
         "id": job_id,
         "status": "QUEUED",
         "chat_id": str(chat_id),
-        "text": raw_text,
+        "text": safe_text,
+        "router_task_id": router_task_id,
         "generic_task_name": meta["name"],
         "estimated_duration": meta["eta"],
         "first_update": meta["first_update"],
@@ -386,6 +397,10 @@ def run_codex(raw_user_message):
 
 def log_inbox(payload):
     LOGS.mkdir(parents=True, exist_ok=True)
+    payload = dict(payload)
+    if "text" in payload:
+        payload["text"] = redact_sensitive_text(payload["text"])
+    payload.pop("raw", None)
     with (LOGS / "direct_cto_inbox.ndjson").open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
@@ -410,20 +425,48 @@ def handle_message(token, expected_chat_id, msg):
         send_message(token, chat_id, "Metin mesajı gönderin.")
         return
 
+    safe_text = redact_sensitive_text(text)
+
     # Açık uygulama/başlatma komutlarında CTO Action Mode devreye girer.
     if is_action_command(text):
-        reply = run_direct_action(text)
+        if submit_task is not None:
+            submit_task(
+                APP,
+                source="telegram",
+                title="Telegram action command",
+                message=safe_text,
+                priority="high",
+                requested_by=from_user,
+                split=False,
+                worker_eligible=False,
+            )
+        reply = run_direct_action(safe_text)
         send_message(token, chat_id, reply)
         return
 
     # Uzun görevlerde Telegram yanıtını bloklama; CTO işi arka planda sürdürür.
     if is_long_task_message(text):
-        start_async_job(chat_id, text)
+        router_task_id = None
+        if submit_task is not None:
+            routed = submit_task(
+                APP,
+                source="telegram",
+                title=classify_job_metadata(safe_text)["name"],
+                message=safe_text,
+                priority="high",
+                requested_by=from_user,
+                split=True,
+                worker_eligible=False,
+            )
+            router_task_id = routed.get("task", {}).get("id")
+            if trigger_lifecycle is not None and routed.get("subtasks"):
+                trigger_lifecycle(APP)
+        start_async_job(chat_id, safe_text, router_task_id=router_task_id)
         send_message(token, chat_id, "Başladım. Kısa bir ilk kontrol yapıp birazdan ilerleme paylaşacağım.")
         return
 
     # Normal kısa mesajda ACK yok. Mesaj doğrudan Codex CTO'ya gider.
-    reply = run_codex(text)
+    reply = run_codex(safe_text)
     send_message(token, chat_id, reply)
 
 def main():

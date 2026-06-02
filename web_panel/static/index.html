@@ -120,6 +120,8 @@
           <button onclick="runAction('rollback_simulation')">Geri Alma Simülasyonu</button>
           <button onclick="runAction('production_deploy_start')">Otomatik Yayına Alma</button>
           <button onclick="runAction('github_safe_flow_dry_run')">GitHub Güvenli Akış</button>
+          <button onclick="runAction('cto_doctor_check')">CTO Doktor</button>
+          <button onclick="runAction('cto_doctor_fix')">Kuyruk Normalize</button>
         </div>
         <div id="pipelineBadges"></div>
       </section>
@@ -267,6 +269,8 @@
         const health = data.last_health_check || {};
         const smoke = data.last_smoke_test || {};
         const github = data.github_safe_flow || {};
+        const router = data.cto_router || {};
+        const doctor = data.cto_doctor || {};
         clock.textContent = new Date().toLocaleTimeString();
         deployMetric.textContent = runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
@@ -289,7 +293,9 @@
           `Zaman: ${actionsState.last_deploy_at || '-'}`,
           `Son smoke: ${actionsState.last_smoke_status || '-'}`,
           `Backup: ${actionsState.last_backup_path ? 'var' : '-'}`,
-          `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`
+          `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`,
+          `CTO router: ${router.enabled ? 'active' : '-'}`,
+          `CTO doctor: ${doctor.ok === undefined ? '-' : doctor.ok}`
         ].map(badge).join('<br>');
         const commands = data.deploy_commands || {};
         commandBox.innerHTML = Object.entries(commands).map(([key, value]) => {

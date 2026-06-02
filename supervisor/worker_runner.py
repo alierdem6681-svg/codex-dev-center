@@ -10,6 +10,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from .task_status_constants import (
+        TASK_STATUS_RUNNING,
+        is_worker_eligible_task,
+        normalize_queue_payload,
+        normalize_status,
+    )
+except ImportError:
+    from task_status_constants import (
+        TASK_STATUS_RUNNING,
+        is_worker_eligible_task,
+        normalize_queue_payload,
+        normalize_status,
+    )
+
 APP_DIR = Path("/opt/codex-dev-center")
 STATE_DIR = APP_DIR / "state"
 LOG_DIR = APP_DIR / "logs"
@@ -74,17 +89,18 @@ def update_worker(worker_id: str, status: str, current_task: str | None = None, 
 
 def claim_task(worker_id: str) -> dict[str, Any] | None:
     queue = read_json(QUEUE_PATH, {"tasks": []})
+    queue, _changes = normalize_queue_payload(queue)
     tasks = queue.get("tasks", [])
 
     claimed = None
 
-    # Telegram görevleri sadece CTO tarafından işlenir.
-    # Workerlar source=telegram olan hiçbir görevi alamaz.
+    # Telegram ana görevleri sadece CTO tarafından işlenir.
+    # Workerlar ancak router'ın ürettiği source=cto alt görevleri alır.
     for task in tasks:
-        if task.get("source") == "telegram":
+        if not is_worker_eligible_task(task):
             continue
-        if task.get("assigned_worker") == worker_id and task.get("status") in ("ASSIGNED", "QUEUED", "PENDING"):
-            task["status"] = "RUNNING"
+        if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) in ("ASSIGNED", "QUEUED", "PENDING"):
+            task["status"] = TASK_STATUS_RUNNING
             task["started_at"] = now()
             task["updated_at"] = now()
             claimed = task
@@ -92,16 +108,15 @@ def claim_task(worker_id: str) -> dict[str, Any] | None:
 
     if claimed is None:
         for task in tasks:
-            if task.get("source") == "telegram":
+            if not is_worker_eligible_task(task):
                 continue
-            if task.get("assigned_worker") in (None, "", worker_id) and task.get("status") in ("PENDING", "QUEUED"):
-                if task.get("risk", "low") in ("low", "medium"):
-                    task["assigned_worker"] = worker_id
-                    task["status"] = "RUNNING"
-                    task["started_at"] = now()
-                    task["updated_at"] = now()
-                    claimed = task
-                    break
+            if task.get("assigned_worker") in (None, "", worker_id) and normalize_status(task.get("status")) in ("PENDING", "QUEUED"):
+                task["assigned_worker"] = worker_id
+                task["status"] = TASK_STATUS_RUNNING
+                task["started_at"] = now()
+                task["updated_at"] = now()
+                claimed = task
+                break
 
     if claimed is not None:
         queue["updated_at"] = now()

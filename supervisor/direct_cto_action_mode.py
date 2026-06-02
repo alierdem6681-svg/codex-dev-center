@@ -6,6 +6,11 @@ import time
 from pathlib import Path
 from datetime import datetime, timezone
 
+try:
+    from .task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
+except ImportError:
+    from task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
+
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 REPORTS = APP / "reports"
@@ -47,7 +52,7 @@ def make_task(run_id, seq, slug, title, description, worker, risk="medium"):
         ),
         "source": "cto",
         "trigger": "direct_cto_action_mode",
-        "status": "PENDING",
+        "status": TASK_STATUS_PENDING,
         "risk": risk,
         "assigned_worker": worker,
         "created_at": now(),
@@ -160,6 +165,7 @@ def run_action_mode(raw_text):
     for task in backlog:
         tasks.append(task)
 
+    queue, _changes = normalize_queue_payload(queue)
     write_json(queue_path, queue)
 
     state_path = STATE / "system_state.json"

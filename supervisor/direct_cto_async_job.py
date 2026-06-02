@@ -10,6 +10,26 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from cto_task_router import mark_task_status
+    from task_status_constants import (
+        TASK_STATUS_DONE,
+        TASK_STATUS_ERROR,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_RUNNING,
+        TASK_STATUS_TIMEOUT,
+        redact_sensitive_text,
+    )
+except ImportError:
+    mark_task_status = None
+    TASK_STATUS_DONE = "DONE"
+    TASK_STATUS_ERROR = "ERROR"
+    TASK_STATUS_FAILED = "FAILED"
+    TASK_STATUS_RUNNING = "RUNNING"
+    TASK_STATUS_TIMEOUT = "TIMEOUT"
+    def redact_sensitive_text(value):
+        return str(value or "")
+
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -113,10 +133,13 @@ def run_job(job_id):
     job = json.loads(job_file.read_text())
     chat_id = job["chat_id"]
     raw_text = job["text"]
+    router_task_id = job.get("router_task_id")
 
     job["status"] = "RUNNING"
     job["started_at"] = now()
     job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
+    if router_task_id and mark_task_status is not None:
+        mark_task_status(APP, router_task_id, TASK_STATUS_RUNNING, "async_cto_job_started")
 
     LOGS.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
@@ -151,24 +174,32 @@ def run_job(job_id):
         if proc.returncode == 0 and raw_out.strip():
             msg = output_guard(raw_out)
             send_message(chat_id, msg)
-            job["status"] = "DONE"
+            job["status"] = TASK_STATUS_DONE
             job["result"] = "telegram_notified"
+            if router_task_id and mark_task_status is not None:
+                mark_task_status(APP, router_task_id, TASK_STATUS_DONE, "async_cto_job_done")
         else:
             with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
                 f.write(now() + " job=" + job_id + " rc=" + str(proc.returncode) + "\n")
                 f.write(raw_err[:2500] + "\n")
             send_message(chat_id, "CTO bu arka plan işi tamamlayamadı. Teknik çıktı Telegram’a gönderilmedi; loglara kaydedildi.")
-            job["status"] = "FAILED"
+            job["status"] = TASK_STATUS_FAILED
             job["result"] = "codex_failed"
+            if router_task_id and mark_task_status is not None:
+                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED, "async_cto_job_failed")
 
     except subprocess.TimeoutExpired:
         send_message(chat_id, "CTO arka plan işi süre sınırına takıldı. Teknik çıktı gönderilmedi. İşi daha küçük parçalara bölelim.")
-        job["status"] = "TIMEOUT"
+        job["status"] = TASK_STATUS_TIMEOUT
         job["result"] = "timeout"
+        if router_task_id and mark_task_status is not None:
+            mark_task_status(APP, router_task_id, TASK_STATUS_TIMEOUT, "async_cto_job_timeout")
     except Exception as exc:
         send_message(chat_id, "CTO arka plan işi sırasında hata aldı. Teknik çıktı Telegram’a gönderilmedi.")
-        job["status"] = "ERROR"
-        job["result"] = str(exc)[:300]
+        job["status"] = TASK_STATUS_ERROR
+        job["result"] = redact_sensitive_text(str(exc))[:300]
+        if router_task_id and mark_task_status is not None:
+            mark_task_status(APP, router_task_id, TASK_STATUS_ERROR, "async_cto_job_error")
 
     job["finished_at"] = now()
     job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")

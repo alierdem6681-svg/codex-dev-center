@@ -8,6 +8,11 @@ import urllib.request
 from pathlib import Path
 from datetime import datetime, timezone
 
+try:
+    from .task_status_constants import normalize_queue_payload, normalize_status
+except ImportError:
+    from task_status_constants import normalize_queue_payload, normalize_status
+
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -102,6 +107,7 @@ def main():
 
     qpath = STATE / "task_queue.json"
     q = read_json(qpath, {"tasks": []})
+    q, _changes = normalize_queue_payload(q)
     tasks = q.get("tasks", [])
     action_tasks = [t for t in tasks if str(t.get("id", "")).startswith("CTO-ACTION-")]
 
@@ -130,7 +136,7 @@ def main():
         if ws and Path(ws).exists():
             created = sum(1 for x in EXPECTED if (Path(ws) / x).exists())
 
-        status = t.get("status")
+        status = normalize_status(t.get("status"))
 
         if created >= 4:
             t["status"] = "PROPOSAL_DONE"
@@ -157,7 +163,7 @@ def main():
             )
             t["report_path"] = str(report_path)
             details.append(f"{tid}: PROPOSAL_DONE ({created}/6)")
-        elif status in ["RUNNING", "ASSIGNED", "PENDING"]:
+        elif status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
             running += 1
             details.append(f"{tid}: {status} ({created}/6)")
         else:

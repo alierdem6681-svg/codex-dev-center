@@ -41,5 +41,16 @@
     "show_last_health_check": true,
     "show_last_smoke_test": true,
     "show_last_error_recommendation": true
+  },
+  "cto_router": {
+    "enabled": true,
+    "show_router_state": true,
+    "show_doctor_state": true,
+    "default_sources": [
+      "telegram",
+      "windows_codex_ssh",
+      "dashboard"
+    ],
+    "status_normalization_required": true
   }
 }

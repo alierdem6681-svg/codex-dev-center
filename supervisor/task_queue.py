@@ -6,6 +6,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from .task_status_constants import (
+        TASK_STATUS_QUEUED,
+        atomic_write_json,
+        normalize_queue_payload,
+        normalize_risk,
+        utc_now,
+    )
+except ImportError:
+    from task_status_constants import (
+        TASK_STATUS_QUEUED,
+        atomic_write_json,
+        normalize_queue_payload,
+        normalize_risk,
+        utc_now,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = ROOT / "state"
 QUEUE_FILE = STATE_DIR / "task_queue.json"
@@ -43,12 +60,7 @@ def read_json(path: Path, default: Any) -> Any:
 
 
 def write_json(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    with tmp_path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-    tmp_path.replace(path)
+    atomic_write_json(path, data)
 
 
 def next_task_id(queue: dict[str, Any]) -> str:
@@ -72,27 +84,36 @@ def enqueue_task(
 ) -> dict[str, Any]:
     ensure_state()
     queue = read_json(QUEUE_FILE, {"tasks": []})
+    task_id = next_task_id(queue)
+    risk = normalize_risk(risk_level)
     task = {
-        "id": next_task_id(queue),
+        "id": task_id,
         "title": title,
         "source": source,
         "raw_message": raw_message,
         "assigned_worker": choose_worker(worker),
-        "risk_level": risk_level,
-        "status": "queued",
+        "risk": risk,
+        "risk_level": risk,
+        "status": TASK_STATUS_QUEUED,
         "created_at": utc_now(),
         "updated_at": utc_now(),
-        "log_path": f"logs/{next_task_id(queue)}.log",
-        "report_path": f"reports/{next_task_id(queue)}_REPORT.md",
+        "worker_eligible": str(source).lower() != "telegram" and risk not in {"high", "critical"},
+        "log_path": f"logs/{task_id}.log",
+        "report_path": f"reports/{task_id}_REPORT.md",
     }
     queue.setdefault("tasks", []).append(task)
+    queue, _changes = normalize_queue_payload(queue)
     write_json(QUEUE_FILE, queue)
     return task
 
 
 def list_tasks() -> dict[str, Any]:
     ensure_state()
-    return read_json(QUEUE_FILE, {"tasks": []})
+    queue = read_json(QUEUE_FILE, {"tasks": []})
+    queue, changes = normalize_queue_payload(queue)
+    if changes:
+        write_json(QUEUE_FILE, queue)
+    return queue
 
 
 def main() -> None:
