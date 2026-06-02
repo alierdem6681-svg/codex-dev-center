@@ -1,10 +1,10 @@
 # Production Environment Last Report
 
-Generated at: 2026-06-02T08:30:16+00:00
+Generated at: 2026-06-02T08:45:21+00:00
 Kind: staging_deploy
 Status: PASS
 Scope: staging
-Dry run: False
+Dry run: True
 
 ## Safety
 - Secret/IAM/database/DNS/firewall/billing/Google Ads mutate performed: false

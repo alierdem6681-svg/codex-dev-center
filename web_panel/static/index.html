@@ -96,7 +96,10 @@
         <h1>Codex Dev Center Yönetim Paneli</h1>
         <div class="muted">Canlıya alma, görevler, çalışanlar, toparlama ve güvenli GitHub akışı</div>
       </div>
-      <span id="clock" class="badge">Yükleniyor</span>
+      <div class="actions">
+        <span id="clock" class="badge">Yükleniyor</span>
+        <button onclick="logout()">Çıkış</button>
+      </div>
     </header>
 
     <main class="stack">
@@ -322,6 +325,10 @@
         const res = await fetch('/api/action', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action})});
         actionResult.textContent = JSON.stringify(await res.json(), null, 2);
         await refresh();
+      }
+      async function logout(){
+        await fetch('/api/auth/logout', {method:'POST'});
+        location.href = '/login';
       }
       [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
       refresh();

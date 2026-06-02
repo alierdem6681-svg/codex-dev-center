@@ -17,6 +17,21 @@
       ]
     },
     {
+      "id": "panel_auth",
+      "name": "Panel Authentication",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Username/password login, signed session cookie and safe first-user setup for the management panel.",
+      "actions": [
+        "panel_login",
+        "panel_logout",
+        "panel_first_user_setup"
+      ]
+    },
+    {
       "id": "supervisor",
       "name": "CTO / Supervisor",
       "status": "active",

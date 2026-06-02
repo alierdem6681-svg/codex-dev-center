@@ -113,6 +113,7 @@ def import_smoke(results: dict[str, Any]) -> None:
         ROOT / "supervisor" / "production_readiness_suite.py",
         ROOT / "supervisor" / "production_environment_manager.py",
         ROOT / "supervisor" / "github_safe_flow.py",
+        ROOT / "web_panel" / "auth.py",
         ROOT / "web_panel" / "server.py",
     ]
     for path in modules:
@@ -133,6 +134,8 @@ def required_file_regression(results: dict[str, Any]) -> None:
         "supervisor/production_readiness_suite.py",
         "supervisor/production_environment_manager.py",
         "supervisor/github_safe_flow.py",
+        "web_panel/auth.py",
+        "web_panel/static/login.html",
         "scripts/staging_deploy.sh",
         "scripts/production_deploy.sh",
         "scripts/rollback_production.sh",
@@ -174,9 +177,13 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Toparlama",
         "Deploy Komutları",
         "Kalite Kapıları",
+        "Çıkış",
     ]
     missing = [item for item in required_text if item not in index]
-    record(results, "dashboard_route_api_test", not missing, {"missing_text": missing})
+    login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
+    login_required = ["Kullanıcı adı", "Şifre", "Giriş Yap", "İlk kullanıcıyı oluştur"]
+    login_missing = [item for item in login_required if item not in login]
+    record(results, "dashboard_route_api_test", not missing and not login_missing, {"missing_text": missing, "login_missing_text": login_missing})
 
 
 def telegram_test(results: dict[str, Any]) -> None:

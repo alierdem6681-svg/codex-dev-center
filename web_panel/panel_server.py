@@ -8,7 +8,9 @@ import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
+
+import auth as panel_auth
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -16,7 +18,6 @@ STATE = ROOT / "state"
 REPORTS = ROOT / "reports"
 LOGS = ROOT / "logs"
 STATIC_DIR = ROOT / "web_panel" / "static"
-TOKEN_FILE = STATE / "panel_token.txt"
 HOST = os.environ.get("CODEX_PANEL_HOST", "0.0.0.0")
 PORT = int(os.environ.get("CODEX_PANEL_PORT", "8080"))
 SCOPE = os.environ.get("CODEX_PANEL_SCOPE", "production")
@@ -44,19 +45,17 @@ def read_text(path: Path, default: str = "") -> str:
     return default
 
 
-def token() -> str:
-    return read_text(TOKEN_FILE).strip()
+def is_loopback(handler: BaseHTTPRequestHandler) -> bool:
+    host = handler.client_address[0]
+    return host in {"127.0.0.1", "::1", "localhost"}
+
+
+def setup_allowed(handler: BaseHTTPRequestHandler) -> bool:
+    return is_loopback(handler) or os.environ.get("CODEX_PANEL_ALLOW_REMOTE_SETUP", "") == "1"
 
 
 def authorized(handler: BaseHTTPRequestHandler) -> bool:
-    current = token()
-    if not current:
-        return False
-    parsed = urlparse(handler.path)
-    query = parse_qs(parsed.query)
-    if query.get("token", [""])[0] == current:
-        return True
-    return f"codex_panel_token={current}" in handler.headers.get("Cookie", "")
+    return bool(panel_auth.user_from_cookie(handler.headers.get("Cookie", "")))
 
 
 def run_cmd(cmd: list[str], timeout: int = 180):
@@ -125,6 +124,7 @@ def status_payload():
         "dashboard_settings": read_json(STATE / "dashboard_settings.json", read_json(ROOT / "state_templates/dashboard_settings.json", {})),
         "module_settings": read_json(STATE / "module_settings.json", read_json(ROOT / "state_templates/module_settings.json", {})),
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
+        "auth": panel_auth.public_auth_state(),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
         "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
@@ -152,18 +152,40 @@ class Handler(BaseHTTPRequestHandler):
         with (LOGS / "panel_access.log").open("a", encoding="utf-8") as handle:
             handle.write(f"{now()} {fmt % args}\n")
 
-    def send_raw(self, payload: bytes, content_type: str = "application/json; charset=utf-8", code: int = 200, cookie: bool = False):
+    def send_raw(self, payload: bytes, content_type: str = "application/json; charset=utf-8", code: int = 200, headers: dict[str, str] | None = None):
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
-        if cookie and token():
-            self.send_header("Set-Cookie", f"codex_panel_token={token()}; Path=/; HttpOnly; SameSite=Lax")
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(payload)
 
     def send_json(self, data, code: int = 200):
         self.send_raw(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"), code=code)
+
+    def redirect_login(self):
+        self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/login"})
+
+    def send_login(self):
+        self.send_raw((STATIC_DIR / "login.html").read_bytes(), "text/html; charset=utf-8")
+
+    def send_with_session(self, data, username: str, code: int = 200):
+        self.send_raw(
+            json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"),
+            "application/json; charset=utf-8",
+            code,
+            {"Set-Cookie": panel_auth.session_cookie_header(username)},
+        )
+
+    def send_logout(self):
+        self.send_raw(
+            json.dumps({"ok": True}, ensure_ascii=False).encode("utf-8"),
+            "application/json; charset=utf-8",
+            200,
+            {"Set-Cookie": panel_auth.clear_cookie_header()},
+        )
 
     def body(self):
         size = int(self.headers.get("Content-Length", "0") or "0")
@@ -176,9 +198,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if not authorized(self):
-            self.send_json({"ok": False, "error": "unauthorized"}, 401)
-            return
         if parsed.path == "/health":
             self.send_json({
                 "ok": True,
@@ -191,19 +210,56 @@ class Handler(BaseHTTPRequestHandler):
                 "version": "production-environment-v1"
             })
             return
+        if parsed.path in ("/login", "/login.html"):
+            self.send_login()
+            return
+        if parsed.path == "/api/auth/state":
+            self.send_json(panel_auth.public_auth_state())
+            return
+        if not authorized(self):
+            if parsed.path in ("/", "/index.html"):
+                self.redirect_login()
+            else:
+                self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
+            return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
             return
         if parsed.path in ("/", "/index.html"):
-            self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8", 200, True)
+            self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
         self.send_json({"ok": False, "error": "not_found"}, 404)
 
     def do_POST(self):
-        if not authorized(self):
-            self.send_json({"ok": False, "error": "unauthorized"}, 401)
-            return
         data = self.body()
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/auth/setup":
+            if panel_auth.auth_configured():
+                self.send_json({"ok": False, "error": "auth_already_configured", "message": "Kullanıcı zaten oluşturuldu."}, 409)
+                return
+            if not setup_allowed(self):
+                self.send_json({"ok": False, "error": "remote_setup_disabled", "message": "İlk kullanıcı yalnızca yerel erişimden oluşturulabilir."}, 403)
+                return
+            try:
+                panel_auth.setup_user(str(data.get("username", "")), str(data.get("password", "")))
+                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, str(data.get("username", "")).strip())
+            except ValueError as exc:
+                self.send_json({"ok": False, "error": str(exc), "message": "Kullanıcı adı veya şifre geçersiz."}, 400)
+            return
+        if parsed.path == "/api/auth/login":
+            username = str(data.get("username", "")).strip()
+            password = str(data.get("password", ""))
+            if panel_auth.verify_credentials(username, password):
+                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, username)
+            else:
+                self.send_json({"ok": False, "error": "invalid_credentials", "message": "Kullanıcı adı veya şifre hatalı."}, 401)
+            return
+        if parsed.path == "/api/auth/logout":
+            self.send_logout()
+            return
+        if not authorized(self):
+            self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
+            return
         action = data.get("action")
         if action == "production_readiness_suite":
             self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))

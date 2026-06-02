@@ -2,6 +2,31 @@
   "updated_at": "2026-06-02T00:00:00+00:00",
   "actions": [
     {
+      "id": "panel_login",
+      "label": "Panel Girişi",
+      "module": "panel_auth",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false
+    },
+    {
+      "id": "panel_logout",
+      "label": "Panel Çıkışı",
+      "module": "panel_auth",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false
+    },
+    {
+      "id": "panel_first_user_setup",
+      "label": "İlk Panel Kullanıcısını Oluştur",
+      "module": "panel_auth",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "local_only_by_default": true
+    },
+    {
       "id": "production_readiness_suite",
       "label": "Canlı Ortam Hazırlık Kapılarını Çalıştır",
       "module": "production_readiness",

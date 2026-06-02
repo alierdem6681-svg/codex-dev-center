@@ -106,3 +106,23 @@ Yeni production tanimi:
 - Google Ads, IAM, secret, billing, database, DNS/firewall veya musteri verisi mutate yok.
 
 Deploy controller artik env yoksa `state_templates/deploy_policy.json` icindeki default komutlari kullanir. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` default policy ile tanimlidir.
+
+---
+
+## Panel Username/Password Auth v1
+
+Tarih: 2026-06-02
+
+Panel tokenli URL yerine kullanici adi/sifre oturumuna tasindi.
+
+Eklenenler:
+- `web_panel/auth.py`
+- `web_panel/static/login.html`
+
+Yeni davranis:
+- `/login` kullanici adi/sifre ekrani gosterir.
+- Ilk kullanici sadece lokal erisimden veya `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` ile olusturulabilir.
+- Sifre hash'i runtime `state/panel_auth.json` icinde PBKDF2 olarak tutulur.
+- Session secret runtime `state/panel_session_secret.txt` icinde tutulur.
+- Repo icine sifre, token veya session secret yazilmaz.
+- Deploy health/smoke otomasyonu query token yerine imzali servis oturumu kullanir.

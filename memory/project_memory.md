@@ -46,3 +46,14 @@ Production deploy blocker'lari giderildi. Sistem artik env eksikliginde BLOCKED 
 Eklenen manager staging'i 18080 portunda, production'i 8080 portunda dogrular. Rollback otomatik `git reset` yapmaz; son saglikli commit ve runtime bilgisi `state/rollback_point.json` icinde korunur.
 
 Kritik dis kapsam ayni kalir: secret/IAM/billing/database/DNS/firewall/Google Ads/customer data mutate yok.
+
+## 2026-06-02 Panel Username/Password Auth v1
+
+Panel tokenli URL yerine kullanici adi/sifre login akisi eklendi. `web_panel/auth.py` PBKDF2 parola hash'i ve imzali session cookie uretir. `web_panel/static/login.html` login ve ilk kullanici kurulum ekranidir.
+
+Runtime secret dosyalari repo disinda kalir:
+
+- `state/panel_auth.json`
+- `state/panel_session_secret.txt`
+
+Ilk kullanici varsayilan olarak yalnizca lokal erisimden kurulabilir; uzak kurulum icin `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` gerekir. Otomasyon token query kullanmaz, servis oturum cookie'si uretir.

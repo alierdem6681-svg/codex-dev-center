@@ -13,6 +13,7 @@ Production hedefi yerel Codex Dev Center çalışma zamanıdır:
 - Panel servisi: `web_panel/panel_server.py`
 - Deploy yöneticisi: `supervisor/production_environment_manager.py`
 - Deploy controller: `supervisor/production_deploy_controller.py`
+- Panel giriş modu: kullanıcı adı/şifre, imzalı oturum çerezi
 
 Windows ortamında systemd yoksa servis keşfi panel portu, process durumu, health endpoint ve runtime state dosyaları üzerinden yapılır.
 
@@ -60,6 +61,12 @@ Rollback mekanizması güvenli ve mantıksaldır. Otomatik `git reset`, veri sil
 - `reports/rollback_production_last_report.md`
 - `reports/production_deploy_last_report.md`
 - `reports/production_readiness_last_report.md`
+
+## Panel Girişi
+
+Tokenlı URL kullanılmaz. Panel `/login` üzerinden kullanıcı adı ve şifre ister. İlk kullanıcı runtime içinde oluşturulur; parola hash'i `state/panel_auth.json`, session secret ise `state/panel_session_secret.txt` altında tutulur. Bu dosyalar repo'ya yazılmaz.
+
+Uzak sunucuda ilk kullanıcı kurulumu güvenlik gereği varsayılan olarak kapalıdır. Uzak ilk kurulum gerekirse VM içinde `CODEX_PANEL_USERNAME` ve `CODEX_PANEL_PASSWORD` verilerek servis başlatılır veya `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` bilinçli olarak açılır.
 
 ## Durdurulacak Riskler
 

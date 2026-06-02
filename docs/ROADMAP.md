@@ -92,4 +92,5 @@ Faz 19B-10A Model Policy
 - [x] Health check ve smoke test scriptleri eklendi.
 - [x] Production environment manager eklendi.
 - [x] Dashboard deploy command, health, smoke ve rollback gorunurlugu eklendi.
+- [x] Panel tokenli giris yerine kullanici adi/sifre auth eklendi.
 - [ ] Production deploy sonrasi uzun sureli servis izleme ve kalici Windows/Linux service wrapper standardi.

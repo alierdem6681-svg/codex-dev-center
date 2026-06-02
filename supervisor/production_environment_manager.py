@@ -13,7 +13,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -23,7 +22,6 @@ LOGS = ROOT / "logs"
 
 PRODUCTION_PORT = int(os.environ.get("CODEX_PRODUCTION_PANEL_PORT", "8080"))
 STAGING_PORT = int(os.environ.get("CODEX_STAGING_PANEL_PORT", "18080"))
-DEFAULT_TOKEN = os.environ.get("CODEX_PANEL_TOKEN_DEFAULT", "local-dashboard-test-token")
 
 DEFAULT_COMMANDS = {
     "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
@@ -106,19 +104,15 @@ def powershell_bin() -> str | None:
     return shutil.which("powershell") or shutil.which("powershell.exe")
 
 
-def token_file() -> Path:
-    return STATE / "panel_token.txt"
+def automation_headers() -> dict[str, str]:
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from web_panel import auth as panel_auth
 
-
-def panel_token() -> str:
-    existing = token_file()
-    if existing.exists():
-        value = existing.read_text(encoding="utf-8", errors="replace").strip()
-        if value:
-            return value
-    STATE.mkdir(parents=True, exist_ok=True)
-    existing.write_text(DEFAULT_TOKEN + "\n", encoding="utf-8")
-    return DEFAULT_TOKEN
+        return {"Cookie": panel_auth.automation_cookie_header()}
+    except Exception:
+        return {}
 
 
 def deploy_policy() -> dict[str, Any]:
@@ -216,12 +210,9 @@ def remote_sync() -> dict[str, Any]:
 
 
 def http_json(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
-    token = quote(panel_token())
-    joiner = "&" if "?" in path else "?"
-    request_path = f"{path}{joiner}token={token}"
     try:
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
-        conn.request("GET", request_path)
+        conn.request("GET", path, headers=automation_headers())
         response = conn.getresponse()
         body = response.read().decode("utf-8", errors="replace")
         try:
@@ -234,12 +225,9 @@ def http_json(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
 
 
 def http_text(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
-    token = quote(panel_token())
-    joiner = "&" if "?" in path else "?"
-    request_path = f"{path}{joiner}token={token}"
     try:
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
-        conn.request("GET", request_path)
+        conn.request("GET", path, headers=automation_headers())
         response = conn.getresponse()
         body = response.read().decode("utf-8", errors="replace")
         return {"ok": response.status < 400, "status": response.status, "body": body[:20000]}
@@ -341,7 +329,6 @@ def panel_identity(port: int) -> dict[str, Any]:
 
 
 def ensure_panel(port: int, scope: str, host: str = "127.0.0.1", replace_mismatch: bool = False) -> dict[str, Any]:
-    panel_token()
     identity = panel_identity(port) if port_open(port) else {"ok": False, "port": port, "matches_repo": False}
     if identity.get("ok") and (identity.get("matches_repo") or not replace_mismatch):
         return {"ok": True, "action": "reused", "identity": identity}

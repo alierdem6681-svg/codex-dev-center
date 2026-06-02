@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codex Dev Center Giriş</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f6f8;
+        --panel: #ffffff;
+        --ink: #20242c;
+        --muted: #68707d;
+        --line: #d9dde5;
+        --accent: #2f5f73;
+        --bad: #9a2f2f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(420px, calc(100vw - 28px));
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 22px;
+      }
+      h1 { margin: 0 0 6px; font-size: 20px; letter-spacing: 0; }
+      p { margin: 0 0 18px; color: var(--muted); }
+      label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; }
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 10px 11px;
+        color: var(--ink);
+        font: inherit;
+      }
+      button {
+        width: 100%;
+        margin-top: 16px;
+        border: 1px solid #c8dce5;
+        border-radius: 7px;
+        padding: 10px 12px;
+        background: #dcebf0;
+        color: var(--accent);
+        font: inherit;
+        cursor: pointer;
+      }
+      .error { min-height: 20px; margin-top: 12px; color: var(--bad); }
+      .muted { color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Giriş</h1>
+      <p id="subtitle">Yönetim paneline erişmek için kullanıcı adı ve şifre girin.</p>
+      <form id="form">
+        <label for="username">Kullanıcı adı</label>
+        <input id="username" name="username" autocomplete="username" required>
+        <label for="password">Şifre</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8">
+        <button id="submit" type="submit">Giriş Yap</button>
+        <div id="error" class="error"></div>
+      </form>
+      <div class="muted">Tokenlı bağlantı yerine güvenli oturum çerezi kullanılır.</div>
+    </main>
+    <script>
+      let setupMode = false;
+      async function loadState() {
+        const response = await fetch('/api/auth/state', {cache: 'no-store'});
+        const state = await response.json();
+        setupMode = !state.configured;
+        if (setupMode) {
+          title.textContent = 'İlk kullanıcıyı oluştur';
+          subtitle.textContent = 'Paneli kullanmak için bir kullanıcı adı ve en az 8 karakterli şifre belirleyin.';
+          submit.textContent = 'Kullanıcıyı Oluştur';
+          password.autocomplete = 'new-password';
+        } else {
+          title.textContent = 'Giriş';
+          subtitle.textContent = 'Yönetim paneline erişmek için kullanıcı adı ve şifre girin.';
+          submit.textContent = 'Giriş Yap';
+        }
+      }
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        error.textContent = '';
+        submit.disabled = true;
+        const endpoint = setupMode ? '/api/auth/setup' : '/api/auth/login';
+        const payload = {
+          username: username.value.trim(),
+          password: password.value
+        };
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            error.textContent = data.message || 'Giriş başarısız.';
+            return;
+          }
+          location.href = '/';
+        } catch {
+          error.textContent = 'Bağlantı hatası.';
+        } finally {
+          submit.disabled = false;
+        }
+      });
+      loadState();
+    </script>
+  </body>
+</html>

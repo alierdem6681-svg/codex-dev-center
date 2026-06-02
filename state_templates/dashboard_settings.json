@@ -4,7 +4,16 @@
     "refresh_seconds": 5,
     "language": "tr",
     "compact_mode": true,
-    "theme": "soft_neutral"
+    "theme": "soft_neutral",
+    "auth_mode": "username_password"
+  },
+  "panel_auth": {
+    "mode": "username_password",
+    "token_login_enabled": false,
+    "session_cookie_name": "codex_panel_session",
+    "password_hash": "pbkdf2_sha256",
+    "remote_first_setup_enabled": false,
+    "runtime_state_file": "state/panel_auth.json"
   },
   "production": {
     "automatic_production_enabled": true,

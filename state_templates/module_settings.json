@@ -15,7 +15,20 @@
     "show_action_buttons": true,
     "language": "tr",
     "compact_mode": true,
-    "theme": "soft_neutral"
+    "theme": "soft_neutral",
+    "auth_mode": "username_password",
+    "token_login_enabled": false
+  },
+  "panel_auth": {
+    "enabled": true,
+    "mode": "username_password",
+    "username_env": "CODEX_PANEL_USERNAME",
+    "password_env": "CODEX_PANEL_PASSWORD",
+    "session_ttl_seconds": 43200,
+    "remote_first_setup_enabled": false,
+    "password_hash_algorithm": "pbkdf2_sha256",
+    "runtime_auth_file": "state/panel_auth.json",
+    "runtime_session_secret_file": "state/panel_session_secret.txt"
   },
   "supervisor": {
     "auto_dispatch_low_risk": true,
