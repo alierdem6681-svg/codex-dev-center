@@ -8,6 +8,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from .task_status_constants import ACTIVE_TASK_STATUSES, is_worker_eligible_task
+except ImportError:
+    from task_status_constants import ACTIVE_TASK_STATUSES, is_worker_eligible_task
+
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 LOGS = APP / "logs"
@@ -18,8 +23,6 @@ SYSTEM_STATE_PATH = STATE / "system_state.json"
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
 POLL_SECONDS = 5
 SLEEP_AFTER_IDLE_CYCLES = 4
-ACTIVE_TASK_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
-APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -88,12 +91,6 @@ def queue_counts():
     running = [t for t in worker_tasks if str(t.get("status", "")).upper() == "RUNNING"]
     active = pending + running
     return len(pending), len(running), len(active)
-
-def is_worker_eligible_task(task):
-    status = str(task.get("status", "")).upper()
-    source = str(task.get("source", "")).lower()
-    risk = str(task.get("risk") or task.get("risk_level") or "low").upper()
-    return status in ACTIVE_TASK_STATUSES and source != "telegram" and risk not in APPROVAL_RISKS
 
 def dispatch():
     try:

@@ -5,6 +5,31 @@ from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
+try:
+    from .task_status_constants import (
+        ACTIVE_TASK_STATUSES,
+        TASK_STATUS_ASSIGNED,
+        TASK_STATUS_DONE,
+        TASK_STATUS_PENDING,
+        atomic_write_json,
+        is_worker_eligible_task,
+        normalize_queue_payload,
+        normalize_risk,
+        normalize_status,
+    )
+except ImportError:
+    from task_status_constants import (
+        ACTIVE_TASK_STATUSES,
+        TASK_STATUS_ASSIGNED,
+        TASK_STATUS_DONE,
+        TASK_STATUS_PENDING,
+        atomic_write_json,
+        is_worker_eligible_task,
+        normalize_queue_payload,
+        normalize_risk,
+        normalize_status,
+    )
+
 APP_DIR = Path("/opt/codex-dev-center")
 STATE_DIR = APP_DIR / "state"
 LOG_DIR = APP_DIR / "logs"
@@ -27,8 +52,7 @@ def read_json(path, default):
         return default
 
 def write_json(path, data):
-    data["updated_at"] = now()
-    Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    atomic_write_json(Path(path), data)
 
 def log(msg):
     with open(LOG_DIR / "supervisor.log", "a", encoding="utf-8") as f:
@@ -48,7 +72,7 @@ def status(_args):
         "workers_total": len(workers.get("workers", [])),
         "workers": workers.get("workers", []),
         "tasks_total": len(queue.get("tasks", [])),
-        "pending_tasks": len([t for t in queue.get("tasks", []) if t.get("status") in ("PENDING", "QUEUED")]),
+        "pending_tasks": len([t for t in queue.get("tasks", []) if normalize_status(t.get("status")) in ACTIVE_TASK_STATUSES]),
         "approvals_pending": len([a for a in approvals.get("approvals", []) if a.get("status") == "PENDING"]),
         "updated_at": now()
     }
@@ -64,13 +88,18 @@ def add_task(args):
         "id": task_id,
         "title": args.title,
         "description": args.description or args.title,
-        "status": "PENDING",
+        "status": TASK_STATUS_PENDING,
         "assigned_worker": None,
-        "risk": args.risk,
+        "risk": normalize_risk(args.risk),
+        "risk_level": normalize_risk(args.risk),
+        "source": args.source,
+        "priority": args.priority,
+        "worker_eligible": args.source != "telegram" and normalize_risk(args.risk) not in {"high", "critical"},
         "created_at": now(),
         "updated_at": now()
     }
     tasks.append(task)
+    queue, _changes = normalize_queue_payload(queue)
     write_json(queue_path, queue)
     log(f"TASK_ADDED {task_id} {args.title}")
     print(json.dumps({"ok": True, "task": task}, indent=2, ensure_ascii=False))
@@ -101,14 +130,15 @@ def dispatch(_args):
     queue = read_json(queue_path, {"tasks": []})
 
     idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
-    pending_tasks = [t for t in queue.get("tasks", []) if t.get("status") in ("PENDING", "QUEUED") and t.get("source") != "telegram"]  # telegram tasks are reserved for CTO
+    queue, _changes = normalize_queue_payload(queue)
+    pending_tasks = [t for t in queue.get("tasks", []) if is_worker_eligible_task(t)]
 
     assignments = []
     for worker, task in zip(idle_workers, pending_tasks):
-        worker["status"] = "ASSIGNED"
+        worker["status"] = TASK_STATUS_ASSIGNED
         worker["current_task"] = task["id"]
         worker["last_seen"] = now()
-        task["status"] = "ASSIGNED"
+        task["status"] = TASK_STATUS_ASSIGNED
         task["assigned_worker"] = worker["id"]
         task["updated_at"] = now()
         assignments.append({"worker": worker["id"], "task": task["id"]})
@@ -130,7 +160,7 @@ def complete_task(args):
     found = False
     for t in queue.get("tasks", []):
         if t.get("id") == args.task_id:
-            t["status"] = "DONE"
+            t["status"] = TASK_STATUS_DONE
             t["result"] = args.result
             t["updated_at"] = now()
             found = True
@@ -163,6 +193,8 @@ def main():
     p.add_argument("--title", required=True)
     p.add_argument("--description", default="")
     p.add_argument("--risk", default="low", choices=["low", "medium", "high", "critical"])
+    p.add_argument("--source", default="local")
+    p.add_argument("--priority", default="normal")
     p.set_defaults(func=add_task)
 
     p = sub.add_parser("set-worker")

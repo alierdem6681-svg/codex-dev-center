@@ -6,12 +6,15 @@ import json
 import shutil
 import subprocess
 import time
+import sys
 from pathlib import Path
 from typing import Any
 
-ACTIVE_TASK_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
-APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 WORKER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4"]
+SUPERVISOR_DIR = Path(__file__).resolve().parents[1] / "supervisor"
+sys.path.insert(0, str(SUPERVISOR_DIR))
+
+from task_status_constants import ACTIVE_TASK_STATUSES, task_risk_upper, worker_block_reason as central_worker_block_reason  # noqa: E402
 
 
 def read_json(path: Path, default: Any) -> Any:
@@ -44,7 +47,7 @@ def task_status(task: dict[str, Any]) -> str:
 
 
 def task_risk(task: dict[str, Any]) -> str:
-    return str(task.get("risk") or task.get("risk_level") or "low").upper()
+    return task_risk_upper(task)
 
 
 def is_active_task(task: dict[str, Any]) -> bool:
@@ -52,12 +55,7 @@ def is_active_task(task: dict[str, Any]) -> bool:
 
 
 def worker_block_reason(task: dict[str, Any]) -> str:
-    source = str(task.get("source", "")).lower()
-    if source == "telegram":
-        return "telegram_reserved_for_cto"
-    if task_risk(task) in APPROVAL_RISKS:
-        return "approval_required"
-    return ""
+    return central_worker_block_reason(task)
 
 
 def task_summary(task: dict[str, Any]) -> dict[str, Any]:

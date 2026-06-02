@@ -278,6 +278,20 @@
       "actions": [
         "github_safe_flow_dry_run"
       ]
+    },
+    {
+      "id": "cto_router",
+      "name": "CTO Task Router / Doctor",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini normalize eder.",
+      "actions": [
+        "cto_doctor_check",
+        "cto_doctor_fix"
+      ]
     }
   ]
 }

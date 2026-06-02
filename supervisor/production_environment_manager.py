@@ -16,6 +16,8 @@ from typing import Any
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
+DEFAULT_SOURCE_ROOT = Path("/home/alierdem6681/codex-dev-center-github-export")
+SOURCE_ROOT = Path(os.environ.get("CODEX_DEV_CENTER_SOURCE", DEFAULT_SOURCE_ROOT)).resolve()
 STATE = ROOT / "state"
 REPORTS = ROOT / "reports"
 LOGS = ROOT / "logs"
@@ -73,9 +75,15 @@ def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def run(args: list[str], timeout: int = 120, env: dict[str, str] | None = None) -> dict[str, Any]:
+def command_root() -> Path:
+    if (SOURCE_ROOT / ".git").exists():
+        return SOURCE_ROOT
+    return ROOT
+
+
+def run(args: list[str], timeout: int = 120, env: dict[str, str] | None = None, cwd: Path | None = None) -> dict[str, Any]:
     try:
-        proc = subprocess.run(args, cwd=str(ROOT), text=True, capture_output=True, timeout=timeout, env=env)
+        proc = subprocess.run(args, cwd=str(cwd or ROOT), text=True, capture_output=True, timeout=timeout, env=env)
         return {
             "ok": proc.returncode == 0,
             "returncode": proc.returncode,
@@ -176,9 +184,10 @@ def git_status() -> dict[str, Any]:
     git = git_bin()
     if not git:
         return {"ok": False, "git_available": False, "reason": "git_not_found", "blocking_dirty_files": []}
-    branch = run([git, "rev-parse", "--abbrev-ref", "HEAD"], 30)
-    head = run([git, "rev-parse", "HEAD"], 30)
-    status = run([git, "status", "--porcelain"], 30)
+    git_root = command_root()
+    branch = run([git, "rev-parse", "--abbrev-ref", "HEAD"], 30, cwd=git_root)
+    head = run([git, "rev-parse", "HEAD"], 30, cwd=git_root)
+    status = run([git, "status", "--porcelain"], 30, cwd=git_root)
     dirty_lines = [line for line in status.get("stdout", "").splitlines() if line.strip()]
     dirty_files = []
     blocking = []
@@ -191,6 +200,9 @@ def git_status() -> dict[str, Any]:
     return {
         "ok": bool(branch["ok"] and head["ok"] and status["ok"]),
         "git_available": True,
+        "worktree": str(git_root),
+        "runtime_root": str(ROOT),
+        "runtime_is_deploy_output": git_root != ROOT,
         "branch": branch.get("stdout", "").strip(),
         "head": head.get("stdout", "").strip(),
         "dirty_files": dirty_files,
@@ -205,7 +217,7 @@ def remote_sync() -> dict[str, Any]:
     if not git or not status.get("ok"):
         return {"ok": False, "reason": "git_status_unavailable", "git_status": status}
     branch = status.get("branch") or "main"
-    remote = run([git, "ls-remote", "origin", f"refs/heads/{branch}"], 60)
+    remote = run([git, "ls-remote", "origin", f"refs/heads/{branch}"], 60, cwd=command_root())
     remote_hash = ""
     if remote["ok"] and remote["stdout"].strip():
         remote_hash = remote["stdout"].split()[0]

@@ -58,6 +58,20 @@
     "token_configured": false,
     "smoke_test_required": true
   },
+  "cto_router": {
+    "enabled": true,
+    "sources": [
+      "telegram",
+      "windows_codex_ssh",
+      "dashboard"
+    ],
+    "standard_statuses_required": true,
+    "telegram_parent_tasks_worker_eligible": false,
+    "worker_subtasks_source": "cto",
+    "audit_log": "logs/cto_audit.ndjson",
+    "doctor_status_file": "state/cto_doctor_status.json",
+    "router_state_file": "state/cto_router_state.json"
+  },
   "codex_execution": {
     "enabled": false,
     "unattended_execution_enabled": false,
