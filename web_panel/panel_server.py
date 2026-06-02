@@ -17,8 +17,9 @@ REPORTS = ROOT / "reports"
 LOGS = ROOT / "logs"
 STATIC_DIR = ROOT / "web_panel" / "static"
 TOKEN_FILE = STATE / "panel_token.txt"
-HOST = "0.0.0.0"
-PORT = 8080
+HOST = os.environ.get("CODEX_PANEL_HOST", "0.0.0.0")
+PORT = int(os.environ.get("CODEX_PANEL_PORT", "8080"))
+SCOPE = os.environ.get("CODEX_PANEL_SCOPE", "production")
 
 
 def now() -> str:
@@ -85,6 +86,32 @@ def services():
     return [{"name": n, "active": service_status(n), "enabled": service_enabled(n)} for n in names]
 
 
+def deploy_commands():
+    policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
+    commands = policy.get("commands", {}) if isinstance(policy, dict) else {}
+    env_defaults = policy.get("environment_defaults", {}) if isinstance(policy, dict) else {}
+    keys = [
+        "CODEX_STAGING_DEPLOY_COMMAND",
+        "CODEX_PRODUCTION_DEPLOY_COMMAND",
+        "CODEX_ROLLBACK_COMMAND",
+        "CODEX_HEALTH_CHECK_COMMAND",
+        "CODEX_SMOKE_TEST_COMMAND",
+    ]
+    result = {}
+    for key in keys:
+        value = os.environ.get(key, "").strip() or commands.get(key, "") or env_defaults.get(key, "")
+        result[key] = {
+            "configured": bool(value),
+            "source": "environment" if os.environ.get(key, "").strip() else "policy_default",
+            "command": value,
+        }
+    result["CODEX_PRODUCTION_DEPLOY_EXECUTE"] = {
+        "configured": (os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip() or str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "1"))) == "1",
+        "source": "environment" if os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip() else "policy_default",
+    }
+    return result
+
+
 def status_payload():
     return {
         "ok": True,
@@ -100,6 +127,14 @@ def status_payload():
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
         "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
+        "production_environment": read_json(STATE / "production_environment_status.json", {}),
+        "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
+        "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
+        "rollback": read_json(STATE / "rollback_status.json", {}),
+        "rollback_point": read_json(STATE / "rollback_point.json", {}),
+        "last_health_check": read_json(STATE / "last_health_check_status.json", {}),
+        "last_smoke_test": read_json(STATE / "last_smoke_test_status.json", {}),
+        "deploy_commands": deploy_commands(),
         "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),
         "reports": sorted([p.name for p in REPORTS.glob("*.md")]) if REPORTS.exists() else [],
         "report_text": {
@@ -145,7 +180,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"ok": False, "error": "unauthorized"}, 401)
             return
         if parsed.path == "/health":
-            self.send_json({"ok": True, "service": "codex-panel", "production_pipeline": True})
+            self.send_json({
+                "ok": True,
+                "service": "codex-panel",
+                "production_pipeline": True,
+                "production_environment_manager": True,
+                "scope": SCOPE,
+                "root": str(ROOT),
+                "port": PORT,
+                "version": "production-environment-v1"
+            })
             return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
@@ -167,11 +211,20 @@ class Handler(BaseHTTPRequestHandler):
         if action == "production_deploy_start":
             self.send_json(run_cmd([sys.executable, "supervisor/production_deploy_controller.py", "start", "--auto"], 300))
             return
+        if action == "staging_deploy":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "staging-deploy"], 420))
+            return
+        if action == "health_check":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "health-check", "--scope", "production"], 120))
+            return
+        if action == "smoke_test":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "smoke-test", "--scope", "production"], 120))
+            return
         if action == "github_safe_flow_dry_run":
             self.send_json(run_cmd([sys.executable, "supervisor/github_safe_flow.py", "dry-run"], 180))
             return
         if action == "rollback_simulation":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "rollback", "--dry-run"], 120))
             return
         self.send_json({"ok": False, "error": "unknown_action"}, 400)
 

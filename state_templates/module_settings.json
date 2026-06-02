@@ -37,7 +37,8 @@
     "send_long_code_outputs": false,
     "send_terminal_dumps": false,
     "send_diff_outputs": false,
-    "token_configured": false
+    "token_configured": false,
+    "smoke_test_required": true
   },
   "codex_execution": {
     "enabled": false,
@@ -46,6 +47,20 @@
     "requires_log_capture": true,
     "requires_output_guard": true,
     "requires_test_before_done": true
+  },
+  "production_environment_manager": {
+    "enabled": true,
+    "production_port": 8080,
+    "staging_port": 18080,
+    "staging_deploy_command": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "production_deploy_command": "{python} supervisor/production_environment_manager.py production-deploy",
+    "rollback_command": "{python} supervisor/production_environment_manager.py rollback",
+    "health_check_command": "{python} supervisor/production_environment_manager.py health-check --scope production",
+    "smoke_test_command": "{python} supervisor/production_environment_manager.py smoke-test --scope production",
+    "git_clean_required_for_production": true,
+    "github_remote_sync_required": true,
+    "rollback_point_required": true,
+    "replace_mismatched_panel_root": true
   },
   "deploy_pipeline": {
     "staging_enabled": true,
@@ -58,12 +73,15 @@
     "rollback_required": true,
     "auto_rollback_on_failure": true,
     "post_deploy_health_check_required": true,
+    "post_deploy_smoke_test_required": true,
     "secret_scan_required": true,
     "git_clean_required": true,
+    "github_remote_sync_required": true,
     "production_deploy_command_env": "CODEX_PRODUCTION_DEPLOY_COMMAND",
     "staging_deploy_command_env": "CODEX_STAGING_DEPLOY_COMMAND",
     "rollback_command_env": "CODEX_ROLLBACK_COMMAND",
     "production_deploy_execute_env": "CODEX_PRODUCTION_DEPLOY_EXECUTE",
+    "production_deploy_execute_default": "1",
     "database_migration_requires_approval": true,
     "critical_exception_auto_block": true
   },

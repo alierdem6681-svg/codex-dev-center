@@ -86,6 +86,10 @@ Faz 19B-10A Model Policy
 - [x] Deploy policy otomatik production icin guncellendi.
 - [x] Dashboard production pipeline bolumleri eklendi.
 - [x] Dashboard ayarlari production otomasyon kapilarina baglandi.
-- [ ] Gercek `CODEX_STAGING_DEPLOY_COMMAND` tanimlanacak.
-- [ ] Gercek `CODEX_PRODUCTION_DEPLOY_COMMAND` tanimlanacak.
-- [ ] Gercek `CODEX_ROLLBACK_COMMAND` tanimlanacak.
+- [x] Gercek `CODEX_STAGING_DEPLOY_COMMAND` policy default ile tanimlandi.
+- [x] Gercek `CODEX_PRODUCTION_DEPLOY_COMMAND` policy default ile tanimlandi.
+- [x] Gercek `CODEX_ROLLBACK_COMMAND` policy default ile tanimlandi.
+- [x] Health check ve smoke test scriptleri eklendi.
+- [x] Production environment manager eklendi.
+- [x] Dashboard deploy command, health, smoke ve rollback gorunurlugu eklendi.
+- [ ] Production deploy sonrasi uzun sureli servis izleme ve kalici Windows/Linux service wrapper standardi.

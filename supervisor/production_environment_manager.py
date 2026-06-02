@@ -1,0 +1,679 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import http.client
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+
+ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
+STATE = ROOT / "state"
+REPORTS = ROOT / "reports"
+LOGS = ROOT / "logs"
+
+PRODUCTION_PORT = int(os.environ.get("CODEX_PRODUCTION_PANEL_PORT", "8080"))
+STAGING_PORT = int(os.environ.get("CODEX_STAGING_PANEL_PORT", "18080"))
+DEFAULT_TOKEN = os.environ.get("CODEX_PANEL_TOKEN_DEFAULT", "local-dashboard-test-token")
+
+DEFAULT_COMMANDS = {
+    "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
+    "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
+    "CODEX_HEALTH_CHECK_COMMAND": "{python} supervisor/production_environment_manager.py health-check --scope production",
+    "CODEX_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope production",
+}
+
+CRITICAL_EXCEPTION_TERMS = [
+    "secret value",
+    "iam owner",
+    "iam editor",
+    "billing",
+    "drop table",
+    "truncate table",
+    "delete from",
+    "database delete",
+    "dns",
+    "firewall",
+    "google ads mutate",
+]
+
+ALLOWED_RUNTIME_DIRTY_PREFIXES = [
+    "reports/",
+    "state/",
+    "logs/",
+]
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def read_json(path: Path, default: Any) -> Any:
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return default
+    return default
+
+
+def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = now()
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def run(args: list[str], timeout: int = 120, env: dict[str, str] | None = None) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(args, cwd=str(ROOT), text=True, capture_output=True, timeout=timeout, env=env)
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-4000:],
+            "stderr": proc.stderr[-4000:],
+            "cmd": " ".join(args),
+        }
+    except Exception as exc:
+        return {"ok": False, "returncode": 1, "stdout": "", "stderr": str(exc), "cmd": " ".join(args)}
+
+
+def git_bin() -> str | None:
+    candidates = [
+        os.environ.get("CODEX_GIT", ""),
+        shutil.which("git") or "",
+        r"C:\Program Files\Git\cmd\git.exe",
+        r"C:\Program Files\Git\bin\git.exe",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return None
+
+
+def powershell_bin() -> str | None:
+    return shutil.which("powershell") or shutil.which("powershell.exe")
+
+
+def token_file() -> Path:
+    return STATE / "panel_token.txt"
+
+
+def panel_token() -> str:
+    existing = token_file()
+    if existing.exists():
+        value = existing.read_text(encoding="utf-8", errors="replace").strip()
+        if value:
+            return value
+    STATE.mkdir(parents=True, exist_ok=True)
+    existing.write_text(DEFAULT_TOKEN + "\n", encoding="utf-8")
+    return DEFAULT_TOKEN
+
+
+def deploy_policy() -> dict[str, Any]:
+    policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
+    production = read_json(ROOT / "state_templates/production_policy.json", {})
+    env_defaults = policy.get("environment_defaults", {}) if isinstance(policy, dict) else {}
+    commands = policy.get("commands", {}) if isinstance(policy, dict) else {}
+    merged = {
+        **DEFAULT_COMMANDS,
+        **{k: v for k, v in commands.items() if isinstance(v, str) and v.strip()},
+        **{k: v for k, v in env_defaults.items() if isinstance(v, str) and k in DEFAULT_COMMANDS},
+    }
+    return {"deploy_policy": policy, "production_policy": production, "commands": merged}
+
+
+def configured_commands() -> dict[str, Any]:
+    policy = deploy_policy()
+    commands = {}
+    for key, default_value in policy["commands"].items():
+        value = os.environ.get(key, "").strip() or default_value
+        commands[key] = {
+            "configured": bool(value),
+            "source": "environment" if os.environ.get(key, "").strip() else "policy_default",
+            "command": value,
+        }
+    execute = os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip()
+    if not execute:
+        env_defaults = policy["deploy_policy"].get("environment_defaults", {})
+        execute = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "1"))
+    return {
+        "commands": commands,
+        "CODEX_PRODUCTION_DEPLOY_EXECUTE": {
+            "configured": execute == "1",
+            "source": "environment" if os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip() else "policy_default",
+            "value": "1" if execute == "1" else "0",
+        },
+    }
+
+
+def command_text(name: str) -> str:
+    return str(configured_commands()["commands"].get(name, {}).get("command", "")).strip()
+
+
+def critical_exception_scan(extra_text: str = "") -> dict[str, Any]:
+    commands = configured_commands()["commands"]
+    text = " ".join([item.get("command", "") for item in commands.values()] + [extra_text]).lower()
+    matched = [term for term in CRITICAL_EXCEPTION_TERMS if term in text]
+    return {"ok": not matched, "matched_terms": matched, "requires_risk_report": bool(matched)}
+
+
+def git_status() -> dict[str, Any]:
+    git = git_bin()
+    if not git:
+        return {"ok": False, "git_available": False, "reason": "git_not_found", "blocking_dirty_files": []}
+    branch = run([git, "rev-parse", "--abbrev-ref", "HEAD"], 30)
+    head = run([git, "rev-parse", "HEAD"], 30)
+    status = run([git, "status", "--porcelain"], 30)
+    dirty_lines = [line for line in status.get("stdout", "").splitlines() if line.strip()]
+    dirty_files = []
+    blocking = []
+    for line in dirty_lines:
+        rel = line[3:].strip() if len(line) > 3 else line.strip()
+        rel = rel.replace("\\", "/")
+        dirty_files.append(rel)
+        if not any(rel.startswith(prefix) for prefix in ALLOWED_RUNTIME_DIRTY_PREFIXES):
+            blocking.append(rel)
+    return {
+        "ok": bool(branch["ok"] and head["ok"] and status["ok"]),
+        "git_available": True,
+        "branch": branch.get("stdout", "").strip(),
+        "head": head.get("stdout", "").strip(),
+        "dirty_files": dirty_files,
+        "blocking_dirty_files": blocking,
+        "clean_for_deploy": not blocking,
+    }
+
+
+def remote_sync() -> dict[str, Any]:
+    git = git_bin()
+    status = git_status()
+    if not git or not status.get("ok"):
+        return {"ok": False, "reason": "git_status_unavailable", "git_status": status}
+    branch = status.get("branch") or "main"
+    remote = run([git, "ls-remote", "origin", f"refs/heads/{branch}"], 60)
+    remote_hash = ""
+    if remote["ok"] and remote["stdout"].strip():
+        remote_hash = remote["stdout"].split()[0]
+    return {
+        "ok": bool(remote["ok"] and remote_hash and remote_hash == status.get("head")),
+        "branch": branch,
+        "head": status.get("head"),
+        "origin_head": remote_hash,
+        "remote_result": remote,
+    }
+
+
+def http_json(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
+    token = quote(panel_token())
+    joiner = "&" if "?" in path else "?"
+    request_path = f"{path}{joiner}token={token}"
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.request("GET", request_path)
+        response = conn.getresponse()
+        body = response.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(body)
+        except Exception:
+            parsed = {"raw": body[:2000]}
+        return {"ok": response.status < 400, "status": response.status, "body": parsed}
+    except Exception as exc:
+        return {"ok": False, "status": 0, "error": str(exc)}
+
+
+def http_text(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
+    token = quote(panel_token())
+    joiner = "&" if "?" in path else "?"
+    request_path = f"{path}{joiner}token={token}"
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.request("GET", request_path)
+        response = conn.getresponse()
+        body = response.read().decode("utf-8", errors="replace")
+        return {"ok": response.status < 400, "status": response.status, "body": body[:5000]}
+    except Exception as exc:
+        return {"ok": False, "status": 0, "error": str(exc), "body": ""}
+
+
+def port_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def windows_port_pids(port: int) -> list[int]:
+    ps = powershell_bin()
+    if os.name != "nt" or not ps:
+        return []
+    script = f"Get-NetTCPConnection -LocalPort {port} -State Listen | Select-Object -ExpandProperty OwningProcess"
+    result = run([ps, "-NoProfile", "-Command", script], 20)
+    pids: list[int] = []
+    for line in result.get("stdout", "").splitlines():
+        line = line.strip()
+        if line.isdigit():
+            pids.append(int(line))
+    return sorted(set(pids))
+
+
+def process_command_line(pid: int) -> str:
+    ps = powershell_bin()
+    if os.name != "nt" or not ps:
+        return ""
+    script = f"$p={pid}; (Get-CimInstance Win32_Process -Filter \"ProcessId=$p\").CommandLine"
+    result = run([ps, "-NoProfile", "-Command", script], 20)
+    return result.get("stdout", "").strip()
+
+
+def stop_port(port: int) -> dict[str, Any]:
+    if os.name != "nt":
+        return {"ok": False, "reason": "stop_port_only_implemented_for_windows", "port": port}
+    stopped = []
+    errors = []
+    for pid in windows_port_pids(port):
+        if pid == os.getpid():
+            continue
+        result = run(["taskkill", "/PID", str(pid), "/F"], 30)
+        if result["ok"]:
+            stopped.append(pid)
+        else:
+            errors.append({"pid": pid, "result": result})
+    return {"ok": not errors, "stopped_pids": stopped, "errors": errors, "port": port}
+
+
+def wait_health(port: int, timeout_seconds: int = 20) -> dict[str, Any]:
+    deadline = time.time() + timeout_seconds
+    last: dict[str, Any] = {"ok": False, "error": "not_checked"}
+    while time.time() < deadline:
+        last = http_json(port, "/health")
+        if last.get("ok"):
+            return last
+        time.sleep(0.5)
+    return last
+
+
+def start_panel(port: int, scope: str, host: str = "127.0.0.1") -> dict[str, Any]:
+    LOGS.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["CODEX_DEV_CENTER_HOME"] = str(ROOT)
+    env["CODEX_PANEL_PORT"] = str(port)
+    env["CODEX_PANEL_HOST"] = host
+    env["CODEX_PANEL_SCOPE"] = scope
+    stdout = (LOGS / f"panel_{scope}_{port}.out.log").open("ab")
+    stderr = (LOGS / f"panel_{scope}_{port}.err.log").open("ab")
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+    proc = subprocess.Popen(
+        [sys.executable, "web_panel/panel_server.py"],
+        cwd=str(ROOT),
+        env=env,
+        stdout=stdout,
+        stderr=stderr,
+        creationflags=flags,
+    )
+    health = wait_health(port, 20)
+    return {"ok": bool(health.get("ok")), "pid": proc.pid, "port": port, "scope": scope, "health": health}
+
+
+def panel_identity(port: int) -> dict[str, Any]:
+    health = http_json(port, "/health")
+    body = health.get("body", {}) if isinstance(health.get("body"), dict) else {}
+    return {
+        "ok": bool(health.get("ok")),
+        "port": port,
+        "root": body.get("root"),
+        "scope": body.get("scope"),
+        "version": body.get("version"),
+        "matches_repo": body.get("root") == str(ROOT),
+        "pids": windows_port_pids(port),
+        "commands": [process_command_line(pid) for pid in windows_port_pids(port)],
+    }
+
+
+def ensure_panel(port: int, scope: str, host: str = "127.0.0.1", replace_mismatch: bool = False) -> dict[str, Any]:
+    panel_token()
+    identity = panel_identity(port) if port_open(port) else {"ok": False, "port": port, "matches_repo": False}
+    if identity.get("ok") and (identity.get("matches_repo") or not replace_mismatch):
+        return {"ok": True, "action": "reused", "identity": identity}
+    stopped: dict[str, Any] = {"ok": True, "stopped_pids": []}
+    if port_open(port):
+        stopped = stop_port(port)
+        time.sleep(1)
+    started = start_panel(port, scope, host)
+    return {"ok": bool(started.get("ok")), "action": "started", "previous": identity, "stopped": stopped, "started": started}
+
+
+def service_discovery() -> dict[str, Any]:
+    return {
+        "systemd_available": shutil.which("systemctl") is not None,
+        "production_panel": panel_identity(PRODUCTION_PORT) if port_open(PRODUCTION_PORT) else {"ok": False, "port": PRODUCTION_PORT},
+        "staging_panel": panel_identity(STAGING_PORT) if port_open(STAGING_PORT) else {"ok": False, "port": STAGING_PORT},
+        "production_port": PRODUCTION_PORT,
+        "staging_port": STAGING_PORT,
+    }
+
+
+def health_check(scope: str = "production") -> dict[str, Any]:
+    port = STAGING_PORT if scope == "staging" else PRODUCTION_PORT
+    required = [
+        ROOT / "web_panel/panel_server.py",
+        ROOT / "web_panel/static/index.html",
+        ROOT / "supervisor/production_environment_manager.py",
+        ROOT / "supervisor/production_deploy_controller.py",
+    ]
+    health = http_json(port, "/health")
+    status = http_json(port, "/api/status") if health.get("ok") else {"ok": False, "reason": "health_failed"}
+    payload = {
+        "ok": bool(health.get("ok") and status.get("ok") and all(path.exists() for path in required)),
+        "scope": scope,
+        "port": port,
+        "checked_at": now(),
+        "required_files_missing": [str(path.relative_to(ROOT)) for path in required if not path.exists()],
+        "health": health,
+        "status_api": {"ok": status.get("ok"), "status": status.get("status"), "keys": sorted((status.get("body") or {}).keys()) if isinstance(status.get("body"), dict) else []},
+        "services": service_discovery(),
+    }
+    atomic_write_json(STATE / f"{scope}_health_check_status.json", payload)
+    atomic_write_json(STATE / "last_health_check_status.json", payload)
+    write_environment_report("health_check", payload)
+    return payload
+
+
+def smoke_test(scope: str = "production") -> dict[str, Any]:
+    port = STAGING_PORT if scope == "staging" else PRODUCTION_PORT
+    health = health_check(scope)
+    status = http_json(port, "/api/status")
+    index = http_text(port, "/")
+    body = status.get("body") if isinstance(status.get("body"), dict) else {}
+    labels = [
+        "Canlıya Alma Durumu",
+        "Ön Canlı Sonucu",
+        "Geri Alma Sonucu",
+        "Deploy Komutları",
+        "Kalite Kapıları",
+    ]
+    checks = {
+        "health_pass": bool(health.get("ok")),
+        "status_api_pass": bool(status.get("ok")),
+        "dashboard_has_production_environment": "production_environment" in body,
+        "dashboard_has_deploy_commands": "deploy_commands" in body,
+        "index_turkish_labels": all(label in index.get("body", "") for label in labels),
+    }
+    payload = {
+        "ok": all(checks.values()),
+        "scope": scope,
+        "port": port,
+        "checked_at": now(),
+        "checks": checks,
+        "health": health,
+        "status_api_status": status.get("status"),
+    }
+    atomic_write_json(STATE / f"{scope}_smoke_test_status.json", payload)
+    atomic_write_json(STATE / "last_smoke_test_status.json", payload)
+    write_environment_report("smoke_test", payload)
+    return payload
+
+
+def rollback_point() -> dict[str, Any]:
+    status = git_status()
+    return {
+        "created_at": now(),
+        "branch": status.get("branch"),
+        "commit": status.get("head"),
+        "production_port": PRODUCTION_PORT,
+        "staging_port": STAGING_PORT,
+        "rollback_mode": "safe_logical_runtime_rollback",
+        "note": "No git reset or data mutation is performed automatically.",
+    }
+
+
+def staging_deploy(dry_run: bool = False) -> dict[str, Any]:
+    git = git_status()
+    critical = critical_exception_scan()
+    result: dict[str, Any] = {
+        "ok": False,
+        "status": "PENDING",
+        "scope": "staging",
+        "dry_run": dry_run,
+        "started_at": now(),
+        "git": git,
+        "remote_sync": remote_sync() if git.get("ok") else {"ok": False, "reason": "git_unavailable"},
+        "critical_exceptions": critical,
+        "commands": configured_commands(),
+        "mutating_cloud_operations_performed": False,
+    }
+    blockers = []
+    if not critical["ok"]:
+        blockers.append("critical_exception_detected")
+    if not git.get("ok"):
+        blockers.append("git_unavailable")
+    if git.get("blocking_dirty_files") and not dry_run:
+        blockers.append("git_blocking_dirty_files")
+    if blockers:
+        result.update({"status": "BLOCKED", "blockers": blockers})
+        write_stage_outputs(result)
+        return result
+    if dry_run:
+        result.update({"ok": True, "status": "PASS", "blockers": [], "health": {"ok": True, "mode": "dry_run"}, "smoke": {"ok": True, "mode": "dry_run"}})
+        write_stage_outputs(result)
+        return result
+    result["panel"] = ensure_panel(STAGING_PORT, "staging", "127.0.0.1", replace_mismatch=True)
+    result["health"] = health_check("staging")
+    result["smoke"] = smoke_test("staging")
+    result["ok"] = bool(result["panel"].get("ok") and result["health"].get("ok") and result["smoke"].get("ok"))
+    result["status"] = "PASS" if result["ok"] else "FAIL"
+    result["blockers"] = [] if result["ok"] else ["staging_health_or_smoke_failed"]
+    write_stage_outputs(result)
+    return result
+
+
+def production_deploy(dry_run: bool = False) -> dict[str, Any]:
+    git = git_status()
+    remote = remote_sync() if git.get("ok") else {"ok": False, "reason": "git_unavailable"}
+    critical = critical_exception_scan()
+    staging = read_json(STATE / "staging_deploy_status.json", {})
+    execute_enabled = configured_commands()["CODEX_PRODUCTION_DEPLOY_EXECUTE"]["configured"]
+    result: dict[str, Any] = {
+        "ok": False,
+        "status": "PENDING",
+        "scope": "production",
+        "dry_run": dry_run,
+        "started_at": now(),
+        "git": git,
+        "remote_sync": remote,
+        "critical_exceptions": critical,
+        "staging": {"status": staging.get("status"), "ok": staging.get("ok"), "commit": staging.get("git", {}).get("head")},
+        "commands": configured_commands(),
+        "execute_enabled": execute_enabled,
+        "mutating_cloud_operations_performed": False,
+    }
+    blockers = []
+    if not execute_enabled:
+        blockers.append("production_execute_flag_missing")
+    if not critical["ok"]:
+        blockers.append("critical_exception_detected")
+    if not git.get("ok"):
+        blockers.append("git_unavailable")
+    if git.get("blocking_dirty_files") and not dry_run:
+        blockers.append("git_blocking_dirty_files")
+    if not remote.get("ok") and not dry_run:
+        blockers.append("github_remote_not_synced")
+    if not staging.get("ok") and not dry_run:
+        blockers.append("staging_deploy_not_passed")
+    if blockers:
+        result.update({"status": "BLOCKED", "blockers": blockers})
+        write_production_outputs(result)
+        return result
+    point = rollback_point()
+    result["rollback_point"] = point
+    if dry_run:
+        result.update({"ok": True, "status": "PASS", "blockers": [], "health": {"ok": True, "mode": "dry_run"}, "smoke": {"ok": True, "mode": "dry_run"}})
+        write_production_outputs(result)
+        return result
+    atomic_write_json(STATE / "rollback_point.json", point)
+    result["panel"] = ensure_panel(PRODUCTION_PORT, "production", "0.0.0.0", replace_mismatch=True)
+    result["health"] = health_check("production")
+    result["smoke"] = smoke_test("production")
+    result["ok"] = bool(result["panel"].get("ok") and result["health"].get("ok") and result["smoke"].get("ok"))
+    result["status"] = "PASS" if result["ok"] else "FAIL"
+    result["blockers"] = [] if result["ok"] else ["production_health_or_smoke_failed"]
+    update_system_flags(result["ok"])
+    write_production_outputs(result)
+    return result
+
+
+def rollback(dry_run: bool = False) -> dict[str, Any]:
+    point = read_json(STATE / "rollback_point.json", rollback_point())
+    result = {
+        "ok": True,
+        "status": "PASS",
+        "scope": "production",
+        "dry_run": dry_run,
+        "checked_at": now(),
+        "rollback_point": point,
+        "mode": "safe_logical_runtime_rollback",
+        "git_reset_performed": False,
+        "data_mutation_performed": False,
+    }
+    if not dry_run:
+        result["health"] = health_check("production")
+        result["ok"] = bool(result["health"].get("ok"))
+        result["status"] = "PASS" if result["ok"] else "FAIL"
+    atomic_write_json(STATE / "rollback_status.json", result)
+    write_environment_report("rollback", result)
+    return result
+
+
+def update_system_flags(production_ok: bool) -> None:
+    state_path = STATE / "system_state.json"
+    state = read_json(state_path, {})
+    if not isinstance(state, dict):
+        state = {}
+    state.update(
+        {
+            "production_deployed": bool(production_ok),
+            "staging_deployed": bool(production_ok),
+            "repo_changes_applied": bool(production_ok),
+            "production_deploy_performed": bool(production_ok),
+            "staging_deploy_performed": bool(production_ok),
+            "mutating_cloud_operations_performed": False,
+            "production_target": "local_codex_dev_center_panel_and_cto_runtime",
+        }
+    )
+    atomic_write_json(state_path, state)
+
+
+def write_stage_outputs(result: dict[str, Any]) -> None:
+    atomic_write_json(STATE / "staging_deploy_status.json", result)
+    write_environment_report("staging_deploy", result)
+
+
+def write_production_outputs(result: dict[str, Any]) -> None:
+    atomic_write_json(STATE / "production_runtime_status.json", result)
+    write_environment_report("production_deploy", result)
+
+
+def write_environment_report(kind: str, payload: dict[str, Any]) -> None:
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    status = payload.get("status") or ("PASS" if payload.get("ok") else "FAIL")
+    lines = [
+        "# Production Environment Last Report",
+        "",
+        f"Generated at: {now()}",
+        f"Kind: {kind}",
+        f"Status: {status}",
+        f"Scope: {payload.get('scope', '-')}",
+        f"Dry run: {payload.get('dry_run', False)}",
+        "",
+        "## Safety",
+        "- Secret/IAM/database/DNS/firewall/billing/Google Ads mutate performed: false",
+        f"- Critical exception findings: {', '.join(payload.get('critical_exceptions', {}).get('matched_terms', [])) or 'none'}",
+        "",
+        "## Summary",
+        f"- Production port: {PRODUCTION_PORT}",
+        f"- Staging port: {STAGING_PORT}",
+        f"- Rollback mode: safe logical runtime rollback",
+    ]
+    blockers = payload.get("blockers", [])
+    if blockers:
+        lines += ["", "## Blockers"] + [f"- {item}" for item in blockers]
+    (REPORTS / "production_environment_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if kind == "staging_deploy":
+        (REPORTS / "staging_deploy_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if kind == "production_deploy":
+        (REPORTS / "production_runtime_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if kind == "rollback":
+        (REPORTS / "rollback_production_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def inspect_environment() -> dict[str, Any]:
+    payload = {
+        "ok": True,
+        "checked_at": now(),
+        "root": str(ROOT),
+        "python": sys.executable,
+        "git": git_status(),
+        "remote_sync": remote_sync(),
+        "services": service_discovery(),
+        "commands": configured_commands(),
+        "critical_exceptions": critical_exception_scan(),
+        "production_definition": "Codex Dev Center local web panel, CTO services, worker/recovery/watchdog/lifecycle state and dashboard flow.",
+    }
+    atomic_write_json(STATE / "production_environment_status.json", payload)
+    write_environment_report("inspect", payload)
+    return payload
+
+
+def print_and_exit(payload: dict[str, Any], as_json: bool) -> None:
+    print(json.dumps(payload, ensure_ascii=False, indent=2) if as_json else f"{payload.get('status', 'PASS' if payload.get('ok') else 'FAIL')}: {payload.get('scope', payload.get('checked_at', ''))}")
+    if not payload.get("ok"):
+        raise SystemExit(1)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--json", action="store_true")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("inspect")
+    health = sub.add_parser("health-check")
+    health.add_argument("--scope", choices=["staging", "production"], default="production")
+    smoke = sub.add_parser("smoke-test")
+    smoke.add_argument("--scope", choices=["staging", "production"], default="production")
+    staging = sub.add_parser("staging-deploy")
+    staging.add_argument("--dry-run", action="store_true")
+    production = sub.add_parser("production-deploy")
+    production.add_argument("--dry-run", action="store_true")
+    rb = sub.add_parser("rollback")
+    rb.add_argument("--dry-run", action="store_true")
+    rb.add_argument("--simulate", action="store_true")
+    args = parser.parse_args()
+
+    if args.cmd == "inspect":
+        payload = inspect_environment()
+    elif args.cmd == "health-check":
+        payload = health_check(args.scope)
+    elif args.cmd == "smoke-test":
+        payload = smoke_test(args.scope)
+    elif args.cmd == "staging-deploy":
+        payload = staging_deploy(args.dry_run)
+    elif args.cmd == "production-deploy":
+        payload = production_deploy(args.dry_run)
+    elif args.cmd == "rollback":
+        payload = rollback(args.dry_run or args.simulate)
+    else:
+        payload = {"ok": False, "status": "UNKNOWN_COMMAND"}
+    print_and_exit(payload, args.json)
+
+
+if __name__ == "__main__":
+    main()

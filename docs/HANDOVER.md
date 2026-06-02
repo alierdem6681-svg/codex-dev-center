@@ -80,3 +80,29 @@ Canli ortam notu:
 - Gercek staging/production/rollback komutlari environment ile tanimlanmadan canli deploy calismaz.
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmadan production komutu calismaz.
 - Kritik istisnalar otomatik bloklanir.
+
+---
+
+## Autonomous Production Environment v1
+
+Tarih: 2026-06-02
+
+Eksik deploy target blocker'lari policy-bound default komutlarla kapatildi.
+
+Eklenenler:
+- `supervisor/production_environment_manager.py`
+- `scripts/staging_deploy.sh`
+- `scripts/production_deploy.sh`
+- `scripts/rollback_production.sh`
+- `scripts/health_check.sh`
+- `scripts/smoke_test.sh`
+- `docs/PRODUCTION_DEPLOY_RUNBOOK.md`
+- `docs/AUTONOMOUS_PRODUCTION_POLICY.md`
+
+Yeni production tanimi:
+- Codex Dev Center paneli ve CTO/worker/recovery/watchdog/lifecycle runtime akisi.
+- Production portu: 8080.
+- Staging portu: 18080.
+- Google Ads, IAM, secret, billing, database, DNS/firewall veya musteri verisi mutate yok.
+
+Deploy controller artik env yoksa `state_templates/deploy_policy.json` icindeki default komutlari kullanir. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` default policy ile tanimlidir.

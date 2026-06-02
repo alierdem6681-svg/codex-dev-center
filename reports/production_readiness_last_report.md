@@ -1,6 +1,6 @@
 # Production Readiness Last Report
 
-Generated at: 2026-06-02T08:08:04+00:00
+Generated at: 2026-06-02T08:26:50+00:00
 Status: PASS
 Score: 100.0%
 
@@ -14,6 +14,7 @@ Score: 100.0%
 - worker_queue_recovery_test: PASS
 - dashboard_route_api_test: PASS
 - telegram_bridge_direct_cto_test: PASS
+- deploy_script_command_check: PASS
 - secret_leakage_scan: PASS
 - forbidden_operation_scan: PASS
 - staging_smoke_test: PASS

@@ -9,11 +9,39 @@
   "production_deploy_execute_flag_required": true,
   "rollback_required": true,
   "auto_rollback_on_failure": true,
+  "production_target": "local_codex_dev_center_panel_cto_worker_recovery_dashboard",
+  "commands": {
+    "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
+    "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
+    "CODEX_HEALTH_CHECK_COMMAND": "{python} supervisor/production_environment_manager.py health-check --scope production",
+    "CODEX_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope production"
+  },
+  "environment_defaults": {
+    "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
+    "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
+    "CODEX_PRODUCTION_DEPLOY_EXECUTE": "1"
+  },
+  "ports": {
+    "production_dashboard": 8080,
+    "staging_dashboard": 18080
+  },
+  "git_clean_required": true,
+  "github_remote_sync_required": true,
+  "secret_scan_required": true,
+  "forbidden_operation_scan_required": true,
+  "staging_health_check_required": true,
+  "staging_smoke_test_required": true,
+  "production_health_check_required": true,
+  "production_smoke_test_required": true,
+  "rollback_point_required": true,
   "database_migration_requires_approval": true,
   "dns_change_requires_approval": true,
   "secret_access_requires_approval": true,
   "iam_owner_editor_change_requires_approval": true,
   "billing_change_requires_approval": true,
   "google_ads_mutate_requires_approval": true,
+  "live_customer_data_loss_risk_requires_approval": true,
   "updated_at": "2026-06-02T00:00:00+00:00"
 }

@@ -10,27 +10,56 @@
       "requires_approval": false
     },
     {
+      "id": "staging_deploy",
+      "label": "Ön Canlıya Al",
+      "module": "production_environment_manager",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py staging-deploy"
+    },
+    {
+      "id": "health_check",
+      "label": "Sağlık Kontrolü",
+      "module": "production_environment_manager",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py health-check --scope production"
+    },
+    {
+      "id": "smoke_test",
+      "label": "Duman Testi",
+      "module": "production_environment_manager",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py smoke-test --scope production"
+    },
+    {
       "id": "production_deploy_start",
-      "label": "Otomatik Yayına Alma Denetleyicisi",
+      "label": "Otomatik Canlı Yayına Alma",
       "module": "deploy_pipeline",
       "risk": "critical",
       "enabled": true,
       "requires_approval": false,
+      "three_word_confirmation_required": false,
       "automatic_if_all_gates_pass": true,
       "requires_configured_deploy_target": true
+    },
+    {
+      "id": "rollback_simulation",
+      "label": "Geri Alma Simülasyonu",
+      "module": "production_environment_manager",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py rollback --dry-run"
     },
     {
       "id": "github_safe_flow_dry_run",
       "label": "GitHub Güvenli Akış Kontrolü",
       "module": "github_safe_flow",
-      "risk": "medium",
-      "enabled": true,
-      "requires_approval": false
-    },
-    {
-      "id": "rollback_simulation",
-      "label": "Geri Alma Simülasyonu",
-      "module": "deploy_pipeline",
       "risk": "medium",
       "enabled": true,
       "requires_approval": false

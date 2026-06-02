@@ -53,7 +53,9 @@ Kritik istisnalar otomatik yapılamaz:
 
 Codex Dev Center uygulamasının kendi repo/app deploy akışı için otomatik yayına alma kullanılabilir. Ancak tüm readiness kapıları, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
 
-Otomatik production için staging, production ve rollback komutları runtime environment ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmadan production komutu çalışmaz.
+Otomatik production için staging, production ve rollback komutları environment veya policy default ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` environment veya policy default olmadan production komutu çalışmaz.
+
+Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templates/deploy_policy.json` içinde tanımlıdır. Bu kapsam Google Ads, IAM, secret, billing, database, DNS/firewall veya müşteri verisi mutate işlemlerini kapsamaz.
 
 ## 8. Kayıt Zorunluluğu
 

@@ -14,6 +14,9 @@ ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().par
 STATE = ROOT / "state"
 REPORTS = ROOT / "reports"
 STATIC_DIR = ROOT / "web_panel" / "static"
+HOST = os.environ.get("CODEX_PANEL_HOST", "127.0.0.1")
+PORT = int(os.environ.get("CODEX_PANEL_PORT", "8080"))
+SCOPE = os.environ.get("CODEX_PANEL_SCOPE", "production")
 
 
 def now() -> str:
@@ -66,6 +69,13 @@ def status_payload():
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
         "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
+        "production_environment": read_json(STATE / "production_environment_status.json", {}),
+        "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
+        "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
+        "rollback": read_json(STATE / "rollback_status.json", {}),
+        "rollback_point": read_json(STATE / "rollback_point.json", {}),
+        "last_health_check": read_json(STATE / "last_health_check_status.json", {}),
+        "last_smoke_test": read_json(STATE / "last_smoke_test_status.json", {}),
         "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),
         "reports": sorted([p.name for p in REPORTS.glob("*.md")]) if REPORTS.exists() else [],
         "report_text": {
@@ -104,7 +114,16 @@ class PanelHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/health":
-            self.send_json({"ok": True, "service": "codex-panel", "production_pipeline": True})
+            self.send_json({
+                "ok": True,
+                "service": "codex-panel",
+                "production_pipeline": True,
+                "production_environment_manager": True,
+                "scope": SCOPE,
+                "root": str(ROOT),
+                "port": PORT,
+                "version": "production-environment-v1"
+            })
             return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
@@ -123,18 +142,27 @@ class PanelHandler(BaseHTTPRequestHandler):
         if action == "production_deploy_start":
             self.send_json(run_cmd([sys.executable, "supervisor/production_deploy_controller.py", "start", "--auto"], 300))
             return
+        if action == "staging_deploy":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "staging-deploy"], 420))
+            return
+        if action == "health_check":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "health-check", "--scope", "production"], 120))
+            return
+        if action == "smoke_test":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "smoke-test", "--scope", "production"], 120))
+            return
         if action == "github_safe_flow_dry_run":
             self.send_json(run_cmd([sys.executable, "supervisor/github_safe_flow.py", "dry-run"], 180))
             return
         if action == "rollback_simulation":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
+            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "rollback", "--dry-run"], 120))
             return
         self.send_json({"ok": False, "error": "unknown_action"}, 400)
 
 
 def main() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 8080), PanelHandler)
-    print("Codex Dev Center panel: http://127.0.0.1:8080")
+    server = ThreadingHTTPServer((HOST, PORT), PanelHandler)
+    print(f"Codex Dev Center panel: http://{HOST}:{PORT}")
     server.serve_forever()
 
 

@@ -2,8 +2,17 @@
   "updated_at": "2026-06-02T00:00:00+00:00",
   "automatic_production_enabled": true,
   "allowed_scope": "codex_dev_center_own_app_deploy_only",
+  "production_definition": "Codex Dev Center web panel, CTO services, worker/recovery/watchdog/lifecycle state and dashboard flow.",
   "manual_approval_required_for_normal_app_deploy": false,
+  "quality_gates_required_before_auto_deploy": true,
+  "staging_required_before_production": true,
+  "rollback_required_before_production": true,
   "auto_rollback_on_failure": true,
+  "commands": {
+    "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
+    "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback"
+  },
   "critical_exceptions_auto_block": [
     "secret_value_view_or_change",
     "iam_owner_editor_change",
@@ -13,5 +22,13 @@
     "critical_dns_firewall_change",
     "google_ads_live_mutate",
     "live_customer_or_data_loss_risk"
+  ],
+  "post_deploy_required_checks": [
+    "health_check",
+    "service_status",
+    "dashboard_status",
+    "telegram_status",
+    "worker_queue_recovery_status",
+    "rollback_point"
   ]
 }

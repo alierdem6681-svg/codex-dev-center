@@ -13,8 +13,14 @@
     "rollback_required": true,
     "secret_scan_required": true,
     "git_clean_required": true,
+    "github_remote_sync_required": true,
     "worker_recovery_required": true,
     "post_deploy_health_check_required": true,
-    "auto_rollback_on_failure": true
+    "post_deploy_smoke_test_required": true,
+    "auto_rollback_on_failure": true,
+    "show_deploy_command_status": true,
+    "show_last_health_check": true,
+    "show_last_smoke_test": true,
+    "show_last_error_recommendation": true
   }
 }

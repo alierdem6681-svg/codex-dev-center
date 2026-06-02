@@ -111,6 +111,7 @@ def import_smoke(results: dict[str, Any]) -> None:
     modules = [
         ROOT / "supervisor" / "production_deploy_controller.py",
         ROOT / "supervisor" / "production_readiness_suite.py",
+        ROOT / "supervisor" / "production_environment_manager.py",
         ROOT / "supervisor" / "github_safe_flow.py",
         ROOT / "web_panel" / "server.py",
     ]
@@ -130,9 +131,17 @@ def required_file_regression(results: dict[str, Any]) -> None:
     required = [
         "supervisor/production_deploy_controller.py",
         "supervisor/production_readiness_suite.py",
+        "supervisor/production_environment_manager.py",
         "supervisor/github_safe_flow.py",
+        "scripts/staging_deploy.sh",
+        "scripts/production_deploy.sh",
+        "scripts/rollback_production.sh",
+        "scripts/health_check.sh",
+        "scripts/smoke_test.sh",
         "docs/STAGING_ROLLBACK_READINESS_PLAN.md",
         "docs/PRODUCTION_READINESS_GATE.md",
+        "docs/PRODUCTION_DEPLOY_RUNBOOK.md",
+        "docs/AUTONOMOUS_PRODUCTION_POLICY.md",
         "state_templates/action_catalog.json",
         "state_templates/dashboard_settings.json",
         "state_templates/production_policy.json",
@@ -157,13 +166,14 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
 def dashboard_test(results: dict[str, Any]) -> None:
     index = (ROOT / "web_panel/static/index.html").read_text(encoding="utf-8", errors="replace")
     required_text = [
-        "Canlı Ortam",
-        "Ön Canlı",
+        "Canlıya Alma Durumu",
+        "Ön Canlı Sonucu",
         "Geri Alma",
         "Yayına Alma",
         "Görev Kuyruğu",
         "Toparlama",
-        "GitHub Senkronizasyonu",
+        "Deploy Komutları",
+        "Kalite Kapıları",
     ]
     missing = [item for item in required_text if item not in index]
     record(results, "dashboard_route_api_test", not missing, {"missing_text": missing})
@@ -237,7 +247,10 @@ def forbidden_operation_findings() -> list[dict[str, Any]]:
 def staging_and_rollback(results: dict[str, Any]) -> None:
     docs_ok = (ROOT / "docs/STAGING_ROLLBACK_READINESS_PLAN.md").exists()
     controller_ok = (ROOT / "supervisor/production_deploy_controller.py").exists()
-    record(results, "staging_smoke_test", docs_ok and controller_ok, {"mode": "dry_run_no_live_deploy"})
+    manager_ok = (ROOT / "supervisor/production_environment_manager.py").exists()
+    staging = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "staging-deploy", "--dry-run"], timeout=180)
+    rollback = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "rollback", "--dry-run"], timeout=120)
+    record(results, "staging_smoke_test", docs_ok and controller_ok and manager_ok and staging["ok"], {"mode": "dry_run", "result": staging})
 
     report = REPORTS / "rollback_simulation_last_report.md"
     report.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +262,39 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
         "- Canli komut calistirilmadi.\n",
         encoding="utf-8",
     )
-    record(results, "rollback_simulation", report.exists(), {"report": str(report.relative_to(ROOT))})
+    record(results, "rollback_simulation", report.exists() and rollback["ok"], {"report": str(report.relative_to(ROOT)), "result": rollback})
+
+
+def deploy_script_checks(results: dict[str, Any]) -> None:
+    scripts = [
+        ROOT / "scripts/staging_deploy.sh",
+        ROOT / "scripts/production_deploy.sh",
+        ROOT / "scripts/rollback_production.sh",
+        ROOT / "scripts/health_check.sh",
+        ROOT / "scripts/smoke_test.sh",
+    ]
+    policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
+    commands = policy.get("commands", {}) if isinstance(policy, dict) else {}
+    env_defaults = policy.get("environment_defaults", {}) if isinstance(policy, dict) else {}
+    required_commands = [
+        "CODEX_STAGING_DEPLOY_COMMAND",
+        "CODEX_PRODUCTION_DEPLOY_COMMAND",
+        "CODEX_ROLLBACK_COMMAND",
+        "CODEX_HEALTH_CHECK_COMMAND",
+        "CODEX_SMOKE_TEST_COMMAND",
+    ]
+    missing_commands = [key for key in required_commands if not commands.get(key)]
+    execute_default = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", ""))
+    record(
+        results,
+        "deploy_script_command_check",
+        all(path.exists() for path in scripts) and not missing_commands and execute_default == "1",
+        {
+            "scripts": [str(path.relative_to(ROOT)) for path in scripts],
+            "missing_commands": missing_commands,
+            "execute_default": execute_default,
+        },
+    )
 
 
 def chaos_simulations(results: dict[str, Any]) -> None:
@@ -281,6 +326,7 @@ def run_suite() -> dict[str, Any]:
     worker_queue_recovery(results)
     dashboard_test(results)
     telegram_test(results)
+    deploy_script_checks(results)
     security_scans(results)
     staging_and_rollback(results)
     chaos_simulations(results)

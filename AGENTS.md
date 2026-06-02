@@ -115,3 +115,15 @@ Otomatik yayina alma sadece su kosullarda calisabilir:
 - Kritik istisna bulunmamali.
 
 Kritik istisnalar otomatik yapilmaz: secret degeri gorme/degistirme, IAM owner/editor degisikligi, billing, database veri silme, geri dondurulemez migration, kritik DNS/firewall degisikligi, Google Ads live mutate ve canli veri kaybi riski. Bu hallerde controller durur ve risk raporu uretir.
+
+## AUTONOMOUS PRODUCTION ENVIRONMENT V1
+
+Deploy komutlari artik `state_templates/deploy_policy.json` icinde policy-bound default olarak tanimlidir. Environment variable varsa override eder; yoksa controller default komutlari kullanir.
+
+Default komutlar:
+- `CODEX_STAGING_DEPLOY_COMMAND={python} supervisor/production_environment_manager.py staging-deploy`
+- `CODEX_PRODUCTION_DEPLOY_COMMAND={python} supervisor/production_environment_manager.py production-deploy`
+- `CODEX_ROLLBACK_COMMAND={python} supervisor/production_environment_manager.py rollback`
+- `CODEX_PRODUCTION_DEPLOY_EXECUTE=1`
+
+Production kapsami sadece Codex Dev Center kendi panel/CTO/worker/recovery/dashboard runtime akisi ile sinirlidir.

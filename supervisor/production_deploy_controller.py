@@ -29,6 +29,12 @@ CRITICAL_EXCEPTION_TERMS = [
     "google ads mutate",
 ]
 
+DEFAULT_COMMANDS = {
+    "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
+    "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
+    "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
+}
+
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -51,17 +57,31 @@ def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def command_args(command: str) -> list[str]:
+    command = command.strip().replace("{root}", str(ROOT))
+    if command.startswith("{python}"):
+        rest = command[len("{python}") :].strip()
+        return [sys.executable] + shlex.split(rest)
+    if command.startswith("{bash}"):
+        rest = command[len("{bash}") :].strip()
+        bash = os.environ.get("CODEX_BASH") or r"C:\Program Files\Git\bin\bash.exe"
+        return [bash] + shlex.split(rest)
+    return shlex.split(command, posix=os.name != "nt")
+
+
 def run_cmd(command: str, timeout: int = 300) -> dict[str, Any]:
     if not command.strip():
         return {"ok": False, "skipped": True, "stdout": "", "stderr": "empty_command", "returncode": 1}
     try:
-        proc = subprocess.run(shlex.split(command), cwd=str(ROOT), text=True, capture_output=True, timeout=timeout)
+        args = command_args(command)
+        proc = subprocess.run(args, cwd=str(ROOT), text=True, capture_output=True, timeout=timeout)
         return {
             "ok": proc.returncode == 0,
             "returncode": proc.returncode,
             "stdout": proc.stdout[-4000:],
             "stderr": proc.stderr[-4000:],
             "cmd": command,
+            "args": args,
         }
     except Exception as exc:
         return {"ok": False, "returncode": 1, "stdout": "", "stderr": str(exc), "cmd": command}
@@ -81,12 +101,46 @@ def settings() -> dict[str, Any]:
     }
 
 
+def deploy_policy() -> dict[str, Any]:
+    policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
+    production = read_json(ROOT / "state_templates/production_policy.json", {})
+    return {
+        "deploy_policy": policy if isinstance(policy, dict) else {},
+        "production_policy": production if isinstance(production, dict) else {},
+    }
+
+
+def configured_command(name: str) -> dict[str, str]:
+    if os.environ.get(name, "").strip():
+        return {"command": os.environ[name].strip(), "source": "environment"}
+    policies = deploy_policy()
+    deploy = policies["deploy_policy"]
+    production = policies["production_policy"]
+    commands = deploy.get("commands", {}) if isinstance(deploy.get("commands", {}), dict) else {}
+    env_defaults = deploy.get("environment_defaults", {}) if isinstance(deploy.get("environment_defaults", {}), dict) else {}
+    production_commands = production.get("commands", {}) if isinstance(production.get("commands", {}), dict) else {}
+    value = commands.get(name) or env_defaults.get(name) or production_commands.get(name) or DEFAULT_COMMANDS.get(name, "")
+    return {"command": str(value).strip(), "source": "policy_default" if value else "missing"}
+
+
+def execute_enabled() -> bool:
+    if os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip():
+        return os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "").strip() == "1"
+    policies = deploy_policy()
+    deploy = policies["deploy_policy"]
+    env_defaults = deploy.get("environment_defaults", {}) if isinstance(deploy.get("environment_defaults", {}), dict) else {}
+    return str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "1")) == "1"
+
+
 def critical_exception_scan() -> dict[str, Any]:
+    staging = configured_command("CODEX_STAGING_DEPLOY_COMMAND")["command"]
+    production = configured_command("CODEX_PRODUCTION_DEPLOY_COMMAND")["command"]
+    rollback = configured_command("CODEX_ROLLBACK_COMMAND")["command"]
     text = " ".join(
         [
-            os.environ.get("CODEX_STAGING_DEPLOY_COMMAND", ""),
-            os.environ.get("CODEX_PRODUCTION_DEPLOY_COMMAND", ""),
-            os.environ.get("CODEX_ROLLBACK_COMMAND", ""),
+            staging,
+            production,
+            rollback,
             os.environ.get("CODEX_PRODUCTION_DEPLOY_DESCRIPTION", ""),
         ]
     ).lower()
@@ -113,11 +167,8 @@ def run_readiness() -> dict[str, Any]:
 
 
 def health_check() -> dict[str, Any]:
-    candidates = [
-        ROOT / "supervisor/service_watchdog.py",
-        ROOT / "web_panel/server.py",
-    ]
-    return {"ok": all(p.exists() for p in candidates), "mode": "static_post_deploy_health_check"}
+    command = "{python} supervisor/production_environment_manager.py health-check --scope production"
+    return run_cmd(command, timeout=180)
 
 
 def start(auto: bool = False) -> dict[str, Any]:
@@ -125,10 +176,13 @@ def start(auto: bool = False) -> dict[str, Any]:
     readiness = run_readiness() if cfg["readiness_required"] else {"ok": True, "status": {}}
     critical = critical_exception_scan()
 
-    staging_cmd = os.environ.get("CODEX_STAGING_DEPLOY_COMMAND", "").strip()
-    production_cmd = os.environ.get("CODEX_PRODUCTION_DEPLOY_COMMAND", "").strip()
-    rollback_cmd = os.environ.get("CODEX_ROLLBACK_COMMAND", "").strip()
-    execute_enabled = os.environ.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", "") == "1"
+    staging_config = configured_command("CODEX_STAGING_DEPLOY_COMMAND")
+    production_config = configured_command("CODEX_PRODUCTION_DEPLOY_COMMAND")
+    rollback_config = configured_command("CODEX_ROLLBACK_COMMAND")
+    staging_cmd = staging_config["command"]
+    production_cmd = production_config["command"]
+    rollback_cmd = rollback_config["command"]
+    production_execute_enabled = execute_enabled()
 
     blockers: list[str] = []
     if not cfg["automatic_production_enabled"]:
@@ -143,7 +197,7 @@ def start(auto: bool = False) -> dict[str, Any]:
         blockers.append("production_deploy_target_missing")
     if cfg["rollback_required"] and not rollback_cmd:
         blockers.append("rollback_command_missing")
-    if not execute_enabled:
+    if not production_execute_enabled:
         blockers.append("production_execute_flag_missing")
 
     result: dict[str, Any] = {
@@ -158,7 +212,13 @@ def start(auto: bool = False) -> dict[str, Any]:
             "staging_command_configured": bool(staging_cmd),
             "production_command_configured": bool(production_cmd),
             "rollback_command_configured": bool(rollback_cmd),
-            "execute_enabled": execute_enabled,
+            "execute_enabled": production_execute_enabled,
+            "staging_command_source": staging_config["source"],
+            "production_command_source": production_config["source"],
+            "rollback_command_source": rollback_config["source"],
+            "staging_command": staging_cmd,
+            "production_command": production_cmd,
+            "rollback_command": rollback_cmd,
         },
         "blockers": blockers,
         "production_deploy_performed": False,
