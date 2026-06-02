@@ -146,6 +146,18 @@ jobs:
             --exclude="$RUNTIME_DIR/.venv" \
             --exclude="$RUNTIME_DIR/venv" \
             --exclude="$RUNTIME_DIR/node_modules" \
+            --exclude="$RUNTIME_DIR/state" \
+            --exclude="$RUNTIME_DIR/logs" \
+            --exclude="$RUNTIME_DIR/workspaces" \
+            --exclude="$RUNTIME_DIR/backups" \
+            --exclude="$RUNTIME_DIR/tmp" \
+            --exclude="$RUNTIME_DIR/secrets" \
+            --exclude="$RUNTIME_DIR/.env" \
+            --exclude="$RUNTIME_DIR/.env.*" \
+            --exclude="$RUNTIME_DIR/*.log" \
+            --exclude="$RUNTIME_DIR/*.ndjson" \
+            --exclude="$RUNTIME_DIR/*.pem" \
+            --exclude="$RUNTIME_DIR/*.key" \
             --exclude="$RUNTIME_DIR/__pycache__" \
             -czf "$backup" \
             -C "$(dirname "$RUNTIME_DIR")" "$(basename "$RUNTIME_DIR")"
