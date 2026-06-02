@@ -11,6 +11,7 @@ try:
         TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
         TASK_STATUS_PENDING,
+        TASK_STATUS_QUEUED,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -23,6 +24,7 @@ except ImportError:
         TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
         TASK_STATUS_PENDING,
+        TASK_STATUS_QUEUED,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -131,7 +133,12 @@ def dispatch(_args):
 
     idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
     queue, _changes = normalize_queue_payload(queue)
-    pending_tasks = [t for t in queue.get("tasks", []) if is_worker_eligible_task(t)]
+    dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
+    pending_tasks = [
+        t
+        for t in queue.get("tasks", [])
+        if is_worker_eligible_task(t) and normalize_status(t.get("status")) in dispatchable_statuses
+    ]
 
     assignments = []
     for worker, task in zip(idle_workers, pending_tasks):
