@@ -1,0 +1,49 @@
+name: VM Smoke Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Runner identity
+        run: |
+          set -e
+          echo "===== WHOAMI ====="
+          whoami
+          echo "===== HOSTNAME ====="
+          hostname
+          echo "===== PWD ====="
+          pwd
+          echo "===== ID ====="
+          id
+
+      - name: VM project directory check
+        run: |
+          set -e
+          echo "===== /opt/codex-dev-center ====="
+          ls -lah /opt/codex-dev-center
+          test -d /opt/codex-dev-center
+
+      - name: Service status check
+        run: |
+          set -e
+          echo "===== SERVICES ====="
+          systemctl is-active codex-panel || true
+          systemctl is-active codex-lifecycle || true
+          systemctl is-active codex-watchdog || true
+          systemctl is-active codex-worker-1 || true
+          systemctl is-active codex-worker-2 || true
+          systemctl is-active codex-worker-3 || true
+          systemctl is-active codex-worker-4 || true
+
+      - name: Local dashboard check
+        run: |
+          set -e
+          echo "===== LOCAL DASHBOARD ====="
+          curl -I http://127.0.0.1:8080 || true
