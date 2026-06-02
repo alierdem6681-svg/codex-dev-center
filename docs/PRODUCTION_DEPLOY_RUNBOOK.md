@@ -1,4 +1,4 @@
-# Production Deploy Runbook
+﻿# Production Deploy Runbook
 
 Tarih: 2026-06-02
 
@@ -6,20 +6,46 @@ Bu runbook Codex Dev Center uygulamasının kendi panel, CTO, worker, recovery, 
 
 ## Production Tanımı
 
-Production hedefi yerel Codex Dev Center çalışma zamanıdır:
+Production hedefi GitHub Actions self-hosted runner ile yönetilen VM çalışma zamanıdır:
 
-- Production dashboard: `127.0.0.1:8080`
+- VM hedefi: `codex-dev-center-01`
+- Runtime dizini: `/opt/codex-dev-center`
+- Production dashboard: VM içinde `127.0.0.1:8080`, dış erişimde mevcut statik IP panel adresi
 - Staging dashboard: `127.0.0.1:18080`
 - Panel servisi: `web_panel/panel_server.py`
 - Deploy yöneticisi: `supervisor/production_environment_manager.py`
 - Deploy controller: `supervisor/production_deploy_controller.py`
 - Panel giriş modu: kullanıcı adı/şifre, imzalı oturum çerezi
 
-Windows ortamında systemd yoksa servis keşfi panel portu, process durumu, health endpoint ve runtime state dosyaları üzerinden yapılır.
+Production dosyalarına doğrudan SSH ile müdahale edilmez. Backup, validate, restart ve smoke check adımları GitHub Actions self-hosted runner üzerinde çalışır.
+
+## GitHub Actions Kapısı
+
+Canlıya alma sadece manuel GitHub Actions workflow ile yapılır:
+
+- Workflow adı: `Deploy to VM`
+- Workflow dosyası: `.github/workflows/deploy-vm.yml`
+- Tetikleme: `workflow_dispatch`
+- Zorunlu confirm alanı: `DEPLOY-CODEX-VM`
+- Runner hedefi: `codex-dev-center-01`
+- Runtime dizini: `/opt/codex-dev-center`
+
+Confirm alanı tam olarak `DEPLOY-CODEX-VM` değilse workflow daha checkout öncesinde durur. Runner adı veya hostname `codex-dev-center-01` ile eşleşmezse deploy durur.
+
+Windows geliştirme ortamında systemd yoksa servis keşfi panel portu, process durumu, health endpoint ve runtime state dosyaları üzerinden yapılır. Production restart adımı yalnızca VM runner üzerinde systemd servisleri varsa çalışır.
+
+Runner ön koşulları:
+
+- `python3`
+- `tar`
+- `rsync`
+- `curl`
+- `systemctl` erişimi
+- `/opt/codex-dev-center` ve `/opt/codex-dev-center-backups` için gerekli sudo yetkisi
 
 ## Komutlar
 
-Policy-bound varsayılan komutlar:
+Policy-bound varsayılan komutlar yerel doğrulama ve controller blokajları içindir:
 
 - `CODEX_STAGING_DEPLOY_COMMAND={python} supervisor/production_environment_manager.py staging-deploy`
 - `CODEX_PRODUCTION_DEPLOY_COMMAND={python} supervisor/production_environment_manager.py production-deploy`
@@ -34,20 +60,23 @@ Shell script karşılıkları:
 - `scripts/health_check.sh`
 - `scripts/smoke_test.sh`
 
+Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanılmaz. `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur.
+
 ## Sıra
 
-1. Git clean kontrolü yapılır.
-2. GitHub `origin/main` senkronu doğrulanır.
-3. Secret scan ve forbidden operation scan çalışır.
-4. Python compile ve JSON validation çalışır.
-5. Unit, integration, regression, worker/queue/recovery, dashboard ve Telegram smoke kapıları geçer.
-6. Staging 18080 portunda ayağa kalkar.
-7. Staging health ve smoke test geçer.
-8. Rollback simulation geçer.
-9. Production 8080 portunda doğru repo köküyle çalışır.
-10. Production health ve smoke test geçer.
-11. Rollback noktası `state/rollback_point.json` içine kaydedilir.
-12. Son raporlar `reports/` altında güncellenir.
+1. GitHub Actions `Deploy to VM` workflow'u manuel çalıştırılır.
+2. Confirm alanı `DEPLOY-CODEX-VM` olarak doğrulanır.
+3. Runner hedefinin `codex-dev-center-01` olduğu doğrulanır.
+4. İstenen branch veya commit checkout edilir.
+5. Python compile ve JSON validation çalışır.
+6. Production readiness suite çalışır.
+7. Mevcut runtime `/opt/codex-dev-center-backups` altına yedeklenir.
+8. Repo içeriği `/opt/codex-dev-center` dizinine senkronize edilir.
+9. Runtime içinde compile ve readiness suite tekrar çalışır.
+10. Kurulu systemd servisleri varsa restart edilir.
+11. Production health check `127.0.0.1:8080/health` üzerinden geçer.
+12. Production smoke check `/login` ekranını doğrular.
+13. GitHub Actions step summary deploy, backup ve smoke sonucunu kaydeder.
 
 ## Rollback
 

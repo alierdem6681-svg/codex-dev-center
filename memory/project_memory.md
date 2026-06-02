@@ -1,4 +1,4 @@
-# PROJECT MEMORY
+﻿# PROJECT MEMORY
 
 Bu sistem Denizkan Bey'in projelerini Codex/CTO/worker mimarisi ile geliştirmek için kurulmaktadır.
 
@@ -57,3 +57,22 @@ Runtime secret dosyalari repo disinda kalir:
 - `state/panel_session_secret.txt`
 
 Ilk kullanici varsayilan olarak yalnizca lokal erisimden kurulabilir; uzak kurulum icin `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` gerekir. Otomasyon token query kullanmaz, servis oturum cookie'si uretir.
+
+## 2026-06-02 GitHub Actions VM Deploy Gate v1
+
+Kullanici production dosyalarina dogrudan SSH/VM mudahalesi yapilmamasini, canliya alma isleminin sadece GitHub Actions uzerinden yapilmasini istedi.
+
+Yeni sozlesme:
+
+- Repo: `alierdem6681-svg/codex-dev-center`
+- Workflow adi: `Deploy to VM`
+- Workflow turu: manuel `workflow_dispatch`
+- Confirm alani: `DEPLOY-CODEX-VM`
+- VM hedefi: `codex-dev-center-01`
+- Runtime dizini: `/opt/codex-dev-center`
+
+`.github/workflows/deploy-vm.yml` GitHub Actions main workflow'u olarak guclendirildi. Workflow self-hosted runner uzerinde confirm, runner hedefi, checkout, preflight, backup, runtime sync, validate, service restart ve smoke check adimlarini calistirir.
+
+Policy `production_deploy_channel=github_actions_manual` oldu. Controller ve production environment manager GitHub Actions disinda production deploy denemesini `github_actions_workflow_required` blocker'i ile durdurur.
+
+Bu paket production deploy calistirmadi; branch/commit/PR hazirlamak icindir.

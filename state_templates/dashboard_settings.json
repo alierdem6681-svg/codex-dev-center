@@ -16,7 +16,12 @@
     "runtime_state_file": "state/panel_auth.json"
   },
   "production": {
-    "automatic_production_enabled": true,
+    "automatic_production_enabled": false,
+    "deploy_channel": "github_actions_manual",
+    "deploy_workflow_name": "Deploy to VM",
+    "deploy_confirm_phrase_required": true,
+    "vm_target": "codex-dev-center-01",
+    "runtime_directory": "/opt/codex-dev-center",
     "readiness_required": true,
     "staging_required": true,
     "rollback_required": true,

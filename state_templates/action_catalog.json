@@ -63,13 +63,16 @@
     },
     {
       "id": "production_deploy_start",
-      "label": "Otomatik Canlı Yayına Alma",
+      "label": "GitHub Actions ile Canlı Yayına Alma",
       "module": "deploy_pipeline",
       "risk": "critical",
-      "enabled": true,
-      "requires_approval": false,
-      "three_word_confirmation_required": false,
-      "automatic_if_all_gates_pass": true,
+      "enabled": false,
+      "requires_approval": true,
+      "github_actions_only": true,
+      "workflow_name": "Deploy to VM",
+      "confirm_phrase": "DEPLOY-CODEX-VM",
+      "three_word_confirmation_required": true,
+      "automatic_if_all_gates_pass": false,
       "requires_configured_deploy_target": true
     },
     {

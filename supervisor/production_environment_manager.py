@@ -128,6 +128,15 @@ def deploy_policy() -> dict[str, Any]:
     return {"deploy_policy": policy, "production_policy": production, "commands": merged}
 
 
+def deploy_channel() -> str:
+    policy = deploy_policy()["deploy_policy"]
+    return str(policy.get("production_deploy_channel", "local_controller"))
+
+
+def github_actions_context() -> bool:
+    return os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+
+
 def configured_commands() -> dict[str, Any]:
     policy = deploy_policy()
     commands = {}
@@ -487,6 +496,8 @@ def production_deploy(dry_run: bool = False) -> dict[str, Any]:
     blockers = []
     if not execute_enabled:
         blockers.append("production_execute_flag_missing")
+    if deploy_channel() == "github_actions_manual" and not github_actions_context() and not dry_run:
+        blockers.append("github_actions_workflow_required")
     if not critical["ok"]:
         blockers.append("critical_exception_detected")
     if not git.get("ok"):

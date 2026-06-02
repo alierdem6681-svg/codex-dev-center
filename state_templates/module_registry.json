@@ -100,7 +100,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Ön canlı, test kapıları, canlı ortam yayına alma ve geri alma denetleyicisi.",
+      "description": "Ön canlı, test kapıları, GitHub Actions manuel canlı yayına alma ve geri alma denetleyicisi.",
       "actions": [
         "production_readiness_suite",
         "staging_deploy",
