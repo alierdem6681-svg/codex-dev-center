@@ -76,3 +76,15 @@ Yeni sozlesme:
 Policy `production_deploy_channel=github_actions_manual` oldu. Controller ve production environment manager GitHub Actions disinda production deploy denemesini `github_actions_workflow_required` blocker'i ile durdurur.
 
 Bu paket production deploy calistirmadi; branch/commit/PR hazirlamak icindir.
+
+## 2026-06-02 Panel First User Bootstrap Workflow v1
+
+Canli panel ilk kullanici kurulumu GitHub Actions self-hosted runner uzerinden yapilacak sekilde workflow eklendi.
+
+- Workflow: `Bootstrap Panel User`
+- Dosya: `.github/workflows/bootstrap-panel-user.yml`
+- Confirm: `BOOTSTRAP-PANEL-USER`
+- Secret kaynaklari: `CODEX_PANEL_BOOTSTRAP_USERNAME`, `CODEX_PANEL_BOOTSTRAP_PASSWORD`
+- Runtime auth state: `/opt/codex-dev-center/state/panel_auth.json`
+
+Parola repo'ya, dokumantasyona veya loglara yazilmamalidir. Workflow `auth.setup_user()` ile PBKDF2 hash uretir, panel servisini restart eder ve login smoke check calistirir.

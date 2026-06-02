@@ -106,3 +106,11 @@ Faz 19B-10A Model Policy
 - [x] Controller GitHub Actions disinda production deploy'u `github_actions_workflow_required` ile blokluyor.
 - [x] Readiness suite workflow dosyasini ve confirm/runner/runtime sozlesmesini kontrol ediyor.
 - [ ] Self-hosted runner uzerinde ilk manuel workflow calistirma ve servis restart/smoke sonucu.
+
+## Faz 27 - Panel First User Bootstrap
+
+- [x] VM'ye SSH kullanmadan ilk panel kullanicisi olusturma workflow'u eklendi.
+- [x] Kullanici/sifre kaynagi GitHub Secrets olarak tanimlandi.
+- [x] Runtime auth state PBKDF2 hash uretimiyle olusturulacak.
+- [x] Bootstrap sonrasi panel restart ve login smoke check zorunlu.
+- [ ] Bootstrap workflow canli ortamda calistirildi ve login dogrulandi.
