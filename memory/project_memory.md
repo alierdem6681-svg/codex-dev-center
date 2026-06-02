@@ -100,3 +100,12 @@ Dashboard pipeline gorunurlugu ve deploy QA kapilari genisletildi.
 - Production readiness suite `yaml_validation` kapisi eklendi.
 
 Bu paket CTO task-to-deploy zinciri icin non-destructive dashboard/pipeline marker testi olarak kullanilacak.
+
+## 2026-06-02 Worker Lifecycle Smoke Check v1
+
+Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
+
+- Bos kuyrukta worker servislerinin inactive/sleeping olmasi hata degildir.
+- Aktif gorev varken hicbir worker servisi active degilse workflow fail olur.
+- Worker state `IDLE`, `SLEEPING` veya `STOPPED` iken `current_task` dolu kalirsa workflow fail olur.
+- Worker state `RUNNING` ve servis inactive ise workflow fail olur.

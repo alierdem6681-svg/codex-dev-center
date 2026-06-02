@@ -45,6 +45,12 @@ jobs:
           systemctl is-active codex-worker-3 || true
           systemctl is-active codex-worker-4 || true
 
+      - name: Worker lifecycle check
+        run: |
+          set -e
+          cd /opt/codex-dev-center
+          python3 scripts/worker_lifecycle_check.py --runtime /opt/codex-dev-center --json
+
       - name: Local dashboard check
         run: |
           set -e
