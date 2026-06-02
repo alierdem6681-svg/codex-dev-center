@@ -227,7 +227,7 @@ jobs:
 
           echo "===== WORKER LIFECYCLE ====="
           cd "$RUNTIME_DIR"
-          python3 scripts/worker_lifecycle_check.py --runtime "$RUNTIME_DIR" --json
+          python3 scripts/worker_lifecycle_check.py --runtime "$RUNTIME_DIR" --repair --json
 
           echo "===== DASHBOARD HEALTH ====="
           for i in $(seq 1 20); do

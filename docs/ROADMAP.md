@@ -130,5 +130,7 @@ Faz 19B-10A Model Policy
 
 - [x] Worker servis durumunu kuyruk durumuyla birlikte degerlendiren `worker_lifecycle_check.py` eklendi.
 - [x] Bos kuyrukta sleeping/inactive worker durumu beklenen davranis olarak siniflandirildi.
-- [x] Aktif kuyruk varken worker servislerinin tamamen inactive kalmasi fail kapisina baglandi.
+- [x] Worker-eligible aktif kuyruk varken worker servislerinin tamamen inactive kalmasi fail kapisina baglandi.
 - [x] `IDLE/SLEEPING + current_task` ve `RUNNING + inactive service` tutarsizliklari fail olur.
+- [x] Telegram ve high/critical approval görevleri worker-eligible sayilmadan raporlanir.
+- [x] Deploy smoke worker-eligible görev varsa recovery + lifecycle wake dener.
