@@ -125,3 +125,10 @@ Faz 19B-10A Model Policy
 - [x] Runtime `github_actions_status.json` ve `pipeline_status.json` state dosyalari dashboard'a baglandi.
 - [x] Production readiness suite `yaml_validation` kapisi eklendi.
 - [x] Bu paket PR/merge/deploy akisi ile canli dashboard'da dogrulandi.
+
+## Faz 29 - Worker Lifecycle Smoke Gate
+
+- [x] Worker servis durumunu kuyruk durumuyla birlikte degerlendiren `worker_lifecycle_check.py` eklendi.
+- [x] Bos kuyrukta sleeping/inactive worker durumu beklenen davranis olarak siniflandirildi.
+- [x] Aktif kuyruk varken worker servislerinin tamamen inactive kalmasi fail kapisina baglandi.
+- [x] `IDLE/SLEEPING + current_task` ve `RUNNING + inactive service` tutarsizliklari fail olur.

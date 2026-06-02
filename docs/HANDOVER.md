@@ -202,3 +202,19 @@ Canli dogrulama:
 - Login page: `http://34.185.153.184:8080/login` 200.
 - Dashboard `Pipeline Gözlemi`: PASS.
 - Runtime marker: `pipeline_status.task_to_deploy_test=PASS`.
+
+---
+
+## Worker Lifecycle Smoke Check v1
+
+Tarih: 2026-06-02
+
+Eklenenler:
+- `scripts/worker_lifecycle_check.py`
+- Deploy ve VM smoke workflow'larında worker lifecycle kapısı.
+
+Yeni davranis:
+- Kuyrukta aktif görev varsa en az bir worker servisinin aktif olması zorunludur.
+- Kuyruk boşsa worker servislerinin sleeping/inactive olması beklenen idle davranış olarak kabul edilir.
+- `IDLE`, `SLEEPING` veya `STOPPED` worker üstünde `current_task` dolu kalırsa kapı fail olur.
+- `RUNNING` worker current_task taşırken servis aktif değilse kapı fail olur.
