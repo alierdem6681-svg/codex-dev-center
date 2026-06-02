@@ -18,6 +18,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       CONFIRM_PHRASE: BOOTSTRAP-PANEL-USER
       VM_TARGET: codex-dev-center-01
       RUNTIME_DIR: /opt/codex-dev-center

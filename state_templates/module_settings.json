@@ -17,7 +17,12 @@
     "compact_mode": true,
     "theme": "soft_neutral",
     "auth_mode": "username_password",
-    "token_login_enabled": false
+    "token_login_enabled": false,
+    "show_runner_status": true,
+    "show_last_deploy_run": true,
+    "show_last_smoke_run": true,
+    "show_backup_status": true,
+    "show_task_to_deploy_status": true
   },
   "panel_auth": {
     "enabled": true,

@@ -88,3 +88,15 @@ Canli panel ilk kullanici kurulumu GitHub Actions self-hosted runner uzerinden y
 - Runtime auth state: `/opt/codex-dev-center/state/panel_auth.json`
 
 Parola repo'ya, dokumantasyona veya loglara yazilmamalidir. Workflow `auth.setup_user()` ile PBKDF2 hash uretir, panel servisini restart eder ve login smoke check calistirir.
+
+## 2026-06-02 Pipeline Observability + QA Hardening v1
+
+Dashboard pipeline gorunurlugu ve deploy QA kapilari genisletildi.
+
+- `Pipeline Gözlemi` dashboard bolumu runner, son deploy run, son smoke, commit, backup ve task-to-deploy marker bilgilerini gosterir.
+- Deploy workflow runtime `state/github_actions_status.json` ve `state/pipeline_status.json` yazar.
+- Deploy workflow YAML sanity, forbidden executable scan, backup file validation, public health/login ve API auth behavior kontrollerini calistirir.
+- VM Smoke Check workflow son smoke sonucunu runtime state'e yazar.
+- Production readiness suite `yaml_validation` kapisi eklendi.
+
+Bu paket CTO task-to-deploy zinciri icin non-destructive dashboard/pipeline marker testi olarak kullanilacak.

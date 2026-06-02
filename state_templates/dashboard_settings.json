@@ -33,6 +33,11 @@
     "post_deploy_smoke_test_required": true,
     "auto_rollback_on_failure": true,
     "show_deploy_command_status": true,
+    "show_runner_status": true,
+    "show_last_deploy_run": true,
+    "show_last_smoke_run": true,
+    "show_backup_status": true,
+    "show_task_to_deploy_status": true,
     "show_last_health_check": true,
     "show_last_smoke_test": true,
     "show_last_error_recommendation": true

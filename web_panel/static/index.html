@@ -126,6 +126,10 @@
 
       <div class="three">
         <section>
+          <h2>Pipeline Gözlemi</h2>
+          <div id="pipelineStatusBox"></div>
+        </section>
+        <section>
           <h2>Deploy Komutları</h2>
           <div id="commandBox"></div>
         </section>
@@ -255,6 +259,8 @@
         latest = data;
         const readiness = data.production_readiness || {};
         const deploy = data.production_deploy || {};
+        const actionsState = data.github_actions || {};
+        const pipelineState = data.pipeline_status || {};
         const staging = data.staging_deploy || {};
         const runtime = data.production_runtime || {};
         const rollback = data.rollback || {};
@@ -272,8 +278,19 @@
           `Ön canlı: ${staging.status || '-'}`,
           `Canlı: ${runtime.status || deploy.status || '-'}`,
           `Sağlık: ${health.status || (health.ok === undefined ? '-' : health.ok)}`,
-          `Duman: ${smoke.status || (smoke.ok === undefined ? '-' : smoke.ok)}`
+          `Duman: ${smoke.status || actionsState.last_smoke_status || (smoke.ok === undefined ? '-' : smoke.ok)}`
         ].map(badge).join('');
+        pipelineStatusBox.innerHTML = [
+          `Runner: ${actionsState.runner_name || '-'}`,
+          `VM: ${actionsState.vm_target || '-'}`,
+          `Son deploy: ${actionsState.last_deploy_status || '-'}`,
+          `Run ID: ${actionsState.last_deploy_run_id || '-'}`,
+          `Commit: ${(actionsState.last_deploy_commit || '').slice(0, 8) || '-'}`,
+          `Zaman: ${actionsState.last_deploy_at || '-'}`,
+          `Son smoke: ${actionsState.last_smoke_status || '-'}`,
+          `Backup: ${actionsState.last_backup_path ? 'var' : '-'}`,
+          `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`
+        ].map(badge).join('<br>');
         const commands = data.deploy_commands || {};
         commandBox.innerHTML = Object.entries(commands).map(([key, value]) => {
           const label = key.replace('CODEX_', '').replaceAll('_', ' ');

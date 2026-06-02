@@ -130,6 +130,8 @@ def status_payload():
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
         "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
+        "github_actions": read_json(STATE / "github_actions_status.json", {}),
+        "pipeline_status": read_json(STATE / "pipeline_status.json", {}),
         "rollback": read_json(STATE / "rollback_status.json", {}),
         "rollback_point": read_json(STATE / "rollback_point.json", {}),
         "last_health_check": read_json(STATE / "last_health_check_status.json", {}),
