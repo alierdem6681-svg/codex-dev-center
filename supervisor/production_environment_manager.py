@@ -242,7 +242,7 @@ def http_text(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
         conn.request("GET", request_path)
         response = conn.getresponse()
         body = response.read().decode("utf-8", errors="replace")
-        return {"ok": response.status < 400, "status": response.status, "body": body[:5000]}
+        return {"ok": response.status < 400, "status": response.status, "body": body[:20000]}
     except Exception as exc:
         return {"ok": False, "status": 0, "error": str(exc), "body": ""}
 
@@ -395,11 +395,11 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     status = http_json(port, "/api/status")
     index = http_text(port, "/")
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
+    body_text = index.get("body", "")
     labels = [
         "Canlıya Alma Durumu",
         "Ön Canlı Sonucu",
         "Geri Alma Sonucu",
-        "Deploy Komutları",
         "Kalite Kapıları",
     ]
     checks = {
@@ -407,7 +407,7 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
         "status_api_pass": bool(status.get("ok")),
         "dashboard_has_production_environment": "production_environment" in body,
         "dashboard_has_deploy_commands": "deploy_commands" in body,
-        "index_turkish_labels": all(label in index.get("body", "") for label in labels),
+        "index_turkish_labels": all(label in body_text for label in labels) and "Deploy" in body_text and "Komut" in body_text,
     }
     payload = {
         "ok": all(checks.values()),

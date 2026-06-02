@@ -1,10 +1,10 @@
 # Production Environment Last Report
 
-Generated at: 2026-06-02T08:27:04+00:00
-Kind: production_deploy
+Generated at: 2026-06-02T08:29:23+00:00
+Kind: smoke_test
 Status: PASS
-Scope: production
-Dry run: True
+Scope: staging
+Dry run: False
 
 ## Safety
 - Secret/IAM/database/DNS/firewall/billing/Google Ads mutate performed: false
