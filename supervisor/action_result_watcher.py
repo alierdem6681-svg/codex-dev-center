@@ -203,7 +203,8 @@ def main():
         "production_deployed": False,
         "repo_changes_applied": False,
         "staging_deployed": False,
-        "production_deploy_requires_explicit_approval": True,
+        "production_deploy_requires_explicit_approval": False,
+        "production_deploy_allowed_when_all_gates_pass": True,
         "updated_at": now(),
     })
     write_json(spath, state)

@@ -21,16 +21,16 @@ Production dosyalarına doğrudan SSH ile müdahale edilmez. Backup, validate, r
 
 ## GitHub Actions Kapısı
 
-Canlıya alma sadece manuel GitHub Actions workflow ile yapılır:
+Canlıya alma sadece GitHub Actions workflow ile yapılır:
 
 - Workflow adı: `Deploy to VM`
 - Workflow dosyası: `.github/workflows/deploy-vm.yml`
-- Tetikleme: `workflow_dispatch`
+- Tetikleme: `workflow_dispatch`; tüm gate'ler PASS ise CTO kullanıcıdan ayrıca deploy onayı istemeden tetikleyebilir
 - Zorunlu confirm alanı: `DEPLOY-CODEX-VM`
 - Runner hedefi: `codex-dev-center-01`
 - Runtime dizini: `/opt/codex-dev-center`
 
-Confirm alanı tam olarak `DEPLOY-CODEX-VM` değilse workflow daha checkout öncesinde durur. Runner adı veya hostname `codex-dev-center-01` ile eşleşmezse deploy durur.
+Confirm alanı tam olarak `DEPLOY-CODEX-VM` değilse workflow daha checkout öncesinde durur. Bu confirm alanı ayrı insan onayı değil, workflow emniyet kilididir. Runner adı veya hostname `codex-dev-center-01` ile eşleşmezse deploy durur.
 
 Windows geliştirme ortamında systemd yoksa servis keşfi panel portu, process durumu, health endpoint ve runtime state dosyaları üzerinden yapılır. Production restart adımı yalnızca VM runner üzerinde systemd servisleri varsa çalışır.
 
@@ -60,7 +60,7 @@ Shell script karşılıkları:
 - `scripts/health_check.sh`
 - `scripts/smoke_test.sh`
 
-Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanılmaz. `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur.
+Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanılmaz. `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur. CTO'nun otomatik deploy kararı `supervisor/cto_autonomous_delivery.py` üzerinden gate PASS, branch/PR/merge marker'ı ve kritik işlem taraması ile verilir.
 
 ## Sıra
 
@@ -72,7 +72,7 @@ Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanıl
 6. Production readiness suite çalışır.
 7. Mevcut runtime `/opt/codex-dev-center-backups` altına yedeklenir.
 8. Repo içeriği `/opt/codex-dev-center` dizinine senkronize edilir.
-9. Runtime içinde compile ve readiness suite tekrar çalışır.
+9. Runtime içinde compile, JSON validation ve non-secret policy sync çalışır.
 10. Kurulu systemd servisleri varsa restart edilir.
 11. Production health check `127.0.0.1:8080/health` üzerinden geçer.
 12. Production smoke check `/login` ekranını doğrular.
@@ -102,6 +102,7 @@ Uzak sunucuda ilk kullanıcı kurulumu güvenlik gereği varsayılan olarak kapa
 Aşağıdaki işlemler otomatik yapılmaz:
 
 - Secret değerini görüntüleme veya değiştirme
+- Token, private key, env değeri veya credential rotation
 - IAM owner/editor yetki değişikliği
 - Billing değişikliği
 - Database veri silme

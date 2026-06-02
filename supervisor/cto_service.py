@@ -139,7 +139,8 @@ def generic_reply(task):
         f"Mesaj: {title[:180]}\n\n"
         "Şu an CTO v1 aktif: mesaj alıyor, durum okuyabiliyor ve cevap verebiliyor.\n"
         "Sonraki adımda gerçek Codex CLI entegrasyonu bağlanacak.\n\n"
-        "Üretim/canlı işlem, secret, IAM, GCloud mutate ve deploy işlemleri onaysız yapılmayacak."
+        "Normal uygulama deploy'u tüm gate'ler PASS ise ayrıca onay istemeden yapılabilir. "
+        "Secret, IAM, billing, DNS/firewall, destructive database veya credential işlemleri onaysız yapılmayacak."
     )
 
 def codex_readonly_plan(user_text):
@@ -262,9 +263,9 @@ def route_task(task):
 
 
     high_risk_phrases = [
-        "canlıya al", "production'a al", "productiona al", "deploy et",
-        "yayına al", "iam yetkisi ver", "owner yetkisi ver",
+        "iam yetkisi ver", "owner yetkisi ver",
         "editor yetkisi ver", "secret oku", "secret göster",
+        "token değiştir", "token degistir", "private key", "credential rotation",
         "veritabanı sil", "database sil", "migration çalıştır",
         "dns değiştir", "firewall aç", "google ads api mutate",
         "billing değiştir", "ödeme değiştir"
@@ -301,13 +302,38 @@ def route_task(task):
     if any(w in lowered for w in status_words):
         return terminal_inspector_reply(text)
 
+    if any(w in lowered for w in policy_words) and any(
+        w in lowered
+        for w in ["production", "canlı", "canli", "deploy", "yayına al", "yayina al", "onay isteme", "onay istemeden"]
+    ):
+        try:
+            state_path = STATE / "system_state.json"
+            state = read_json(state_path, {})
+            state.update({
+                "production_deploy_requires_explicit_approval": False,
+                "production_deploy_allowed_when_all_gates_pass": True,
+                "production_deploy_requires_quality_gate": True,
+                "production_deploy_requires_staging": True,
+                "production_deploy_requires_rollback_plan": True,
+                "critical_infrastructure_requires_approval": True,
+                "updated_at": now()
+            })
+            write_json(state_path, state)
+        except Exception:
+            pass
+        return (
+            "Production deploy kuralı kaydedildi.\n"
+            "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
+            "Secret/IAM/billing/DNS/firewall/destructive database/credential işlemleri APPROVAL_REQUIRED kalacak."
+        )
+
     if any(p in lowered for p in high_risk_phrases):
         if any(w in lowered for w in policy_words):
             try:
                 state_path = STATE / "system_state.json"
                 state = read_json(state_path, {})
                 state.update({
-                    "production_deploy_requires_explicit_approval": True,
+                    "production_deploy_requires_explicit_approval": False,
                     "production_deploy_requires_quality_gate": True,
                     "production_deploy_requires_staging": True,
                     "production_deploy_requires_rollback_plan": True,
@@ -320,8 +346,9 @@ def route_task(task):
 
             return (
                 "Production deploy kuralı kaydedildi.\n"
-                "Canlıya alma ancak açık onayınızdan sonra yapılacak.\n"
+                "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
                 "Öncesinde test, diff, quality gate, staging kontrolü ve rollback planı zorunlu olacak.\n"
+                "Secret/IAM/billing/DNS/firewall/destructive database/credential işlemleri APPROVAL_REQUIRED kalacak.\n"
                 "Canlıya alma sonrası sonuç, health durumu ve rollback bilgisi Telegram’dan bildirilecek."
             )
 

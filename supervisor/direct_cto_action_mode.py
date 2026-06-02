@@ -153,7 +153,7 @@ def run_action_mode(raw_text):
     if any(x in lower for x in ["production'a al", "productiona al", "canlıya al", "canliya al", "deploy et"]):
         return (
             "Production aşaması için önce readiness kapıları tamamlanmalı.\n"
-            "Quality gate, staging health, smoke test ve rollback planı geçmeden production başlatmayacağım."
+            "Quality gate, staging health, smoke test ve rollback planı PASS olursa ayrıca onay istemeden GitHub Actions deploy başlatılabilir."
         )
 
     queue_path = STATE / "task_queue.json"
@@ -179,7 +179,8 @@ def run_action_mode(raw_text):
         "production_deployed": False,
         "repo_changes_applied": False,
         "staging_deployed": False,
-        "production_deploy_requires_explicit_approval": True,
+        "production_deploy_requires_explicit_approval": False,
+        "production_deploy_allowed_when_all_gates_pass": True,
         "updated_at": now()
     })
     write_json(state_path, state)

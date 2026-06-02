@@ -23,7 +23,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 
 ## Otomatik Yayına Alma Kuralı
 
-`production_requires_explicit_approval=false` olabilir. Bu, kontrolsüz yayına alma anlamına gelmez.
+`production_requires_explicit_approval=false` normal Codex Dev Center app deploy'u için hedef kuraldır. Bu, kontrolsüz yayına alma anlamına gelmez.
 
 Controller şu şartlar olmadan canlıya geçmez:
 
@@ -35,9 +35,10 @@ Controller şu şartlar olmadan canlıya geçmez:
 - `CODEX_ROLLBACK_COMMAND` tanımlı
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1`
 - Kritik istisna yok
+- İlgili görev worker'a atanmış, worker çıktısı CTO tarafından denetlenmiş, branch/PR/merge akışı tamamlanmış ve deploy adayı olarak işaretlenmiş
 
 ## Kritik İstisnalar
 
-Secret, IAM owner/editor, billing, database veri silme, geri döndürülemez migration, kritik DNS/firewall değişikliği, Google Ads canlı mutate ve canlı veri kaybı riski otomatik yapılamaz.
+Secret, token/private key/env değeri, credential rotation, IAM owner/editor, billing, database veri silme, geri döndürülemez migration, kritik DNS/firewall değişikliği, Google Ads canlı mutate ve canlı veri kaybı riski otomatik yapılamaz.
 
 Bu durumlardan biri gerekiyorsa controller `critical_exception_detected` ile durur ve risk raporu üretir.
