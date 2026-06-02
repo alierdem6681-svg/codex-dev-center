@@ -91,6 +91,20 @@ jobs:
           sudo systemctl restart codex-panel
           systemctl is-active codex-panel
 
+      - name: Wait for panel health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$DASHBOARD_URL/health" >/tmp/codex-panel-health.json; then
+              cat /tmp/codex-panel-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Panel health did not become ready in time."
+          exit 1
+
       - name: Login smoke check
         shell: bash
         run: |
