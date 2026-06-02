@@ -1,9 +1,9 @@
 # Production Environment Last Report
 
-Generated at: 2026-06-02T08:29:23+00:00
+Generated at: 2026-06-02T08:31:21+00:00
 Kind: smoke_test
 Status: PASS
-Scope: staging
+Scope: production
 Dry run: False
 
 ## Safety

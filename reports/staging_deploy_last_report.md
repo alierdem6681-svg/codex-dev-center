@@ -1,8 +1,8 @@
 # Production Environment Last Report
 
-Generated at: 2026-06-02T08:28:26+00:00
+Generated at: 2026-06-02T08:30:16+00:00
 Kind: staging_deploy
-Status: FAIL
+Status: PASS
 Scope: staging
 Dry run: False
 
@@ -14,6 +14,3 @@ Dry run: False
 - Production port: 8080
 - Staging port: 18080
 - Rollback mode: safe logical runtime rollback
-
-## Blockers
-- staging_health_or_smoke_failed
