@@ -1,0 +1,111 @@
+name: Deploy to VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY-CODEX-VM to deploy"
+        required: true
+        default: ""
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Confirm manual deploy
+        run: |
+          set -e
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY-CODEX-VM" ]; then
+            echo "Confirmation text is wrong. Deployment stopped."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Preflight checks
+        run: |
+          set -e
+          echo "===== WHOAMI ====="
+          whoami
+          echo "===== HOSTNAME ====="
+          hostname
+          echo "===== TARGET DIRECTORY ====="
+          test -d /opt/codex-dev-center
+          ls -lah /opt/codex-dev-center
+          echo "===== SSH RUNNER OK ====="
+
+      - name: Create backup
+        run: |
+          set -e
+          TS="$(date -u +%Y%m%d_%H%M%S)"
+          BACKUP_DIR="/opt/codex-dev-center-backups"
+          sudo mkdir -p "$BACKUP_DIR"
+          sudo tar \
+            --exclude='/opt/codex-dev-center/.git' \
+            --exclude='/opt/codex-dev-center/.venv' \
+            --exclude='/opt/codex-dev-center/venv' \
+            --exclude='/opt/codex-dev-center/node_modules' \
+            --exclude='/opt/codex-dev-center/__pycache__' \
+            -czf "$BACKUP_DIR/pre_deploy_$TS.tar.gz" \
+            -C /opt codex-dev-center
+          echo "Backup created: $BACKUP_DIR/pre_deploy_$TS.tar.gz"
+
+      - name: Deploy repository files
+        run: |
+          set -e
+          SRC="$GITHUB_WORKSPACE"
+          DST="/opt/codex-dev-center"
+
+          sudo rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='actions-runner' \
+            --exclude='state' \
+            --exclude='logs' \
+            --exclude='*.log' \
+            --exclude='.env' \
+            --exclude='venv' \
+            --exclude='.venv' \
+            --exclude='node_modules' \
+            "$SRC"/ "$DST"/
+
+          sudo chown -R alierdem6681:alierdem6681 "$DST"
+
+      - name: Validate files
+        run: |
+          set -e
+          cd /opt/codex-dev-center
+          echo "===== PYTHON COMPILE CHECK ====="
+          find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*" -print0 | xargs -0 -r python3 -m py_compile
+          echo "===== JSON CHECK ====="
+          find . -name "*.json" -print0 | xargs -0 -r -I{} python3 -m json.tool "{}" >/dev/null
+
+      - name: Restart services
+        run: |
+          set -e
+          sudo systemctl restart codex-panel || true
+          sudo systemctl restart codex-lifecycle || true
+          sudo systemctl restart codex-watchdog || true
+          sudo systemctl restart codex-worker-1 || true
+          sudo systemctl restart codex-worker-2 || true
+          sudo systemctl restart codex-worker-3 || true
+          sudo systemctl restart codex-worker-4 || true
+
+      - name: Smoke check
+        run: |
+          set -e
+          sleep 3
+          echo "===== SERVICES ====="
+          systemctl is-active codex-panel
+          systemctl is-active codex-lifecycle || true
+          systemctl is-active codex-watchdog || true
+
+          echo "===== DASHBOARD ====="
+          curl -I http://127.0.0.1:8080
+
+      - name: Deployment summary
+        run: |
+          echo "Deployment completed on $(hostname) at $(date -u)"
+          echo "Target: /opt/codex-dev-center"
