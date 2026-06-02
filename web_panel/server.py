@@ -1,37 +1,135 @@
 from __future__ import annotations
 
 import json
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
 
-ROOT = Path(__file__).resolve().parents[1]
+
+ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
+STATE = ROOT / "state"
+REPORTS = ROOT / "reports"
 STATIC_DIR = ROOT / "web_panel" / "static"
 
 
-class PanelHandler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
+def now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def read_json(path: Path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"error": str(exc), "path": str(path)}
+    return default
+
+
+def read_text(path: Path, default: str = "") -> str:
+    try:
+        if path.exists():
+            return path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    return default
+
+
+def run_cmd(cmd: list[str], timeout: int = 180):
+    try:
+        proc = subprocess.run(cmd, cwd=str(ROOT), text=True, capture_output=True, timeout=timeout)
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-5000:],
+            "stderr": proc.stderr[-5000:],
+            "cmd": " ".join(cmd),
+        }
+    except Exception as exc:
+        return {"ok": False, "returncode": 1, "stdout": "", "stderr": str(exc), "cmd": " ".join(cmd)}
+
+
+def status_payload():
+    return {
+        "ok": True,
+        "time": now(),
+        "system_state": read_json(STATE / "system_state.json", {}),
+        "workers": read_json(STATE / "workers.json", {"workers": []}),
+        "tasks": read_json(STATE / "task_queue.json", {"tasks": []}),
+        "modules": read_json(STATE / "module_registry.json", read_json(ROOT / "state_templates/module_registry.json", {"modules": []})),
+        "actions": read_json(STATE / "action_catalog.json", read_json(ROOT / "state_templates/action_catalog.json", {"actions": []})),
+        "dashboard_settings": read_json(STATE / "dashboard_settings.json", read_json(ROOT / "state_templates/dashboard_settings.json", {})),
+        "module_settings": read_json(STATE / "module_settings.json", read_json(ROOT / "state_templates/module_settings.json", {})),
+        "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
+        "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
+        "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
+        "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),
+        "reports": sorted([p.name for p in REPORTS.glob("*.md")]) if REPORTS.exists() else [],
+        "report_text": {
+            "readiness": read_text(REPORTS / "production_readiness_last_report.md"),
+            "deploy": read_text(REPORTS / "production_deploy_last_report.md"),
+            "rollback": read_text(REPORTS / "rollback_simulation_last_report.md"),
+            "github": read_text(REPORTS / "github_safe_flow_last_report.md"),
+        },
+    }
+
+
+class PanelHandler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        return
+
+    def send_raw(self, payload: bytes, content_type: str = "application/json; charset=utf-8", code: int = 200):
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def send_json(self, data, code: int = 200):
+        self.send_raw(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"), code=code)
+
+    def body(self):
+        size = int(self.headers.get("Content-Length", "0") or "0")
+        if size <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(size).decode("utf-8"))
+        except Exception:
+            return {}
 
     def do_GET(self) -> None:
-        if self.path == "/api/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            payload = {
-                "system_state": read_json(ROOT / "state" / "system_state.json", {}),
-                "workers": read_json(ROOT / "state" / "workers.json", {}),
-                "tasks": read_json(ROOT / "state" / "task_queue.json", {"tasks": []}),
-            }
-            self.wfile.write(json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"))
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
+            self.send_json({"ok": True, "service": "codex-panel", "production_pipeline": True})
             return
-        super().do_GET()
+        if parsed.path == "/api/status":
+            self.send_json(status_payload())
+            return
+        if parsed.path in ("/", "/index.html"):
+            self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+            return
+        self.send_json({"ok": False, "error": "not_found"}, 404)
 
-
-def read_json(path: Path, default: dict) -> dict:
-    if not path.exists():
-        return default
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    def do_POST(self) -> None:
+        data = self.body()
+        action = data.get("action")
+        if action == "production_readiness_suite":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
+            return
+        if action == "production_deploy_start":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_deploy_controller.py", "start", "--auto"], 300))
+            return
+        if action == "github_safe_flow_dry_run":
+            self.send_json(run_cmd([sys.executable, "supervisor/github_safe_flow.py", "dry-run"], 180))
+            return
+        if action == "rollback_simulation":
+            self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
+            return
+        self.send_json({"ok": False, "error": "unknown_action"}, 400)
 
 
 def main() -> None:

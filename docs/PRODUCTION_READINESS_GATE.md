@@ -1,0 +1,43 @@
+# Production Readiness Gate
+
+Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının kendi repo/app deploy akışı için geçerlidir.
+
+## Zorunlu Kapılar
+
+- Python compile check PASS
+- JSON validation PASS
+- Import smoke test PASS
+- Unit test PASS
+- Integration test PASS
+- Regression test PASS
+- Worker lifecycle test PASS
+- Queue / recovery test PASS
+- Dashboard route/API test PASS
+- Telegram bridge/direct CTO test PASS
+- Secret leakage scan PASS
+- Forbidden operation scan PASS
+- Ön canlı smoke test PASS
+- Geri alma simulation PASS
+- Restart simulation PASS
+- Failure injection simulation PASS
+
+## Otomatik Yayına Alma Kuralı
+
+`production_requires_explicit_approval=false` olabilir. Bu, kontrolsüz yayına alma anlamına gelmez.
+
+Controller şu şartlar olmadan canlıya geçmez:
+
+- Production readiness suite PASS
+- Ön canlı kapısı PASS
+- Geri alma kapısı PASS
+- `CODEX_STAGING_DEPLOY_COMMAND` tanımlı
+- `CODEX_PRODUCTION_DEPLOY_COMMAND` tanımlı
+- `CODEX_ROLLBACK_COMMAND` tanımlı
+- `CODEX_PRODUCTION_DEPLOY_EXECUTE=1`
+- Kritik istisna yok
+
+## Kritik İstisnalar
+
+Secret, IAM owner/editor, billing, database veri silme, geri döndürülemez migration, kritik DNS/firewall değişikliği, Google Ads canlı mutate ve canlı veri kaybı riski otomatik yapılamaz.
+
+Bu durumlardan biri gerekiyorsa controller `critical_exception_detected` ile durur ve risk raporu üretir.

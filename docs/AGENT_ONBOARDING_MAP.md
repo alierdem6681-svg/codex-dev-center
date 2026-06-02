@@ -82,8 +82,13 @@ Ajan şu klasörleri inceler:
 - supervisor/drift_checker.py
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
+- supervisor/production_readiness_suite.py
+- supervisor/production_deploy_controller.py
+- supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
 - web_panel/panel_server.py
+- docs/STAGING_ROLLBACK_READINESS_PLAN.md
+- docs/PRODUCTION_READINESS_GATE.md
 
 ## Servis Keşfi
 

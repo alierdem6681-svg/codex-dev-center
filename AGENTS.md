@@ -98,3 +98,20 @@ Güncellenmesi gereken ana dosyalar:
 
 MODEL POLICY GPT55 XHIGH
 All CTO, worker and future Codex processes must use model gpt-5.5 with reasoning effort xhigh when available.
+
+---
+
+## AUTONOMOUS PRODUCTION DELIVERY SYSTEM V1
+
+Bu repo artik Codex Dev Center uygulamasinin kendi repo/app yayina alma akisi icin otomatik production delivery iskeletine sahiptir.
+
+Otomatik yayina alma sadece su kosullarda calisabilir:
+- `supervisor/production_readiness_suite.py --json` PASS olmali.
+- On canli kapisi PASS olmali.
+- Geri alma simulasyonu PASS olmali.
+- Secret leakage ve forbidden operation scan PASS olmali.
+- `CODEX_STAGING_DEPLOY_COMMAND`, `CODEX_PRODUCTION_DEPLOY_COMMAND`, `CODEX_ROLLBACK_COMMAND` tanimli olmali.
+- `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmali.
+- Kritik istisna bulunmamali.
+
+Kritik istisnalar otomatik yapilmaz: secret degeri gorme/degistirme, IAM owner/editor degisikligi, billing, database veri silme, geri dondurulemez migration, kritik DNS/firewall degisikligi, Google Ads live mutate ve canli veri kaybi riski. Bu hallerde controller durur ve risk raporu uretir.

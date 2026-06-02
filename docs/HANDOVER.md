@@ -55,3 +55,28 @@ Düzeltmeler:
 
 STEP 19B-10A Model Policy
 Codex model policy documented: model=gpt-5.5, reasoning=xhigh, bubblewrap installed, read-only exec verified.
+
+---
+
+## Autonomous Production Delivery System v1
+
+Tarih: 2026-06-02
+
+Eklenenler:
+- `supervisor/production_deploy_controller.py`
+- `supervisor/production_readiness_suite.py`
+- `supervisor/github_safe_flow.py`
+- `docs/STAGING_ROLLBACK_READINESS_PLAN.md`
+- `docs/PRODUCTION_READINESS_GATE.md`
+- `state_templates/action_catalog.json`
+- `state_templates/dashboard_settings.json`
+- `state_templates/production_policy.json`
+- `state_templates/production_readiness_policy.json`
+- `state_templates/github_safe_flow_policy.json`
+
+Dashboard artik Canli Ortam hazirlik durumu, test kapilari, On Canli, Geri Alma, son Yayina Alma, otomatik yayina alma ayari, GitHub senkronizasyonu, hata/riskler ve Calisan/Gorev Kuyrugu/Toparlama durumlarini gosterir.
+
+Canli ortam notu:
+- Gercek staging/production/rollback komutlari environment ile tanimlanmadan canli deploy calismaz.
+- `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmadan production komutu calismaz.
+- Kritik istisnalar otomatik bloklanir.

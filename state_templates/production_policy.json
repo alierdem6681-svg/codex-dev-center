@@ -1,0 +1,17 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "automatic_production_enabled": true,
+  "allowed_scope": "codex_dev_center_own_app_deploy_only",
+  "manual_approval_required_for_normal_app_deploy": false,
+  "auto_rollback_on_failure": true,
+  "critical_exceptions_auto_block": [
+    "secret_value_view_or_change",
+    "iam_owner_editor_change",
+    "billing_change",
+    "database_data_delete",
+    "irreversible_migration",
+    "critical_dns_firewall_change",
+    "google_ads_live_mutate",
+    "live_customer_or_data_loss_risk"
+  ]
+}

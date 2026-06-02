@@ -1,0 +1,22 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "required_status": "PASS",
+  "required_score_percent": 100,
+  "required_gates": [
+    "python_compile_check",
+    "json_validation",
+    "import_smoke_test",
+    "unit_test",
+    "integration_test",
+    "regression_test",
+    "worker_queue_recovery_test",
+    "dashboard_route_api_test",
+    "telegram_bridge_direct_cto_test",
+    "secret_leakage_scan",
+    "forbidden_operation_scan",
+    "staging_smoke_test",
+    "rollback_simulation",
+    "restart_simulation",
+    "failure_injection_simulation"
+  ]
+}

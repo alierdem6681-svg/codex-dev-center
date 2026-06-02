@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-01T09:59:49.684783+00:00",
+  "updated_at": "2026-06-02T00:00:00+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -10,9 +10,12 @@
   },
   "dashboard": {
     "live_update": true,
-    "poll_seconds": 2,
+    "poll_seconds": 5,
     "show_settings_buttons": true,
-    "show_action_buttons": true
+    "show_action_buttons": true,
+    "language": "tr",
+    "compact_mode": true,
+    "theme": "soft_neutral"
   },
   "supervisor": {
     "auto_dispatch_low_risk": true,
@@ -24,7 +27,8 @@
     "worker_count": 4,
     "restart_on_failure": true,
     "safe_mode": true,
-    "codex_execution_enabled": false
+    "codex_execution_enabled": false,
+    "worker_recovery_required": true
   },
   "telegram": {
     "enabled": false,
@@ -44,11 +48,24 @@
     "requires_test_before_done": true
   },
   "deploy_pipeline": {
-    "staging_enabled": false,
-    "production_enabled": false,
-    "production_requires_explicit_approval": true,
+    "staging_enabled": true,
+    "production_enabled": true,
+    "automatic_production_enabled": true,
+    "production_requires_explicit_approval": false,
+    "production_requires_readiness_pass": true,
+    "production_requires_staging_pass": true,
+    "production_requires_rollback_pass": true,
     "rollback_required": true,
-    "database_migration_requires_approval": true
+    "auto_rollback_on_failure": true,
+    "post_deploy_health_check_required": true,
+    "secret_scan_required": true,
+    "git_clean_required": true,
+    "production_deploy_command_env": "CODEX_PRODUCTION_DEPLOY_COMMAND",
+    "staging_deploy_command_env": "CODEX_STAGING_DEPLOY_COMMAND",
+    "rollback_command_env": "CODEX_ROLLBACK_COMMAND",
+    "production_deploy_execute_env": "CODEX_PRODUCTION_DEPLOY_EXECUTE",
+    "database_migration_requires_approval": true,
+    "critical_exception_auto_block": true
   },
   "backup_recovery": {
     "manual_backup_enabled": true,
@@ -60,5 +77,13 @@
     "high_risk_approval_required": true,
     "critical_risk_approval_required": true,
     "three_word_confirmation_required": true
+  },
+  "github_safe_flow": {
+    "enabled": true,
+    "secret_scan_before_commit": true,
+    "git_clean_check_enabled": true,
+    "branch_sync_required": true,
+    "push_after_tests_pass": true,
+    "runtime_state_committed": false
   }
 }

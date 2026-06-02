@@ -1,0 +1,17 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "enabled": true,
+  "require_secret_scan_before_commit": true,
+  "require_branch_sync": true,
+  "require_diff_summary": true,
+  "do_not_commit": [
+    "state/",
+    "logs/",
+    "workspaces/",
+    "backups/",
+    "tmp/",
+    ".env",
+    "*.key",
+    "*.pem"
+  ]
+}

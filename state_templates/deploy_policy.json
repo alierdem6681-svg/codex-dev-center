@@ -1,10 +1,19 @@
 {
-  "staging_enabled": false,
-  "production_enabled": false,
-  "production_requires_explicit_approval": true,
+  "staging_enabled": true,
+  "production_enabled": true,
+  "automatic_production_enabled": true,
+  "production_requires_explicit_approval": false,
+  "production_requires_readiness_pass": true,
+  "production_requires_staging_pass": true,
+  "production_requires_rollback_pass": true,
+  "production_deploy_execute_flag_required": true,
   "rollback_required": true,
+  "auto_rollback_on_failure": true,
   "database_migration_requires_approval": true,
   "dns_change_requires_approval": true,
   "secret_access_requires_approval": true,
-  "updated_at": "2026-06-01T10:02:50.938486+00:00"
+  "iam_owner_editor_change_requires_approval": true,
+  "billing_change_requires_approval": true,
+  "google_ads_mutate_requires_approval": true,
+  "updated_at": "2026-06-02T00:00:00+00:00"
 }

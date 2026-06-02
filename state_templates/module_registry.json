@@ -79,18 +79,17 @@
     },
     {
       "id": "deploy_pipeline",
-      "name": "Deploy Pipeline",
-      "status": "planned_locked",
+      "name": "Yayına Alma Pipeline",
+      "status": "active",
       "risk": "critical",
       "settings_enabled": true,
-      "actions_enabled": false,
+      "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Staging, test, production deploy ve rollback.",
+      "description": "Ön canlı, test kapıları, canlı ortam yayına alma ve geri alma denetleyicisi.",
       "actions": [
-        "deploy_staging",
-        "request_production_approval",
-        "deploy_production",
-        "rollback"
+        "production_readiness_suite",
+        "production_deploy_start",
+        "rollback_simulation"
       ]
     },
     {
@@ -218,6 +217,32 @@
       "description": "Her geliştirme paketi sonunda yaşayan dokümantasyonun güncel tutulmasını zorunlu kılar.",
       "actions": [
         "validate_living_documentation"
+      ]
+    },
+    {
+      "id": "production_readiness",
+      "name": "Canlı Ortam Hazırlık Kapıları",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma ve simülasyon kapılarını çalıştırır.",
+      "actions": [
+        "production_readiness_suite"
+      ]
+    },
+    {
+      "id": "github_safe_flow",
+      "name": "GitHub Güvenli Senkronizasyon",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Git temizliği, branch/remote uyumu, secret scan, diff özeti, commit ve push akışını yönetir.",
+      "actions": [
+        "github_safe_flow_dry_run"
       ]
     }
   ]

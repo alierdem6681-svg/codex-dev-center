@@ -1,0 +1,39 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "actions": [
+    {
+      "id": "production_readiness_suite",
+      "label": "Canlı Ortam Hazırlık Kapılarını Çalıştır",
+      "module": "production_readiness",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false
+    },
+    {
+      "id": "production_deploy_start",
+      "label": "Otomatik Yayına Alma Denetleyicisi",
+      "module": "deploy_pipeline",
+      "risk": "critical",
+      "enabled": true,
+      "requires_approval": false,
+      "automatic_if_all_gates_pass": true,
+      "requires_configured_deploy_target": true
+    },
+    {
+      "id": "github_safe_flow_dry_run",
+      "label": "GitHub Güvenli Akış Kontrolü",
+      "module": "github_safe_flow",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false
+    },
+    {
+      "id": "rollback_simulation",
+      "label": "Geri Alma Simülasyonu",
+      "module": "deploy_pipeline",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false
+    }
+  ]
+}

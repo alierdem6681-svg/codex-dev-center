@@ -3,115 +3,285 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Codex Dev Center</title>
+    <title>Codex Dev Center Yönetim Paneli</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f6f7f9;
+        --bg: #f5f6f8;
         --panel: #ffffff;
-        --ink: #1f2937;
-        --muted: #6b7280;
-        --line: #d8dee8;
-        --accent: #0f766e;
-        --warn: #b45309;
+        --ink: #20242c;
+        --muted: #68707d;
+        --line: #d8dde6;
+        --soft: #eef1f5;
+        --ok: #226b55;
+        --warn: #8a5a10;
+        --bad: #9a2f2f;
+        --accent: #2f5f73;
       }
       * { box-sizing: border-box; }
+      html, body { margin: 0; max-width: 100%; overflow-x: hidden; }
       body {
-        margin: 0;
         background: var(--bg);
         color: var(--ink);
-        font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       header {
-        border-bottom: 1px solid var(--line);
         background: var(--panel);
-        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
       }
-      h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
-      main {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 16px;
-        padding: 18px;
-      }
-      section {
+      h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
+      h2 { margin: 0 0 10px; font-size: 15px; letter-spacing: 0; }
+      main { padding: 14px; max-width: 1500px; margin: 0 auto; }
+      .grid { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(160px, 1fr)); }
+      .wide { display: grid; gap: 12px; grid-template-columns: 1.15fr .85fr; }
+      section, .card {
+        min-width: 0;
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 16px;
-        min-height: 180px;
+        padding: 14px;
+        overflow-wrap: anywhere;
       }
-      h2 { margin: 0 0 12px; font-size: 15px; }
-      dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin: 0; }
-      dt { color: var(--muted); }
-      dd { margin: 0; overflow-wrap: anywhere; }
-      .worker, .task {
-        border-top: 1px solid var(--line);
-        padding: 10px 0;
-      }
+      .metric { font-size: 22px; font-weight: 700; margin-top: 3px; }
+      .muted { color: var(--muted); font-size: 12px; }
       .badge {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         border-radius: 999px;
-        padding: 2px 8px;
-        background: #e8f3f1;
-        color: var(--accent);
+        padding: 3px 8px;
+        background: var(--soft);
+        color: var(--muted);
         font-size: 12px;
+        margin: 2px 4px 2px 0;
+        white-space: nowrap;
       }
-      .risk { color: var(--warn); }
+      .ok { color: var(--ok); background: #e7f2ee; }
+      .warn { color: var(--warn); background: #f7efd9; }
+      .bad { color: var(--bad); background: #f5e4e4; }
+      button, select, input {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+      }
+      button { cursor: pointer; background: #eaf0f4; color: var(--accent); }
+      button.primary { background: #dcebf0; border-color: #c8dce5; }
+      .controls { display: grid; gap: 8px; grid-template-columns: 1.3fr repeat(4, minmax(120px, .6fr)); margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; font-size: 12px; }
+      pre { margin: 0; white-space: pre-wrap; background: #f2f4f6; padding: 10px; border-radius: 7px; max-height: 280px; overflow: auto; }
+      .stack { display: grid; gap: 12px; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .mobile-list { display: none; }
+      @media (max-width: 980px) {
+        .grid, .wide, .controls { grid-template-columns: 1fr; }
+        .desktop-table { display: none; }
+        .mobile-list { display: grid; gap: 8px; }
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>Codex Dev Center</h1>
+      <div>
+        <h1>Codex Dev Center Yönetim Paneli</h1>
+        <div class="muted">Canlı Ortam hazırlığı, görevler, çalışanlar ve güvenli GitHub akışı</div>
+      </div>
+      <span id="clock" class="badge">Yükleniyor</span>
     </header>
-    <main>
+
+    <main class="stack">
+      <div class="grid">
+        <section><div class="muted">Canlı Ortam hazırlığı</div><div id="readyMetric" class="metric">-</div></section>
+        <section><div class="muted">Ön Canlı</div><div id="stagingMetric" class="metric">-</div></section>
+        <section><div class="muted">Geri Alma</div><div id="rollbackMetric" class="metric">-</div></section>
+        <section><div class="muted">Görev Kuyruğu</div><div id="queueMetric" class="metric">-</div></section>
+      </div>
+
       <section>
-        <h2>Sistem</h2>
-        <dl id="system"></dl>
+        <h2>Canlı Ortam Pipeline</h2>
+        <div class="actions">
+          <button class="primary" onclick="runAction('production_readiness_suite')">Hazırlık Kapılarını Çalıştır</button>
+          <button onclick="runAction('github_safe_flow_dry_run')">GitHub Güvenli Akış</button>
+          <button onclick="runAction('rollback_simulation')">Geri Alma Simülasyonu</button>
+          <button onclick="runAction('production_deploy_start')">Yayına Alma Denetleyicisi</button>
+        </div>
+        <div id="pipelineBadges"></div>
       </section>
-      <section>
-        <h2>Worker Durumu</h2>
-        <div id="workers"></div>
-      </section>
-      <section>
-        <h2>Görev Kuyruğu</h2>
-        <div id="tasks"></div>
-      </section>
-      <section>
-        <h2>Güvenlik Kapıları</h2>
-        <dl>
-          <dt>Production</dt><dd class="risk">Kapalı</dd>
-          <dt>Onay gerekir</dt><dd>Deploy, migration, veri silme, secret, DNS, maliyet</dd>
-          <dt>Telegram</dt><dd>Raw input passthrough ve output guard aktif iskelet</dd>
-        </dl>
-      </section>
+
+      <div class="wide">
+        <section>
+          <h2>Görevler</h2>
+          <div class="controls">
+            <input id="search" placeholder="Ara">
+            <select id="statusFilter"><option value="">Tüm durumlar</option></select>
+            <select id="workerFilter"><option value="">Tüm çalışanlar</option></select>
+            <select id="riskFilter"><option value="">Tüm riskler</option></select>
+            <select id="sortMode">
+              <option value="newest">En yeni</option>
+              <option value="oldest">En eski</option>
+              <option value="risk">En riskli</option>
+              <option value="errors">En çok hata</option>
+            </select>
+          </div>
+          <div id="tasksTable" class="desktop-table"></div>
+          <div id="tasksCards" class="mobile-list"></div>
+        </section>
+
+        <section>
+          <h2>Ayarlar</h2>
+          <div id="settingsBadges"></div>
+          <h2 style="margin-top:14px">Son İşlem</h2>
+          <pre id="actionResult">Henüz işlem yok.</pre>
+        </section>
+      </div>
+
+      <div class="wide">
+        <section>
+          <h2>Çalışan / Görev Kuyruğu / Toparlama</h2>
+          <div id="workersTable"></div>
+        </section>
+        <section>
+          <h2>GitHub Senkronizasyonu</h2>
+          <div id="githubBox"></div>
+        </section>
+      </div>
+
+      <div class="wide">
+        <section>
+          <h2>Hata ve Riskler</h2>
+          <div id="riskBox"></div>
+        </section>
+        <section>
+          <h2>Raporlar</h2>
+          <div id="reportsBox"></div>
+        </section>
+      </div>
     </main>
+
     <script>
-      async function loadStatus() {
-        const response = await fetch('/api/status');
-        const data = await response.json();
-        const state = data.system_state || {};
-        document.getElementById('system').innerHTML = [
-          ['Faz', state.phase || '-'],
-          ['Supervisor', String(Boolean(state.supervisor_created))],
-          ['Workers', String(Boolean(state.workers_created))],
-          ['Web panel', String(Boolean(state.web_panel_created))],
-          ['Telegram', String(Boolean(state.telegram_connected))],
-          ['Production deploy', String(Boolean(state.production_deploy_enabled))]
-        ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
-
-        const workers = (data.workers && data.workers.workers) || [];
-        document.getElementById('workers').innerHTML = workers.map((worker) => (
-          `<div class="worker"><strong>${worker.id}</strong> <span class="badge">${worker.status}</span><br>${worker.current_task || 'Görev yok'}</div>`
-        )).join('') || 'Worker kaydı yok';
-
-        const tasks = (data.tasks && data.tasks.tasks) || [];
-        document.getElementById('tasks').innerHTML = tasks.slice(-8).reverse().map((task) => (
-          `<div class="task"><strong>${task.id}</strong> <span class="badge">${task.status}</span><br>${task.title}<br><small>${task.assigned_worker} / ${task.risk_level}</small></div>`
-        )).join('') || 'Kuyruk boş';
+      let latest = {};
+      const riskRank = {critical: 4, high: 3, medium: 2, low: 1};
+      const tr = {
+        WORKER: 'Çalışan',
+        QUEUE: 'Görev Kuyruğu',
+        RECOVERY: 'Toparlama',
+        FAILED: 'Hatalı',
+        RUNNING: 'Çalışıyor',
+        ASSIGNED: 'Atandı',
+        PENDING: 'Bekliyor',
+        DONE: 'Tamamlandı'
+      };
+      function esc(value){return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+      function badge(value){
+        const s = String(value ?? '-');
+        const u = s.toUpperCase();
+        let cls = 'badge';
+        if (['PASS','OK','DONE','TRUE','ACTIVE'].includes(u)) cls += ' ok';
+        if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN'].includes(u)) cls += ' warn';
+        if (['FAIL','FAILED','ERROR','FALSE','INACTIVE'].includes(u)) cls += ' bad';
+        return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
-      loadStatus();
-      setInterval(loadStatus, 10000);
+      function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
+      function fillFilters(tasks, workers){
+        const statuses = [...new Set(tasks.map(t => t.status).filter(Boolean))].sort();
+        const risks = [...new Set(tasks.map(t => t.risk || t.risk_level).filter(Boolean))].sort();
+        const workerIds = [...new Set(workers.map(w => w.id).filter(Boolean))].sort();
+        statusFilter.innerHTML = '<option value="">Tüm durumlar</option>' + statuses.map(x => `<option>${esc(x)}</option>`).join('');
+        riskFilter.innerHTML = '<option value="">Tüm riskler</option>' + risks.map(x => `<option>${esc(x)}</option>`).join('');
+        workerFilter.innerHTML = '<option value="">Tüm çalışanlar</option>' + workerIds.map(x => `<option>${esc(x)}</option>`).join('');
+      }
+      function filteredTasks(){
+        let tasks = ((latest.tasks || {}).tasks || []).slice();
+        const q = search.value.toLowerCase();
+        tasks = tasks.filter(t => {
+          const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
+          return (!q || text.includes(q))
+            && (!statusFilter.value || t.status === statusFilter.value)
+            && (!workerFilter.value || t.assigned_worker === workerFilter.value)
+            && (!riskFilter.value || (t.risk || t.risk_level) === riskFilter.value);
+        });
+        if (sortMode.value === 'oldest') tasks.sort((a,b) => taskTime(a)-taskTime(b));
+        else if (sortMode.value === 'risk') tasks.sort((a,b) => (riskRank[b.risk || b.risk_level]||0)-(riskRank[a.risk || a.risk_level]||0));
+        else if (sortMode.value === 'errors') tasks.sort((a,b) => (b.error_count||0)-(a.error_count||0));
+        else tasks.sort((a,b) => taskTime(b)-taskTime(a));
+        return tasks;
+      }
+      function renderTasks(){
+        const tasks = filteredTasks();
+        tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody>${
+          tasks.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
+        }</tbody></table>`;
+        tasksCards.innerHTML = tasks.map(t => `<div class="card"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('');
+      }
+      function render(data){
+        latest = data;
+        const readiness = data.production_readiness || {};
+        const deploy = data.production_deploy || {};
+        const github = data.github_safe_flow || {};
+        const workers = ((data.workers || {}).workers || []);
+        const tasks = ((data.tasks || {}).tasks || []);
+        clock.textContent = new Date().toLocaleTimeString();
+        readyMetric.textContent = readiness.status || 'Bekliyor';
+        stagingMetric.textContent = deploy.staging_deploy_performed ? 'Geçti' : 'Bekliyor';
+        rollbackMetric.textContent = deploy.rollback_performed ? 'Çalıştı' : 'Simülasyon';
+        queueMetric.textContent = tasks.length;
+        pipelineBadges.innerHTML = [
+          `Hazırlık: ${readiness.status || '-'}`,
+          `Skor: ${readiness.score_percent ?? '-'}`,
+          `Yayına Alma: ${deploy.status || '-'}`,
+          `Otomatik: ${data.production_policy?.automatic_production_enabled}`,
+          `GitHub: ${github.ok === undefined ? '-' : github.ok}`
+        ].map(badge).join('');
+        const s = data.dashboard_settings?.production || {};
+        settingsBadges.innerHTML = Object.entries({
+          'Otomatik production': s.automatic_production_enabled,
+          'Readiness zorunlu': s.readiness_required,
+          'Ön canlı zorunlu': s.staging_required,
+          'Geri alma zorunlu': s.rollback_required,
+          'Secret scan': s.secret_scan_required,
+          'Git clean': s.git_clean_required,
+          'Çalışan toparlama': s.worker_recovery_required,
+          'Health check': s.post_deploy_health_check_required,
+          'Hata olursa geri alma': s.auto_rollback_on_failure
+        }).map(([k,v]) => `${esc(k)}: ${badge(v)}`).join('<br>');
+        workersTable.innerHTML = `<table><thead><tr><th>Çalışan</th><th>Durum</th><th>Görev</th></tr></thead><tbody>${
+          workers.map(w => `<tr><td>${esc(w.id)}</td><td>${badge(w.status)}</td><td>${esc(w.current_task || '-')}</td></tr>`).join('')
+        }</tbody></table>`;
+        githubBox.innerHTML = [
+          `Branch: ${github.current_branch || '-'}`,
+          `Git: ${github.git_available}`,
+          `Değişen dosya: ${(github.diff_files || []).length}`,
+          `Secret bulgusu: ${(github.secret_findings || []).length}`
+        ].map(badge).join('');
+        riskBox.innerHTML = [
+          `Blokaj: ${(deploy.blockers || []).join(', ') || 'Yok'}`,
+          `Kritik istisna: ${(deploy.critical_exceptions?.matched_terms || []).join(', ') || 'Yok'}`
+        ].map(x => `<div>${esc(x)}</div>`).join('');
+        reportsBox.innerHTML = (data.reports || []).map(r => `<div>${esc(r)}</div>`).join('') || 'Rapor yok';
+        fillFilters(tasks, workers);
+        renderTasks();
+      }
+      async function refresh(){
+        const res = await fetch('/api/status', {cache:'no-store'});
+        render(await res.json());
+      }
+      async function runAction(action){
+        actionResult.textContent = 'Çalışıyor...';
+        const res = await fetch('/api/action', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action})});
+        actionResult.textContent = JSON.stringify(await res.json(), null, 2);
+        await refresh();
+      }
+      [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
+      refresh();
+      setInterval(refresh, 5000);
     </script>
   </body>
 </html>

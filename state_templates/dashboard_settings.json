@@ -1,0 +1,20 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "dashboard": {
+    "refresh_seconds": 5,
+    "language": "tr",
+    "compact_mode": true,
+    "theme": "soft_neutral"
+  },
+  "production": {
+    "automatic_production_enabled": true,
+    "readiness_required": true,
+    "staging_required": true,
+    "rollback_required": true,
+    "secret_scan_required": true,
+    "git_clean_required": true,
+    "worker_recovery_required": true,
+    "post_deploy_health_check_required": true,
+    "auto_rollback_on_failure": true
+  }
+}

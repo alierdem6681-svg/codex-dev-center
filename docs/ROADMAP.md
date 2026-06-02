@@ -75,3 +75,17 @@ Faz 19B-10A Model Policy
 - [x] gpt-5.5 model policy documented
 - [x] xhigh reasoning policy documented
 - [ ] CTO Controlled Execution v1
+
+## Faz 25 - Autonomous Production Delivery System v1
+
+- [x] Production deploy controller eklendi.
+- [x] Production readiness suite eklendi.
+- [x] GitHub safe flow eklendi.
+- [x] Staging / rollback readiness dokumanlari eklendi.
+- [x] Production readiness gate dokumani eklendi.
+- [x] Deploy policy otomatik production icin guncellendi.
+- [x] Dashboard production pipeline bolumleri eklendi.
+- [x] Dashboard ayarlari production otomasyon kapilarina baglandi.
+- [ ] Gercek `CODEX_STAGING_DEPLOY_COMMAND` tanimlanacak.
+- [ ] Gercek `CODEX_PRODUCTION_DEPLOY_COMMAND` tanimlanacak.
+- [ ] Gercek `CODEX_ROLLBACK_COMMAND` tanimlanacak.

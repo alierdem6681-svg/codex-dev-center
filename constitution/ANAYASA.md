@@ -2,97 +2,73 @@
 
 ## 1. Ana Amaç
 
-Bu sistemin amacı, proje geliştirme süreçlerini Codex/CTO mantığıyla yönetmek, görevleri worker'lara dağıtmak, yapılan tüm geliştirmeleri kaydetmek ve yeni gelen Codex/agent/worker sistemlerinin kaldığı yerden devam edebilmesini sağlamaktır.
+Bu sistemin amacı, proje geliştirme süreçlerini Codex/CTO mantığıyla yönetmek, görevleri çalışanlara dağıtmak, yapılan tüm geliştirmeleri kaydetmek ve yeni gelen Codex/agent/worker sistemlerinin kaldığı yerden devam edebilmesini sağlamaktır.
 
 ## 2. Kalıcı Hafıza Zorunluluğu
 
-Her agent, worker veya Codex oturumu işe başlamadan önce aşağıdaki dosyaları okumak zorundadır:
+Her agent, worker veya Codex oturumu işe başlamadan önce aşağıdaki dosyaları okumalıdır:
 
-1. /opt/codex-dev-center/constitution/ANAYASA.md
-2. /opt/codex-dev-center/docs/ARCHITECTURE.md
-3. /opt/codex-dev-center/docs/ROADMAP.md
-4. /opt/codex-dev-center/docs/HANDOVER.md
-5. /opt/codex-dev-center/state/system_state.json
-6. /opt/codex-dev-center/memory/project_memory.md
+1. AGENTS.md
+2. constitution/ANAYASA.md
+3. docs/ARCHITECTURE.md
+4. docs/ROADMAP.md
+5. docs/HANDOVER.md
+6. memory/project_memory.md
 
 ## 3. Çalışma Kuralı
 
 Hiçbir agent doğrudan kontrolsüz canlı değişiklik yapamaz.
 
-Önce:
-- Görevi anlar
-- Plan çıkarır
-- Dosya değişikliklerini yapar
-- Test eder
-- Log yazar
-- Rapor üretir
-- Gerekirse onay ister
+Önce görevi anlar, plan çıkarır, dosya değişikliklerini yapar, test eder, log yazar, rapor üretir ve risk seviyesine göre onay ister veya otomatik kapılardan geçer.
 
 ## 4. Telegram Kuralı
 
-Kullanıcının Telegram mesajları Codex'e aynen iletilir.
+Kullanıcının Telegram mesajları Codex'e aynen iletilir. Kod çıktısı, uzun terminal çıktısı, diff, stack trace ve log dump Telegram'a gönderilmez; teknik çıktı log dosyasına kaydedilir.
 
-Kullanıcı mesajlarında:
-- Özetleme yapılmaz
-- Düzeltme yapılmaz
-- Yorum eklenmez
-- Yönlendirme yapılmaz
-- Filtre uygulanmaz
+## 5. Çalışan Kuralı
 
-Codex yanıtlarında:
-- Normal konuşma aynen gönderilir
-- Kod çıktısı, uzun terminal çıktısı, diff, stack trace ve log dump Telegram'a gönderilmez
-- Teknik çıktı log dosyasına kaydedilir
-- Telegram'a sadece kısa teknik çıktı bildirimi gönderilir
-
-## 5. Worker Kuralı
-
-Worker'lar ayrı görevlerde çalışır.
-
-Başlangıç worker rolleri:
+Başlangıç rolleri:
 
 - worker-1: Backend ve altyapı
 - worker-2: Frontend ve panel
-- worker-3: DevOps, deploy ve servisler
+- worker-3: DevOps, yayına alma ve servisler
 - worker-4: Test, kalite ve denetim
 
 ## 6. Canlı Ortam Kuralı
 
-Canlıya alma işlemi sistem tarafından yapılabilir; ancak risk seviyesine göre güvenlik kapıları uygulanır.
+Canlıya alma işlemi sistem tarafından yapılabilir; ancak kalite kapıları ve risk politikaları zorunludur.
 
-Kritik işlemler:
-- Production deploy
-- Veritabanı migration
-- Veri silme
-- Secret erişimi
-- DNS değişikliği
-- Cloud maliyeti artıran işlemler
+Kritik istisnalar otomatik yapılamaz:
 
-Bu işlemler loglanmalı, geri dönüş planı üretmeli ve gerekiyorsa kullanıcıdan açık onay istemelidir.
+- Secret değerlerini görüntüleme veya değiştirme
+- IAM owner/editor yetki değişikliği
+- Billing ayarı değiştirme
+- Database veri silme
+- Geri döndürülemez migration
+- DNS/firewall kritik değişiklik
+- Google Ads canlı mutate işlemi
+- Canlı müşteri/veri kaybı riski taşıyan işlem
 
-## 7. Kayıt Zorunluluğu
+## 7. Autonomous Production Delivery
+
+Codex Dev Center uygulamasının kendi repo/app deploy akışı için otomatik yayına alma kullanılabilir. Ancak tüm readiness kapıları, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
+
+Otomatik production için staging, production ve rollback komutları runtime environment ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmadan production komutu çalışmaz.
+
+## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:
 
 - Görev ID
 - Başlangıç zamanı
 - Bitiş zamanı
-- Sorumlu worker
+- Sorumlu çalışan
 - Değişen dosyalar
 - Test sonucu
 - Hata varsa hata özeti
 - Son durum
 - Devam notu
 
-## 8. Devir Teslim Kuralı
+## 9. Devir Teslim Kuralı
 
-Her geliştirme sonunda HANDOVER.md güncellenir.
-
-Yeni gelen Codex bu dosyayı okuyarak:
-- Ne bitti
-- Ne yarım kaldı
-- Ne riskli
-- Sıradaki görev ne
-- Hangi dosyalara bakmalı
-
-bilgilerini öğrenir.
+Her geliştirme sonunda HANDOVER.md, ROADMAP.md ve memory/project_memory.md güncellenir.
