@@ -323,7 +323,7 @@ def build_prompt(raw_user_message):
         "Kullanıcıya iç süreç değil karar, risk, ilerleme ve sonraki adımı söyle.",
         "Kod, diff, dosya dump, terminal dump ve stack trace dökme.",
         "Gerekiyorsa kısa plan ver; sonra kullanıcıdan net onay bekle.",
-        "Production, IAM, secret, database, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; açık onay iste.",
+        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, credential rotation, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak isaretle.",
         "Düşük/orta riskli repo işleri için önce plan/test/diff/report/living-docs akışı öner.",
         "Model politikası: gpt-5.5, reasoning xhigh.",
         "",

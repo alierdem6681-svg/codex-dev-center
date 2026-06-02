@@ -124,6 +124,7 @@ def status_payload():
         "dashboard_settings": read_json(STATE / "dashboard_settings.json", read_json(ROOT / "state_templates/dashboard_settings.json", {})),
         "module_settings": read_json(STATE / "module_settings.json", read_json(ROOT / "state_templates/module_settings.json", {})),
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
+        "cto_delivery": read_json(STATE / "cto_delivery_state.json", read_json(ROOT / "state_templates/cto_delivery_policy.json", {})),
         "auth": panel_auth.public_auth_state(),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
         "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
@@ -269,7 +270,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
             return
         if action == "production_deploy_start":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_deploy_controller.py", "start", "--auto"], 300))
+            self.send_json(run_cmd([sys.executable, "supervisor/cto_autonomous_delivery.py", "deploy-latest", "--execute", "--wait"], 1200))
+            return
+        if action == "cto_delivery_status":
+            self.send_json(run_cmd([sys.executable, "supervisor/cto_autonomous_delivery.py", "status"], 120))
             return
         if action == "staging_deploy":
             self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "staging-deploy"], 420))

@@ -5,7 +5,8 @@
   "approval_required_for": [
     "iam_owner_or_editor_grant",
     "secret_read_or_write",
-    "production_deploy",
+    "credential_rotation",
+    "token_private_key_env_change",
     "database_migration",
     "data_delete",
     "dns_change",

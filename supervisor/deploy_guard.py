@@ -5,20 +5,13 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from .critical_operation_policy import critical_operation_findings
+except ImportError:
+    from critical_operation_policy import critical_operation_findings
+
 ROOT = Path(__file__).resolve().parents[1]
 APPROVAL_LOG = ROOT / "logs" / "deploy_approval_required.log"
-
-HIGH_RISK_TERMS = [
-    "production",
-    "prod deploy",
-    "migration",
-    "delete data",
-    "drop table",
-    "secret",
-    "dns",
-    "cloud cost",
-    "billing",
-]
 
 
 def utc_now() -> str:
@@ -26,15 +19,16 @@ def utc_now() -> str:
 
 
 def evaluate_deploy_action(description: str) -> dict:
-    normalized = description.lower()
-    matched = [term for term in HIGH_RISK_TERMS if term in normalized]
+    matched = critical_operation_findings(description)
     result = {
         "description": description,
         "risk_level": "high" if matched else "low",
         "approval_required": bool(matched),
         "matched_terms": matched,
         "evaluated_at": utc_now(),
-        "production_deploy_enabled": False,
+        "production_deploy_enabled": not matched,
+        "automatic_if_all_gates_pass": not matched,
+        "status": "APPROVAL_REQUIRED" if matched else "ALLOWED_WITH_GATES",
     }
     if result["approval_required"]:
         APPROVAL_LOG.parent.mkdir(parents=True, exist_ok=True)

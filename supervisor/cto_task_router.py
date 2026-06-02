@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .critical_operation_policy import critical_operation_findings
     from .task_status_constants import (
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
@@ -25,6 +26,7 @@ try:
         worker_block_reason,
     )
 except ImportError:
+    from critical_operation_policy import critical_operation_findings
     from task_status_constants import (
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
@@ -73,12 +75,14 @@ def classify_risk(text: str, requested: str | None = None) -> str:
     if requested:
         return normalize_risk(requested)
     lowered = (text or "").lower()
-    critical_words = ["secret rotation", "iam", "billing", "firewall", "dns", "database destructive"]
-    high_words = ["production", "canlı", "canli", "deploy", "rollback", "database", "migration"]
-    if any(word in lowered for word in critical_words):
+    if critical_operation_findings(text):
         return "critical"
+    high_words = ["database", "migration"]
+    normal_delivery_words = ["production", "canlı", "canli", "deploy", "rollback", "yayına al", "yayina al"]
     if any(word in lowered for word in high_words):
         return "high"
+    if any(word in lowered for word in normal_delivery_words):
+        return "medium"
     if any(word in lowered for word in ["pipeline", "worker", "queue", "telegram", "dashboard", "test"]):
         return "medium"
     return "low"

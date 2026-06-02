@@ -1,0 +1,38 @@
+{
+  "updated_at": "2026-06-02T00:00:00+00:00",
+  "enabled": true,
+  "mode": "single_task_until_stable",
+  "cto_role": "orchestrate_plan_assign_review_gate_deploy_health_rollback",
+  "worker_role": "implement_or_prepare_changes_in_isolated_task_flow",
+  "max_parallel_tasks": 1,
+  "stable_successful_low_risk_deploy_threshold": 3,
+  "allow_parallel_increase_after_stable": true,
+  "production_deploy_requires_user_approval_for_normal_app_changes": false,
+  "production_deploy_allowed_when_all_gates_pass": true,
+  "production_deploy_channel": "github_actions_manual",
+  "github_actions_workflow_name": "Deploy to VM",
+  "github_actions_confirm_phrase": "DEPLOY-CODEX-VM",
+  "required_before_production": [
+    "worker_assignment",
+    "worker_result_review",
+    "branch_pr_merge",
+    "production_readiness_pass",
+    "github_actions_deploy_pass",
+    "post_deploy_health_pass",
+    "post_deploy_smoke_pass"
+  ],
+  "critical_operations_auto_block": [
+    "secret_value_view_or_change",
+    "token_private_key_env_value_change",
+    "credential_rotation",
+    "iam_owner_editor_change",
+    "billing_change",
+    "firewall_change",
+    "dns_change",
+    "database_destructive_operation",
+    "irreversible_migration",
+    "google_ads_live_mutate",
+    "live_customer_or_data_loss_risk"
+  ],
+  "critical_operation_status": "APPROVAL_REQUIRED"
+}

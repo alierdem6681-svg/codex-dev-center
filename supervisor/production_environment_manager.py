@@ -35,8 +35,14 @@ DEFAULT_COMMANDS = {
 
 CRITICAL_EXCEPTION_TERMS = [
     "secret value",
+    "token value",
+    "private key",
+    "env change",
+    "credential",
+    "credential rotation",
     "iam owner",
     "iam editor",
+    "iam ",
     "billing",
     "drop table",
     "truncate table",

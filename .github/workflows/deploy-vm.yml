@@ -198,6 +198,7 @@ jobs:
           cd "$RUNTIME_DIR"
           python3 -m compileall -q supervisor web_panel scripts
           find state_templates -name "*.json" -print0 | xargs -0 -r -I{} python3 -m json.tool "{}" >/dev/null
+          python3 supervisor/policy_sync.py --json
 
       - name: Restart services
         shell: bash

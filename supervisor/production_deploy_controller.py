@@ -18,11 +18,18 @@ REPORTS = ROOT / "reports"
 
 CRITICAL_EXCEPTION_TERMS = [
     "secret",
+    "token",
+    "private key",
+    "env change",
+    "credential",
+    "credential rotation",
     "iam owner",
     "iam editor",
+    "iam",
     "billing",
     "drop table",
     "truncate table",
+    "delete from",
     "database delete",
     "dns",
     "firewall",
@@ -93,8 +100,24 @@ def settings() -> dict[str, Any]:
     deploy_policy_data = read_json(ROOT / "state_templates/deploy_policy.json", {})
     deploy = module_settings.get("deploy_pipeline", {}) if isinstance(module_settings, dict) else {}
     return {
-        "automatic_production_enabled": bool(production_policy.get("automatic_production_enabled", deploy.get("automatic_production_enabled", False))),
-        "manual_approval_required": bool(deploy.get("production_requires_explicit_approval", False)),
+        "automatic_production_enabled": bool(
+            production_policy.get(
+                "automatic_production_enabled",
+                deploy_policy_data.get("automatic_production_enabled", deploy.get("automatic_production_enabled", False)),
+            )
+        ),
+        "manual_approval_required": bool(
+            production_policy.get(
+                "manual_approval_required_for_normal_app_deploy",
+                deploy_policy_data.get("production_requires_explicit_approval", deploy.get("production_requires_explicit_approval", False)),
+            )
+        ),
+        "normal_app_deploy_allowed_when_all_gates_pass": bool(
+            production_policy.get(
+                "normal_app_deploy_allowed_when_all_gates_pass",
+                deploy_policy_data.get("normal_app_deploy_allowed_when_all_gates_pass", False),
+            )
+        ),
         "readiness_required": bool(deploy.get("production_requires_readiness_pass", True)),
         "staging_required": bool(deploy.get("production_requires_staging_pass", True)),
         "rollback_required": bool(deploy.get("production_requires_rollback_pass", True)),
@@ -189,6 +212,8 @@ def start(auto: bool = False) -> dict[str, Any]:
     blockers: list[str] = []
     if not cfg["automatic_production_enabled"]:
         blockers.append("automatic_production_disabled")
+    if cfg["manual_approval_required"]:
+        blockers.append("normal_app_deploy_explicit_approval_required_by_policy")
     if not readiness["ok"]:
         blockers.append("readiness_not_pass")
     if not critical["ok"]:

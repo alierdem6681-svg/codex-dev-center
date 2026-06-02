@@ -97,14 +97,17 @@
   "deploy_pipeline": {
     "staging_enabled": true,
     "production_enabled": true,
-    "automatic_production_enabled": false,
+    "automatic_production_enabled": true,
     "production_deploy_channel": "github_actions_manual",
     "github_actions_workflow_name": "Deploy to VM",
     "github_actions_confirm_phrase": "DEPLOY-CODEX-VM",
     "vm_target": "codex-dev-center-01",
     "runtime_directory": "/opt/codex-dev-center",
     "direct_vm_ssh_forbidden": true,
-    "production_requires_explicit_approval": true,
+    "production_requires_explicit_approval": false,
+    "normal_app_deploy_allowed_when_all_gates_pass": true,
+    "max_parallel_tasks_until_stable": 1,
+    "stable_successful_low_risk_deploy_threshold": 3,
     "production_requires_readiness_pass": true,
     "production_requires_staging_pass": true,
     "production_requires_rollback_pass": true,
@@ -121,6 +124,8 @@
     "production_deploy_execute_env": "CODEX_PRODUCTION_DEPLOY_EXECUTE",
     "production_deploy_execute_default": "1",
     "database_migration_requires_approval": true,
+    "credential_rotation_requires_approval": true,
+    "token_private_key_env_change_requires_approval": true,
     "critical_exception_auto_block": true
   },
   "backup_recovery": {

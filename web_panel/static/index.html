@@ -271,6 +271,7 @@
         const github = data.github_safe_flow || {};
         const router = data.cto_router || {};
         const doctor = data.cto_doctor || {};
+        const delivery = data.cto_delivery || {};
         clock.textContent = new Date().toLocaleTimeString();
         deployMetric.textContent = runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
@@ -295,7 +296,9 @@
           `Backup: ${actionsState.last_backup_path ? 'var' : '-'}`,
           `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`,
           `CTO router: ${router.enabled ? 'active' : '-'}`,
-          `CTO doctor: ${doctor.ok === undefined ? '-' : doctor.ok}`
+          `CTO doctor: ${doctor.ok === undefined ? '-' : doctor.ok}`,
+          `Delivery stable: ${delivery.stable === undefined ? '-' : delivery.stable}`,
+          `Max paralel: ${delivery.policy?.max_parallel_tasks || delivery.max_parallel_tasks || '-'}`
         ].map(badge).join('<br>');
         const commands = data.deploy_commands || {};
         commandBox.innerHTML = Object.entries(commands).map(([key, value]) => {
@@ -308,7 +311,8 @@
           `Son sağlık: ${health.status || health.ok || '-'}`,
           `Son duman testi: ${smoke.status || smoke.ok || '-'}`,
           `Rollback noktası: ${data.rollback_point?.commit ? data.rollback_point.commit.slice(0, 8) : '-'}`,
-          `Otomatik production: ${data.production_policy?.automatic_production_enabled}`
+          `Otomatik production: ${data.production_policy?.automatic_production_enabled}`,
+          `Gate PASS deploy: ${delivery.policy?.production_deploy_allowed_when_all_gates_pass ?? data.production_policy?.normal_app_deploy_allowed_when_all_gates_pass ?? '-'}`
         ].map(badge).join('');
         const s = data.dashboard_settings?.production || {};
         settingsBadges.innerHTML = Object.entries({
