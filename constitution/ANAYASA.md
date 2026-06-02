@@ -36,7 +36,11 @@ Başlangıç rolleri:
 
 ## 6. Canlı Ortam Kuralı
 
-Canlıya alma işlemi sistem tarafından yapılabilir; ancak kalite kapıları ve risk politikaları zorunludur.
+Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.
+
+Workflow manuel çalışır. Confirm alanına tam olarak `DEPLOY-CODEX-VM` yazılmadan deploy ilerlemez. Hedef VM `codex-dev-center-01`, runtime dizini `/opt/codex-dev-center` olmalıdır.
+
+Kalite kapıları ve risk politikaları zorunludur.
 
 Kritik istisnalar otomatik yapılamaz:
 
@@ -51,9 +55,9 @@ Kritik istisnalar otomatik yapılamaz:
 
 ## 7. Autonomous Production Delivery
 
-Codex Dev Center uygulamasının kendi repo/app deploy akışı için otomatik yayına alma kullanılabilir. Ancak tüm readiness kapıları, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
+Codex Dev Center uygulamasının kendi repo/app deploy akışı için GitHub Actions manuel yayına alma kapısı kullanılır. Tüm readiness kapıları, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
 
-Otomatik production için staging, production ve rollback komutları environment veya policy default ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` environment veya policy default olmadan production komutu çalışmaz.
+Production için staging, production ve rollback komutları environment veya policy default ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` environment veya policy default olmadan production komutu çalışmaz. `production_deploy_channel=github_actions_manual` olduğunda GitHub Actions dışındaki production deploy denemeleri `github_actions_workflow_required` blocker'ı ile durur.
 
 Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templates/deploy_policy.json` içinde tanımlıdır. Bu kapsam Google Ads, IAM, secret, billing, database, DNS/firewall veya müşteri verisi mutate işlemlerini kapsamaz.
 

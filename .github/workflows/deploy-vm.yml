@@ -6,106 +6,199 @@ on:
       confirm:
         description: "Type DEPLOY-CODEX-VM to deploy"
         required: true
-        default: ""
+        type: string
+      ref:
+        description: "Branch or commit to deploy"
+        required: true
+        default: "main"
+        type: string
+
+concurrency:
+  group: codex-dev-center-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Deploy codex-dev-center-01
     runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    env:
+      CONFIRM_PHRASE: DEPLOY-CODEX-VM
+      VM_TARGET: codex-dev-center-01
+      RUNTIME_DIR: /opt/codex-dev-center
+      BACKUP_DIR: /opt/codex-dev-center-backups
+      DASHBOARD_URL: http://127.0.0.1:8080
 
     steps:
       - name: Confirm manual deploy
+        shell: bash
         run: |
-          set -e
-          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY-CODEX-VM" ]; then
+          set -euo pipefail
+          if [ "${{ inputs.confirm }}" != "$CONFIRM_PHRASE" ]; then
             echo "Confirmation text is wrong. Deployment stopped."
             exit 1
           fi
 
-      - name: Checkout repository
+      - name: Validate runner target
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="$(hostname)"
+          echo "Runner name: ${RUNNER_NAME:-unknown}"
+          echo "Host: $host"
+          if [ "${RUNNER_NAME:-}" != "$VM_TARGET" ] && [ "$host" != "$VM_TARGET" ]; then
+            echo "This workflow must run on $VM_TARGET."
+            exit 1
+          fi
+
+      - name: Checkout requested ref
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
 
       - name: Preflight checks
+        shell: bash
         run: |
-          set -e
-          echo "===== WHOAMI ====="
-          whoami
-          echo "===== HOSTNAME ====="
-          hostname
+          set -euo pipefail
+          echo "===== TOOL CHECK ====="
+          command -v python3
+          command -v tar
+          command -v rsync
+          command -v curl
+          command -v systemctl
+
           echo "===== TARGET DIRECTORY ====="
-          test -d /opt/codex-dev-center
-          ls -lah /opt/codex-dev-center
-          echo "===== SSH RUNNER OK ====="
+          test -d "$RUNTIME_DIR"
+          sudo mkdir -p "$BACKUP_DIR"
+
+          echo "===== PYTHON COMPILE CHECK ====="
+          python3 -m compileall -q supervisor web_panel scripts
+
+          echo "===== JSON CHECK ====="
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path("state_templates").glob("*.json"):
+              json.loads(path.read_text(encoding="utf-8-sig"))
+          print("json_validation_pass")
+          PY
+
+          echo "===== PRODUCTION READINESS ====="
+          python3 supervisor/production_readiness_suite.py --json
 
       - name: Create backup
+        shell: bash
         run: |
-          set -e
-          TS="$(date -u +%Y%m%d_%H%M%S)"
-          BACKUP_DIR="/opt/codex-dev-center-backups"
-          sudo mkdir -p "$BACKUP_DIR"
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          backup="$BACKUP_DIR/pre_deploy_$stamp.tar.gz"
           sudo tar \
-            --exclude='/opt/codex-dev-center/.git' \
-            --exclude='/opt/codex-dev-center/.venv' \
-            --exclude='/opt/codex-dev-center/venv' \
-            --exclude='/opt/codex-dev-center/node_modules' \
-            --exclude='/opt/codex-dev-center/__pycache__' \
-            -czf "$BACKUP_DIR/pre_deploy_$TS.tar.gz" \
-            -C /opt codex-dev-center
-          echo "Backup created: $BACKUP_DIR/pre_deploy_$TS.tar.gz"
+            --exclude="$RUNTIME_DIR/.git" \
+            --exclude="$RUNTIME_DIR/.github" \
+            --exclude="$RUNTIME_DIR/.venv" \
+            --exclude="$RUNTIME_DIR/venv" \
+            --exclude="$RUNTIME_DIR/node_modules" \
+            --exclude="$RUNTIME_DIR/__pycache__" \
+            -czf "$backup" \
+            -C "$(dirname "$RUNTIME_DIR")" "$(basename "$RUNTIME_DIR")"
+          echo "backup=$backup" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy repository files
+        shell: bash
         run: |
-          set -e
-          SRC="$GITHUB_WORKSPACE"
-          DST="/opt/codex-dev-center"
-
+          set -euo pipefail
           sudo rsync -a --delete \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='actions-runner' \
-            --exclude='state' \
-            --exclude='logs' \
-            --exclude='*.log' \
-            --exclude='.env' \
-            --exclude='venv' \
-            --exclude='.venv' \
-            --exclude='node_modules' \
-            "$SRC"/ "$DST"/
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude "actions-runner/" \
+            --exclude "state/" \
+            --exclude "logs/" \
+            --exclude "workspaces/" \
+            --exclude "backups/" \
+            --exclude "tmp/" \
+            --exclude "*.log" \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "secrets/" \
+            --exclude "*.pem" \
+            --exclude "*.key" \
+            --exclude "venv/" \
+            --exclude ".venv/" \
+            --exclude "node_modules/" \
+            --exclude "__pycache__/" \
+            ./ "$RUNTIME_DIR"/
+          sudo chown -R alierdem6681:alierdem6681 "$RUNTIME_DIR"
 
-          sudo chown -R alierdem6681:alierdem6681 "$DST"
-
-      - name: Validate files
+      - name: Validate runtime files
+        shell: bash
         run: |
-          set -e
-          cd /opt/codex-dev-center
-          echo "===== PYTHON COMPILE CHECK ====="
-          find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*" -print0 | xargs -0 -r python3 -m py_compile
-          echo "===== JSON CHECK ====="
-          find . -name "*.json" -print0 | xargs -0 -r -I{} python3 -m json.tool "{}" >/dev/null
+          set -euo pipefail
+          cd "$RUNTIME_DIR"
+          python3 -m compileall -q supervisor web_panel scripts
+          find state_templates -name "*.json" -print0 | xargs -0 -r -I{} python3 -m json.tool "{}" >/dev/null
 
       - name: Restart services
+        shell: bash
         run: |
-          set -e
-          sudo systemctl restart codex-panel || true
-          sudo systemctl restart codex-lifecycle || true
-          sudo systemctl restart codex-watchdog || true
-          sudo systemctl restart codex-worker-1 || true
-          sudo systemctl restart codex-worker-2 || true
-          sudo systemctl restart codex-worker-3 || true
-          sudo systemctl restart codex-worker-4 || true
+          set -euo pipefail
+          services=(codex-panel codex-lifecycle codex-watchdog codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4)
+          for svc in "${services[@]}"; do
+            if systemctl list-unit-files "$svc.service" >/dev/null 2>&1; then
+              sudo systemctl restart "$svc"
+              echo "$svc restarted"
+            else
+              echo "$svc.service not installed; skipped"
+            fi
+          done
 
       - name: Smoke check
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
           sleep 3
-          echo "===== SERVICES ====="
-          systemctl is-active codex-panel
-          systemctl is-active codex-lifecycle || true
-          systemctl is-active codex-watchdog || true
 
-          echo "===== DASHBOARD ====="
-          curl -I http://127.0.0.1:8080
+          echo "===== REQUIRED SERVICES ====="
+          systemctl is-active codex-panel
+          if systemctl list-unit-files codex-lifecycle.service >/dev/null 2>&1; then
+            systemctl is-active codex-lifecycle
+          fi
+          if systemctl list-unit-files codex-watchdog.service >/dev/null 2>&1; then
+            systemctl is-active codex-watchdog
+          fi
+
+          echo "===== WORKER SERVICES ====="
+          for svc in codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4; do
+            if systemctl list-unit-files "$svc.service" >/dev/null 2>&1; then
+              systemctl is-active "$svc" || true
+            else
+              echo "$svc.service not installed"
+            fi
+          done
+
+          echo "===== DASHBOARD HEALTH ====="
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 "$DASHBOARD_URL/health" >/tmp/codex-health.json; then
+              cat /tmp/codex-health.json
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/codex-health.json
+
+          echo "===== LOGIN PAGE ====="
+          curl -fsS --max-time 10 "$DASHBOARD_URL/login" >/tmp/codex-login.html
+          grep -q "Kullanıcı adı" /tmp/codex-login.html
+          grep -q "Şifre" /tmp/codex-login.html
+          echo "smoke=PASS" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deployment summary
+        shell: bash
         run: |
-          echo "Deployment completed on $(hostname) at $(date -u)"
-          echo "Target: /opt/codex-dev-center"
+          {
+            echo "deployment=PASS"
+            echo "target=$VM_TARGET"
+            echo "runtime=$RUNTIME_DIR"
+            echo "ref=${{ inputs.ref }}"
+            echo "completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_STEP_SUMMARY"

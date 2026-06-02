@@ -90,6 +90,7 @@ def run_cmd(command: str, timeout: int = 300) -> dict[str, Any]:
 def settings() -> dict[str, Any]:
     module_settings = read_json(ROOT / "state_templates/module_settings.json", {})
     production_policy = read_json(ROOT / "state_templates/production_policy.json", {})
+    deploy_policy_data = read_json(ROOT / "state_templates/deploy_policy.json", {})
     deploy = module_settings.get("deploy_pipeline", {}) if isinstance(module_settings, dict) else {}
     return {
         "automatic_production_enabled": bool(production_policy.get("automatic_production_enabled", deploy.get("automatic_production_enabled", False))),
@@ -98,6 +99,7 @@ def settings() -> dict[str, Any]:
         "staging_required": bool(deploy.get("production_requires_staging_pass", True)),
         "rollback_required": bool(deploy.get("production_requires_rollback_pass", True)),
         "auto_rollback_on_failure": bool(production_policy.get("auto_rollback_on_failure", True)),
+        "production_deploy_channel": str(deploy_policy_data.get("production_deploy_channel", "local_controller")),
     }
 
 
@@ -199,6 +201,8 @@ def start(auto: bool = False) -> dict[str, Any]:
         blockers.append("rollback_command_missing")
     if not production_execute_enabled:
         blockers.append("production_execute_flag_missing")
+    if cfg.get("production_deploy_channel") == "github_actions_manual" and os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+        blockers.append("github_actions_workflow_required")
 
     result: dict[str, Any] = {
         "ok": False,

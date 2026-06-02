@@ -1,10 +1,20 @@
-# Autonomous Production Policy
+﻿# Autonomous Production Policy
 
 Tarih: 2026-06-02
 
-Codex Dev Center kendi uygulama kapsamında production'a manuel onay beklemeden geçebilir. Bu yetki sadece tüm kalite kapıları PASS olduğunda geçerlidir.
+Codex Dev Center kendi uygulama kapsamında production'a yalnızca GitHub Actions üzerinden geçebilir. Production deploy terminalden, doğrudan VM SSH ile veya production runtime dosyalarına elle müdahale edilerek yapılmaz.
 
-## Otomatik Geçiş Şartları
+Production kapısı manuel workflow'dur:
+
+- Workflow adı: `Deploy to VM`
+- Confirm alanı: `DEPLOY-CODEX-VM`
+- VM hedefi: `codex-dev-center-01`
+- Runtime dizini: `/opt/codex-dev-center`
+- Deploy kanalı: `github_actions_manual`
+
+Bu modelde kalite kapıları zorunludur, ancak canlıya alma başlatma yetkisi GitHub Actions manuel confirm alanına bağlıdır.
+
+## Canlıya Alma Şartları
 
 Production deploy ancak şu şartların tamamı sağlanırsa çalışır:
 
@@ -21,10 +31,12 @@ Production deploy ancak şu şartların tamamı sağlanırsa çalışır:
 - Production health check `PASS`
 - Production smoke test `PASS`
 - Rollback noktası kaydı `PASS`
+- GitHub Actions confirm `DEPLOY-CODEX-VM`
+- Runner hedef doğrulaması `codex-dev-center-01`
 
-## Otomatik Komut Kaynağı
+## Komut Kaynağı ve Blokaj
 
-Env değişkenleri tanımlıysa önceliklidir. Tanımlı değilse policy default kullanılır:
+Env değişkenleri tanımlıysa yerel controller doğrulamalarında önceliklidir. Tanımlı değilse policy default kullanılır:
 
 - `state_templates/deploy_policy.json`
 - `state_templates/production_policy.json`
@@ -32,7 +44,9 @@ Env değişkenleri tanımlıysa önceliklidir. Tanımlı değilse policy default
 - `state_templates/action_catalog.json`
 - `state_templates/module_registry.json`
 
-Bu nedenle eksik env sistemi BLOCKED bırakmaz; güvenli default komutlar controller tarafından çözülür.
+Bu nedenle eksik env readiness raporunu gereksiz yere BLOCKED bırakmaz. Ancak `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur.
+
+Production deploy için kullanılacak gerçek yol `.github/workflows/deploy-vm.yml` dosyasıdır. Bu workflow backup, validate, runtime sync, service restart ve smoke check adımlarını self-hosted runner üzerinde yürütür.
 
 ## Kritik İstisnalar
 
@@ -46,7 +60,7 @@ Aşağıdaki konular otomatik production kapsamı dışındadır ve ayrı risk r
 
 ## Production Sonrası
 
-Deploy tamamlandıktan sonra şu kontroller yapılır:
+GitHub Actions deploy tamamlandıktan sonra şu kontroller yapılır:
 
 - Health check
 - Smoke test

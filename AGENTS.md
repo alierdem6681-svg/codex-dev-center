@@ -1,4 +1,4 @@
-# CODEX DEV CENTER - AGENTS.md
+﻿# CODEX DEV CENTER - AGENTS.md
 
 Bu depo/dizin Codex Dev Center ana çalışma alanıdır.
 
@@ -46,7 +46,11 @@ Bu teknik çıktılar logs/ ve reports/ altına yazılmalıdır.
 
 ## Canlı Ortam Kuralı
 
-Sistem ileride canlıya alabilir. Ancak production deploy, veri silme, migration, secret erişimi, DNS değişikliği ve maliyet artıran cloud işlemleri risk kapısına bağlıdır.
+Sistem canlıya alma hazırlığı yapabilir. Production deploy sadece GitHub Actions `Deploy to VM` workflow'u üzerinden yapılır. VM'ye doğrudan SSH ile bağlanma, production runtime dosyalarına elle müdahale etme ve terminalden production deploy çalıştırma yasaktır.
+
+Production workflow manuel çalışır ve confirm alanına tam olarak `DEPLOY-CODEX-VM` yazılmadan ilerlemez. Hedef VM `codex-dev-center-01`, runtime dizini `/opt/codex-dev-center` olarak tanımlıdır.
+
+Veri silme, migration, secret erişimi, IAM, DNS/firewall, billing, Google Ads mutate ve maliyet artıran cloud işlemleri risk kapısına bağlıdır ve otomatik yapılmaz.
 
 ## Çalışma Prensibi
 
@@ -101,11 +105,15 @@ All CTO, worker and future Codex processes must use model gpt-5.5 with reasoning
 
 ---
 
-## AUTONOMOUS PRODUCTION DELIVERY SYSTEM V1
+## GITHUB ACTIONS VM DEPLOY GATE V1
 
-Bu repo artik Codex Dev Center uygulamasinin kendi repo/app yayina alma akisi icin otomatik production delivery iskeletine sahiptir.
+Bu repo artik Codex Dev Center uygulamasinin kendi repo/app yayina alma akisi icin GitHub Actions manuel production gate'e sahiptir.
 
-Otomatik yayina alma sadece su kosullarda calisabilir:
+Canliya alma sadece su kosullarda calisabilir:
+- `.github/workflows/deploy-vm.yml` icindeki `Deploy to VM` workflow'u manuel calistirilir.
+- Confirm alani tam olarak `DEPLOY-CODEX-VM` olur.
+- Self-hosted runner hedefi `codex-dev-center-01` olur.
+- Runtime dizini `/opt/codex-dev-center` olur.
 - `supervisor/production_readiness_suite.py --json` PASS olmali.
 - On canli kapisi PASS olmali.
 - Geri alma simulasyonu PASS olmali.
@@ -113,6 +121,8 @@ Otomatik yayina alma sadece su kosullarda calisabilir:
 - `CODEX_STAGING_DEPLOY_COMMAND`, `CODEX_PRODUCTION_DEPLOY_COMMAND`, `CODEX_ROLLBACK_COMMAND` tanimli olmali.
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmali.
 - Kritik istisna bulunmamali.
+
+`production_deploy_channel=github_actions_manual` iken controller GitHub Actions disinda production deploy denemesini `github_actions_workflow_required` blocker'i ile durdurur.
 
 Kritik istisnalar otomatik yapilmaz: secret degeri gorme/degistirme, IAM owner/editor degisikligi, billing, database veri silme, geri dondurulemez migration, kritik DNS/firewall degisikligi, Google Ads live mutate ve canli veri kaybi riski. Bu hallerde controller durur ve risk raporu uretir.
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -136,6 +136,7 @@ def required_file_regression(results: dict[str, Any]) -> None:
         "supervisor/github_safe_flow.py",
         "web_panel/auth.py",
         "web_panel/static/login.html",
+        ".github/workflows/deploy-vm.yml",
         "scripts/staging_deploy.sh",
         "scripts/production_deploy.sh",
         "scripts/rollback_production.sh",
@@ -292,14 +293,24 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     ]
     missing_commands = [key for key in required_commands if not commands.get(key)]
     execute_default = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", ""))
+    workflow = ROOT / ".github/workflows/deploy-vm.yml"
+    workflow_text = workflow.read_text(encoding="utf-8", errors="replace") if workflow.exists() else ""
+    workflow_ok = (
+        "name: Deploy to VM" in workflow_text
+        and "workflow_dispatch" in workflow_text
+        and "DEPLOY-CODEX-VM" in workflow_text
+        and "codex-dev-center-01" in workflow_text
+        and "/opt/codex-dev-center" in workflow_text
+    )
     record(
         results,
         "deploy_script_command_check",
-        all(path.exists() for path in scripts) and not missing_commands and execute_default == "1",
+        all(path.exists() for path in scripts) and not missing_commands and execute_default == "1" and workflow_ok,
         {
             "scripts": [str(path.relative_to(ROOT)) for path in scripts],
             "missing_commands": missing_commands,
             "execute_default": execute_default,
+            "workflow_ok": workflow_ok,
         },
     )
 
@@ -317,7 +328,8 @@ def chaos_simulations(results: dict[str, Any]) -> None:
 
 def unit_and_integration(results: dict[str, Any]) -> None:
     policy = read_json(ROOT / "state_templates/production_policy.json", {})
-    record(results, "unit_test", bool(policy.get("automatic_production_enabled")), {"scope": "production_policy"})
+    ok = bool(policy.get("automatic_production_enabled") or policy.get("production_deploy_channel") == "github_actions_manual")
+    record(results, "unit_test", ok, {"scope": "production_policy", "deploy_channel": policy.get("production_deploy_channel")})
     registry = read_json(ROOT / "state_templates/module_registry.json", {"modules": []})
     active = [m.get("id") for m in registry.get("modules", []) if m.get("dashboard_visible")]
     record(results, "integration_test", "deploy_pipeline" in active, {"dashboard_visible_modules": active})

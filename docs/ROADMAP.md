@@ -94,3 +94,15 @@ Faz 19B-10A Model Policy
 - [x] Dashboard deploy command, health, smoke ve rollback gorunurlugu eklendi.
 - [x] Panel tokenli giris yerine kullanici adi/sifre auth eklendi.
 - [ ] Production deploy sonrasi uzun sureli servis izleme ve kalici Windows/Linux service wrapper standardi.
+
+## Faz 26 - GitHub Actions VM Deploy Gate v1
+
+- [x] Production deploy kanali `github_actions_manual` olarak policy'ye baglandi.
+- [x] `Deploy to VM` manuel GitHub Actions workflow'u eklendi.
+- [x] Confirm alani `DEPLOY-CODEX-VM` zorunlu yapildi.
+- [x] VM hedefi `codex-dev-center-01` olarak dogrulaniyor.
+- [x] Runtime dizini `/opt/codex-dev-center` olarak workflow ve policy'ye baglandi.
+- [x] Dogrudan VM SSH ve production runtime dosya mudahalesi policy'de yasaklandi.
+- [x] Controller GitHub Actions disinda production deploy'u `github_actions_workflow_required` ile blokluyor.
+- [x] Readiness suite workflow dosyasini ve confirm/runner/runtime sozlesmesini kontrol ediyor.
+- [ ] Self-hosted runner uzerinde ilk manuel workflow calistirma ve servis restart/smoke sonucu.
