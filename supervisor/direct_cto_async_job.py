@@ -110,8 +110,19 @@ def send_message(chat_id, text):
     tg_call(token, "sendMessage", {"chat_id": chat_id, "text": text, "disable_web_page_preview": "true"})
 
 def save_job(job_file, job):
-    job["updated_at"] = now()
-    job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
+    current = {}
+    try:
+        if job_file.exists():
+            loaded = json.loads(job_file.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded, dict):
+                current = loaded
+    except Exception:
+        current = {}
+    current.update(job)
+    current["updated_at"] = now()
+    job_file.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n")
+    job.clear()
+    job.update(current)
 
 def update_job_progress(job_file, job, progress):
     job["status"] = "RUNNING"
