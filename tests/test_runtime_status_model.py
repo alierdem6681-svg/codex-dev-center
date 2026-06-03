@@ -3,6 +3,8 @@ import tempfile
 import unittest
 import importlib.util
 import json
+import contextlib
+import io
 from pathlib import Path
 
 
@@ -14,6 +16,7 @@ from supervisor import (  # noqa: E402
     lifecycle_manager,
     progress_aware_runner,
     direct_cto_async_job,
+    supervisor_cli,
     task_validation_engine,
     telegram_direct_cto_simulator,
     worker_runner,
@@ -501,6 +504,62 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(result["changed"], 1)
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
         self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
+
+
+class SupervisorCliCompletionTest(unittest.TestCase):
+    def run_complete_task(self, tmp, task):
+        runtime = Path(tmp)
+        state = runtime / "state"
+        logs = runtime / "logs"
+        reports = runtime / "reports"
+        state.mkdir()
+        logs.mkdir()
+        reports.mkdir()
+        (state / "task_queue.json").write_text(json.dumps({"tasks": [task]}), encoding="utf-8")
+        (state / "workers.json").write_text(json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": task["id"]}]}), encoding="utf-8")
+
+        originals = (supervisor_cli.STATE_DIR, supervisor_cli.LOG_DIR, supervisor_cli.REPORT_DIR)
+        supervisor_cli.STATE_DIR = state
+        supervisor_cli.LOG_DIR = logs
+        supervisor_cli.REPORT_DIR = reports
+        try:
+            args = type("Args", (), {"task_id": task["id"], "result": "manual"})()
+            with contextlib.redirect_stdout(io.StringIO()):
+                supervisor_cli.complete_task(args)
+        finally:
+            supervisor_cli.STATE_DIR, supervisor_cli.LOG_DIR, supervisor_cli.REPORT_DIR = originals
+
+        return json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+
+    def test_cli_complete_task_without_gates_waits_for_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue = self.run_complete_task(
+                tmp,
+                {
+                    "id": "TASK-MANUAL",
+                    "status": "RUNNING",
+                    "validation_status": "PENDING",
+                    "pipeline_status": "NOT_RUN",
+                },
+            )
+
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertEqual(queue["tasks"][0]["result"], "manual_completion_requires_validation_pipeline_pass")
+
+    def test_cli_complete_task_with_gates_can_mark_done(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue = self.run_complete_task(
+                tmp,
+                {
+                    "id": "TASK-MANUAL",
+                    "status": "RUNNING",
+                    "validation_status": "PASS",
+                    "pipeline_status": "PASS",
+                },
+            )
+
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["result"], "manual")
 
 
 if __name__ == "__main__":

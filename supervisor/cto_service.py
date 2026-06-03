@@ -448,9 +448,11 @@ def process_one():
             latest_queue = read_json(QUEUE, {"tasks": []})
             for latest_task in latest_queue.get("tasks", []):
                 if latest_task.get("id") == task.get("id"):
-                    latest_task["status"] = "DONE"
+                    latest_task["status"] = "READY_FOR_VALIDATION"
                     latest_task["finished_at"] = now()
-                    latest_task["result"] = "telegram_cto_v1_replied"
+                    latest_task["result"] = "telegram_cto_v1_replied_validation_required"
+                    latest_task["validation_status"] = latest_task.get("validation_status") or "PENDING"
+                    latest_task["pipeline_status"] = latest_task.get("pipeline_status") or "NOT_RUN"
                     break
             write_json(QUEUE, latest_queue)
             changed = False
