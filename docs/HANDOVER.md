@@ -243,6 +243,27 @@ Not:
 
 ---
 
+## Dashboard Pipeline Tracking Validation
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-170853 / CTO-DISPATCH-20260603-073035-CTO-ACTION-20260601-160827-04-DASHBOARD-TRACKING
+
+Eklenenler:
+- `tests/test_runtime_status_model.py` ana ve legacy panel server icin runtime marker dosyalari yokken de `/api/status` payload'unda `github_actions` ve `pipeline_status` anahtarlarinin bos nesne olarak kaldigini dogrular.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- `python3 supervisor/production_readiness_suite.py --json` PASS; production deploy yapilmadi.
+
+Not:
+- Production deploy calistirilmadi.
+- Git metadata yolu read-only oldugu icin `git add`, commit ve PR olusturma adimi bu sandbox'ta calistirilamadi.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write islemi yapilmadi.
+
+---
+
 ## Worker Lifecycle Smoke Check v1
 
 Tarih: 2026-06-02

@@ -113,6 +113,12 @@ Legacy `web_panel/server.py` `/api/status` payload'u ana `web_panel/panel_server
 
 Davranis `tests/test_runtime_status_model.py` icindeki unit test ile sabitlendi. Compile, unit test ve production readiness suite PASS oldu. Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi tamamlanamadi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapilmadi.
 
+## 2026-06-03 Dashboard Pipeline Tracking Validation
+
+Dashboard pipeline tracking icin ek regresyon testi eklendi. Ana panel ve legacy panel `/api/status` payload'u, runtime `state/github_actions_status.json` ve `state/pipeline_status.json` dosyalari henuz yokken de `github_actions` ve `pipeline_status` anahtarlarini bos nesne olarak dondurmek zorundadir.
+
+Compile, `tests.test_runtime_status_model` ve production readiness suite PASS oldu. Git metadata yolu read-only oldugu icin commit/PR olusturma adimi bu sandbox'ta calistirilamadi. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapmadi.
+
 ## 2026-06-02 Worker Lifecycle Smoke Check v1
 
 Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.

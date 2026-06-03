@@ -766,6 +766,27 @@ class DashboardControlledExecutionSummaryTest(unittest.TestCase):
 
 
 class DashboardPipelineTrackingStatusTest(unittest.TestCase):
+    def test_status_payload_keeps_pipeline_tracking_keys_when_markers_are_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+
+            originals = {
+                panel_server: panel_server.STATE,
+                legacy_panel_server: legacy_panel_server.STATE,
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    payload = module.status_payload()
+                    self.assertIn("github_actions", payload)
+                    self.assertIn("pipeline_status", payload)
+                    self.assertEqual(payload["github_actions"], {})
+                    self.assertEqual(payload["pipeline_status"], {})
+            finally:
+                for module, original_state in originals.items():
+                    module.STATE = original_state
+
     def test_status_payload_exposes_pipeline_tracking_for_all_panel_servers(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "state"
