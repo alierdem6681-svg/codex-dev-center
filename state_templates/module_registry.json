@@ -246,7 +246,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma ve non-mutating simülasyon sözleşmesi kapılarını çalıştırır.",
+      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, dry-run non-mutating ve simülasyon sözleşmesi kapılarını çalıştırır.",
       "actions": [
         "production_readiness_suite"
       ]

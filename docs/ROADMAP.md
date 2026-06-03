@@ -142,6 +142,7 @@ Faz 19B-10A Model Policy
 - [x] Production readiness restart simülasyonu non-mutating static contract kanıtına bağlandı.
 - [x] Failure injection simülasyonu JSON hata yakalama, security scan ve critical approval sözleşmelerini doğrular.
 - [x] Simülasyon sözleşmeleri unit test ve state template kayıtlarıyla sabitlendi.
+- [x] Ön canlı ve geri alma dry-run çıktıları non-mutating JSON sözleşmesiyle doğrulanır.
 
 ## Faz 31 - Controlled Apply Pipeline Validation
 
