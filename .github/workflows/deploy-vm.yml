@@ -205,11 +205,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          services=(codex-panel codex-direct-cto codex-lifecycle codex-watchdog codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4)
-          for svc in "${services[@]}"; do
+          required_services=(codex-panel codex-direct-cto codex-lifecycle codex-watchdog)
+          for svc in "${required_services[@]}"; do
             if systemctl list-unit-files "$svc.service" >/dev/null 2>&1; then
               sudo systemctl restart "$svc"
               echo "$svc restarted"
+            else
+              echo "$svc.service not installed; skipped"
+            fi
+          done
+          worker_services=(codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4)
+          for svc in "${worker_services[@]}"; do
+            if systemctl list-unit-files "$svc.service" >/dev/null 2>&1; then
+              sudo systemctl reset-failed "$svc" || true
+              if sudo systemctl restart "$svc"; then
+                echo "$svc restarted"
+              else
+                echo "$svc restart skipped or canceled; lifecycle will reconcile worker state"
+              fi
             else
               echo "$svc.service not installed; skipped"
             fi
