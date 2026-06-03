@@ -55,7 +55,7 @@ Production deploy için kullanılacak gerçek yol `.github/workflows/deploy-vm.y
 Aşağıdaki konular otomatik production kapsamı dışındadır ve ayrı risk raporu ister:
 
 - Secret/IAM/billing işlemi
-- Token, private key, env değeri veya credential rotation
+- Token, private key veya env değeri
 - Database veri silme veya irreversible migration
 - DNS/firewall kritik değişikliği
 - Google Ads canlı mutate

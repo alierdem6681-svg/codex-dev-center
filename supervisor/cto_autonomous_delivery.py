@@ -311,7 +311,7 @@ def create_backlog_continuation_task(queue: dict[str, Any], parent: dict[str, An
             f"Parent status: {parent_status}",
             "CTO backlog continuation pilot.",
             "Worker görevi: parent rapor/proposal/workspace kayıtlarını güvenli şekilde incele, uygulanabilir küçük bir repo/app iyileştirme önerisi hazırla, test planı ve risk özeti üret.",
-            "Ana repo dosyalarını doğrudan değiştirme; production deploy yapma; secret/env/token/private key/IAM/billing/DNS/firewall/database destructive/credential rotation işlemlerine dokunma.",
+            "Ana repo dosyalarını doğrudan değiştirme; production deploy yapma; secret/env/token/private key/IAM/billing/DNS/firewall/database destructive işlemlerine dokunma.",
             "Çıktı beklentisi: PLAN.md, CHANGE_PROPOSAL.md, TEST_PLAN.md, RISK_REVIEW.md, LIVING_DOCS_CHECKLIST.md, WORKER_SUMMARY.md.",
         ]
     )

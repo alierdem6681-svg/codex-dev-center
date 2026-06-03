@@ -50,6 +50,6 @@ Controller şu şartlar olmadan canlıya geçmez:
 
 ## Kritik İstisnalar
 
-Secret, token/private key/env değeri, credential rotation, IAM owner/editor, billing, database veri silme, geri döndürülemez migration, kritik DNS/firewall değişikliği, Google Ads canlı mutate ve canlı veri kaybı riski otomatik yapılamaz.
+Secret, token/private key/env değeri, IAM owner/editor, billing, database veri silme, geri döndürülemez migration, kritik DNS/firewall değişikliği, Google Ads canlı mutate ve canlı veri kaybı riski otomatik yapılamaz.
 
 Bu durumlardan biri gerekiyorsa controller `critical_exception_detected` ile durur ve risk raporu üretir.

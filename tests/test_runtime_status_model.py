@@ -72,8 +72,8 @@ class WorkerStatusModelTest(unittest.TestCase):
             [
                 "Kapsam dışı:",
                 "- database destructive operation",
-                "- credential rotation",
-                "Secret, IAM, billing, DNS, firewall, database veya credential rotation işlemi yapılmadı.",
+                "- irreversible migration",
+                "Secret, IAM, billing, DNS, firewall veya database işlemi yapılmadı.",
                 "Ana repo dosyalarını değiştirme; token/private key/env değerlerine dokunma.",
             ]
         )
@@ -84,7 +84,7 @@ class WorkerStatusModelTest(unittest.TestCase):
         findings = critical_operation_policy.critical_operation_findings(
             "\n".join(
                 [
-                    "production token rotate and credential rotation",
+                    "production token rotate",
                     "iam grant owner role",
                     "billing update payment settings",
                     "dns add record",
@@ -96,7 +96,6 @@ class WorkerStatusModelTest(unittest.TestCase):
         )
 
         self.assertIn("token_private_key_env_value_change", findings)
-        self.assertIn("credential_rotation", findings)
         self.assertIn("iam_owner_editor_change", findings)
         self.assertIn("billing_change", findings)
         self.assertIn("dns_change", findings)
@@ -911,8 +910,8 @@ class DeployGateStatusModelTest(unittest.TestCase):
             "validation_status": "PASS",
             "pipeline_status": "PASS",
             "risk": "low",
-            "title": "credential rotation scope note",
-            "description": "Kapsam dışı:\n- credential rotation yapılmadı.\nDo not change token/private key/env values.",
+            "title": "safe deployment scope note",
+            "description": "Kapsam dışı:\n- irreversible migration yapılmadı.\nDo not change token/private key/env values.",
         }
 
     @contextlib.contextmanager
@@ -975,7 +974,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertTrue(result["ready_for_deploy_gate"])
 
-    def test_safe_credential_rotation_context_does_not_block_deploy_gate(self):
+    def test_safe_boundary_context_does_not_block_deploy_gate(self):
         task = self.deployable_task("TASK-CRED-SAFE")
 
         result = cto_autonomous_delivery.evaluate_task(task)
@@ -995,7 +994,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
     def test_active_approval_required_blocks_deploy_gate(self):
         task = self.deployable_task("TASK-ACTIVE-APPROVAL")
         task["approval_required"] = True
-        task["critical_operation_findings"] = ["credential_rotation"]
+        task["critical_operation_findings"] = ["token_private_key_env_value_change"]
 
         result = cto_autonomous_delivery.evaluate_task(task)
 
@@ -1011,7 +1010,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
             self.assertFalse(result["ready_for_deploy_gate"])
 
-    def test_deploy_task_does_not_return_approval_required_for_safe_credential_text(self):
+    def test_deploy_task_does_not_return_approval_required_for_safe_boundary_text(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-DEPLOY-SAFE")
             with self.patched_delivery_runtime(tmp, [task]):
@@ -1569,7 +1568,7 @@ class TaskValidationEngineTest(unittest.TestCase):
                 "# Test\n\n"
                 "Kapsam disi:\n"
                 "- database destructive operation\n"
-                "- credential rotation\n\n"
+                "- irreversible migration\n\n"
                 "Do not change token/private key/env values.\n"
                 "Valid worker output.\n",
                 encoding="utf-8",

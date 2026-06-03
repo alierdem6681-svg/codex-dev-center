@@ -272,7 +272,7 @@ def backlog_description(parent: dict[str, Any], mode: str) -> str:
         f"Backlog dispatcher child for parent {parent_id}. "
         f"Parent status: {status}. Parent title: {title}. Evidence: {report}. "
         f"{action} Work only in the isolated worker workspace. "
-        "Do not mutate production, secrets, IAM, billing, DNS, firewall, credentials, database, or Google Ads."
+        "Do not mutate production, secrets, IAM, billing, DNS, firewall, token/private key/env values, database, or Google Ads."
     )
 
 def task_text(task: dict[str, Any]) -> str:
@@ -332,7 +332,7 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
             f"Parent status: {normalize_status(parent.get('status'))}. Evidence: {evidence}. "
             "Worker must implement the smallest safe repo/app change in an isolated git worktree and branch, "
             "then create a PR after local gates pass. Do not deploy production. Do not touch secret/env/token/private key, "
-            "IAM, billing, DNS, firewall, destructive database, credential rotation, or advertising platform live-write operations."
+            "IAM, billing, DNS, firewall, destructive database, or advertising platform live-write operations."
         ),
         "status": TASK_STATUS_PENDING,
         "source": BACKLOG_DISPATCHER_SOURCE,

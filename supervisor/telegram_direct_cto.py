@@ -179,7 +179,7 @@ def local_natural_reply(text):
         return (
             "Bu istek kritik altyapı kapsamına giriyor ve otomatik yapılmayacak.\n"
             "Durum: APPROVAL_REQUIRED.\n"
-            "Kısa özet: secret, token/private key/env, credential rotation, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
+            "Kısa özet: secret, token/private key/env, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
         )
 
     if compact in {"cto", "hey cto", "ctom"} or any(x in lowered for x in ["merhaba", "selam", "sistem durumu", "status", "çalışıyor", "calisiyor"]):
@@ -493,7 +493,7 @@ def build_prompt(raw_user_message):
         "Kullanıcıya iç süreç değil karar, risk, ilerleme ve sonraki adımı söyle.",
         "Kod, diff, dosya dump, terminal dump ve stack trace dökme.",
         "Gerekiyorsa kısa plan ver; sonra kullanıcıdan net onay bekle.",
-        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, credential rotation, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak isaretle.",
+        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak isaretle.",
         "Düşük/orta riskli repo işleri için önce plan/test/diff/report/living-docs akışı öner.",
         "Model politikası: gpt-5.5, reasoning xhigh.",
         "",

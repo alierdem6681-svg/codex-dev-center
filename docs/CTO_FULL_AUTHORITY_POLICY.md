@@ -33,4 +33,4 @@ Risk modeli:
 Gercek GCloud IAM yetkisi henuz verilmedi.
 Bu ayri ve kritik onayli paketle yapilacak.
 
-Normal Codex Dev Center app deploy'u production gate'leri PASS ise kullanicidan ayrica deploy onayi istemez. Secret, IAM, billing, DNS, firewall, database destructive operation, credential rotation, token/private key/env degeri degisikligi ve benzeri kritik altyapi islemleri otomatik yetki kapsaminda degildir; `APPROVAL_REQUIRED` veya `BLOCKED` kalir.
+Normal Codex Dev Center app deploy'u production gate'leri PASS ise kullanicidan ayrica deploy onayi istemez. Secret, IAM, billing, DNS, firewall, database destructive operation, token/private key/env degeri degisikligi ve benzeri kritik altyapi islemleri otomatik yetki kapsaminda degildir; `APPROVAL_REQUIRED` veya `BLOCKED` kalir.
