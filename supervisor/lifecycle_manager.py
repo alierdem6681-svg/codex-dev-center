@@ -154,6 +154,24 @@ def choose_worker(title):
         return "worker-4"
     return "worker-1"
 
+def selected_workers_for_single_mode() -> list[str]:
+    queue = read_json(QUEUE_PATH, {"tasks": []})
+    queue, _changes = normalize_queue_payload(queue)
+    tasks = [
+        task
+        for task in queue.get("tasks", [])
+        if is_worker_eligible_task(task) and normalize_status(task.get("status")) in {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
+    ]
+    for status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
+        for task in tasks:
+            if normalize_status(task.get("status")) != status:
+                continue
+            worker_id = task.get("assigned_worker")
+            if worker_id in WORKERS:
+                return [worker_id]
+            return [choose_worker(task.get("title") or task.get("id"))]
+    return ["worker-1"]
+
 def active_child_exists(tasks: list[dict[str, Any]], child_id: str | None) -> bool:
     if not child_id:
         return False
@@ -333,16 +351,23 @@ def sleep_now():
     return {"ok": True, "mode": "SLEEPING"}
 
 def wake_now():
-    log("WAKE_NOW requested")
+    selected = set(selected_workers_for_single_mode())
+    log(f"WAKE_NOW requested selected={','.join(sorted(selected))}")
     for w in WORKERS:
-        systemctl("start", w)
-        update_worker_state(w, "IDLE", "woken_by_lifecycle")
+        if w in selected:
+            systemctl("start", w)
+            update_worker_state(w, "IDLE", "woken_by_lifecycle_single_mode")
+        else:
+            update_worker_state(w, "SLEEPING", "single_mode_not_selected")
+            systemctl("stop", w)
     dispatch()
     update_system_state(
         worker_sleep_wake_implemented=True,
-        worker_fleet_mode="AWAKE"
+        worker_fleet_mode="AWAKE_SINGLE",
+        worker_single_mode_active=True,
+        worker_single_mode_selected=sorted(selected),
     )
-    return {"ok": True, "mode": "AWAKE"}
+    return {"ok": True, "mode": "AWAKE_SINGLE", "selected_workers": sorted(selected)}
 
 def update_system_state(**updates):
     data = read_json(SYSTEM_STATE_PATH, {})

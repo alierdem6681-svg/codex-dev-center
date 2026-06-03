@@ -1,5 +1,8 @@
 import sys
+import tempfile
 import unittest
+import importlib.util
+import json
 from pathlib import Path
 
 
@@ -15,6 +18,14 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
 )
+
+WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
+    "worker_lifecycle_check_test_module",
+    ROOT / "scripts" / "worker_lifecycle_check.py",
+)
+worker_lifecycle_check = importlib.util.module_from_spec(WORKER_LIFECYCLE_SPEC)
+assert WORKER_LIFECYCLE_SPEC.loader is not None
+WORKER_LIFECYCLE_SPEC.loader.exec_module(worker_lifecycle_check)
 
 
 class WorkerStatusModelTest(unittest.TestCase):
@@ -94,6 +105,54 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         ]
 
         self.assertEqual(lifecycle_manager.dispatcher_candidate(tasks)["id"], "PARENT")
+
+
+class WorkerLifecycleRepairTest(unittest.TestCase):
+    def test_repair_marks_stale_running_retryable_and_clears_idle_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            workers_path = state / "workers.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STale",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            workers_path.write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {
+                                "id": "worker-1",
+                                "status": "IDLE",
+                                "current_task": "TASK-STale",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = worker_lifecycle_check.repair_state_consistency(runtime)
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            workers = json.loads(workers_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["stale_tasks_failed_retryable"], ["TASK-STale"])
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertIsNone(workers["workers"][0]["current_task"])
 
 
 if __name__ == "__main__":

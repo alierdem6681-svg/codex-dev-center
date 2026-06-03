@@ -14,7 +14,14 @@ WORKER_IDS = ["worker-1", "worker-2", "worker-3", "worker-4"]
 SUPERVISOR_DIR = Path(__file__).resolve().parents[1] / "supervisor"
 sys.path.insert(0, str(SUPERVISOR_DIR))
 
-from task_status_constants import ACTIVE_TASK_STATUSES, task_risk_upper, worker_block_reason as central_worker_block_reason  # noqa: E402
+from task_status_constants import (  # noqa: E402
+    ACTIVE_TASK_STATUSES,
+    TASK_STATUS_FAILED_RETRYABLE,
+    atomic_write_json,
+    task_risk_upper,
+    utc_now,
+    worker_block_reason as central_worker_block_reason,
+)
 
 
 def read_json(path: Path, default: Any) -> Any:
@@ -24,6 +31,10 @@ def read_json(path: Path, default: Any) -> Any:
     except Exception:
         pass
     return default
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    atomic_write_json(path, payload)
 
 
 def service_status(service: str) -> str:
@@ -95,12 +106,57 @@ def worker_state_map(runtime: Path) -> dict[str, dict[str, Any]]:
     return workers
 
 
+def repair_state_consistency(runtime: Path) -> dict[str, Any]:
+    qpath = runtime / "state" / "task_queue.json"
+    wpath = runtime / "state" / "workers.json"
+    queue = read_json(qpath, {"tasks": []})
+    workers = read_json(wpath, {"workers": []})
+    worker_by_task = {
+        worker.get("current_task"): worker
+        for worker in workers.get("workers", [])
+        if str(worker.get("status", "")).upper() == "RUNNING" and worker.get("current_task")
+    }
+    stale_tasks = []
+    for task in queue.get("tasks", []):
+        status = task_status(task)
+        if status not in {"RUNNING", "ASSIGNED"}:
+            continue
+        task_id = task.get("id")
+        if task_id in worker_by_task:
+            continue
+        task["status"] = TASK_STATUS_FAILED_RETRYABLE
+        task["result"] = "single_mode_repair_stale_active_task"
+        task["delivery_level"] = TASK_STATUS_FAILED_RETRYABLE
+        task["production_deployed"] = False
+        task["repo_applied"] = False
+        task["updated_at"] = utc_now()
+        stale_tasks.append(task_id)
+
+    cleared_workers = []
+    for worker in workers.get("workers", []):
+        status = str(worker.get("status", "")).upper()
+        if status in {"IDLE", "SLEEPING", "STOPPED"} and worker.get("current_task"):
+            cleared_workers.append(worker.get("id"))
+            worker["current_task"] = None
+            worker["note"] = "single_mode_repair_cleared_stale_current_task"
+            worker["last_seen"] = utc_now()
+
+    if stale_tasks:
+        write_json(qpath, queue)
+    if cleared_workers:
+        write_json(wpath, workers)
+
+    return {
+        "command": "internal single-mode state repair",
+        "returncode": 0,
+        "stale_tasks_failed_retryable": stale_tasks,
+        "workers_cleared": cleared_workers,
+    }
+
+
 def repair_worker_fleet(runtime: Path) -> list[dict[str, Any]]:
-    commands = [
-        ["python3", "supervisor/task_recovery_engine.py"],
-        ["python3", "supervisor/lifecycle_manager.py", "wake-now"],
-    ]
-    results = []
+    results = [repair_state_consistency(runtime)]
+    commands = [["python3", "supervisor/lifecycle_manager.py", "wake-now"]]
     for command in commands:
         try:
             proc = subprocess.run(
@@ -134,7 +190,7 @@ def evaluate(runtime: Path, repair: bool = False) -> dict[str, Any]:
     ]
 
     repair_log: list[dict[str, Any]] = []
-    if repair and worker_tasks and not active_worker_services:
+    if repair and worker_tasks:
         repair_log = repair_worker_fleet(runtime)
         all_active, worker_tasks, excluded_tasks = split_active_tasks(runtime)
         states = worker_state_map(runtime)
@@ -176,7 +232,7 @@ def evaluate(runtime: Path, repair: bool = False) -> dict[str, Any]:
 
     system_state = read_json(runtime / "state" / "system_state.json", {})
     configured_mode = system_state.get("worker_fleet_mode")
-    if not worker_tasks and configured_mode not in (None, "", "SLEEPING", "AWAKE"):
+    if not worker_tasks and configured_mode not in (None, "", "SLEEPING", "AWAKE", "AWAKE_SINGLE"):
         warnings.append(f"unexpected worker_fleet_mode={configured_mode}")
 
     return {
