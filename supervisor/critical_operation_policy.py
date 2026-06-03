@@ -23,6 +23,20 @@ SAFE_CONTEXT_SECTION_MARKERS = (
     "blocked",
     "approval_required",
     "requires_approval",
+    "dokunulmayacak",
+    "dokunulmaz",
+    "riskler",
+    "risk:",
+    "high risk",
+    "yuksek risk",
+    "yüksek risk",
+    "riskli",
+    "ornek",
+    "örnek",
+    "example",
+    "azaltim",
+    "azaltım",
+    "mitigation",
 )
 
 SAFE_CRITICAL_CONTEXT_PATTERNS: list[re.Pattern[str]] = [
@@ -42,6 +56,7 @@ SAFE_CRITICAL_CONTEXT_PATTERNS: list[re.Pattern[str]] = [
         r"(yapma|yapmayacak|yapilmayacak|yapılmayacak|yapilmaz|yapılmaz|"
         r"yapilamaz|yapılamaz|yapilmadi|yapılmadı|yapmadi|yapmadı|"
         r"dokunma|dokunmadi|dokunmadı|dokunulmadi|dokunulmadı|"
+        r"dokunulmayacak|dokunulmaz|"
         r"degistirme|değiştirme|degistirilmedi|değiştirilmedi|"
         r"uygulama|uygulanmadi|uygulanmadı|olmaz|olmadi|olmadı|yok)\b",
         re.I,

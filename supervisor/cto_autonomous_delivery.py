@@ -77,6 +77,8 @@ DEPLOY_WORKFLOW = "Deploy to VM"
 SMOKE_WORKFLOW = "VM Smoke Check"
 CONFIRM_PHRASE = "DEPLOY-CODEX-VM"
 ACTIVE_WORKFLOW_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+SUCCESSFUL_WORKFLOW_STATUS = "completed"
+SUCCESSFUL_WORKFLOW_CONCLUSION = "success"
 MERGE_FAILURE_CONFLICT_MARKERS = (
     "not mergeable",
     "cannot be cleanly",
@@ -512,7 +514,7 @@ def workflow_runs(workflow: str) -> dict[str, Any]:
         "--workflow",
         workflow,
         "--limit",
-        "10",
+        "30",
         "--json",
         "databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,name,url,event",
     ]
@@ -545,6 +547,20 @@ def active_run(workflow: str, head_sha: str) -> dict[str, Any]:
         if item.get("headSha") == head_sha and str(item.get("status") or "").lower() in ACTIVE_WORKFLOW_STATUSES:
             return {"ok": True, "run": item}
     return {"ok": False, "error": "active_run_not_found"}
+
+
+def successful_run(workflow: str, head_sha: str) -> dict[str, Any]:
+    payload = workflow_runs(workflow)
+    if not payload["ok"]:
+        return payload
+    for item in payload["runs"]:
+        if (
+            item.get("headSha") == head_sha
+            and str(item.get("status") or "").lower() == SUCCESSFUL_WORKFLOW_STATUS
+            and str(item.get("conclusion") or "").lower() == SUCCESSFUL_WORKFLOW_CONCLUSION
+        ):
+            return {"ok": True, "run": item}
+    return {"ok": False, "error": "successful_run_not_found"}
 
 
 def merge_failure_conflict_reason(result: dict[str, Any], pr: dict[str, Any]) -> str:
@@ -580,6 +596,15 @@ def wait_run(run_id: str, timeout_seconds: int = 900) -> dict[str, Any]:
 
 def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
     head = main_head()
+    success = successful_run(workflow, head)
+    if success.get("ok"):
+        return {
+            "ok": True,
+            "status": "WORKFLOW_SUCCESS_REUSED",
+            "run": success["run"],
+            "deduped": True,
+            "dedupe_reason": "successful_run_for_origin_main_commit",
+        }
     existing = active_run(workflow, head)
     if existing.get("ok"):
         run_id = str(existing["run"].get("databaseId"))
@@ -587,6 +612,9 @@ def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
         if wait:
             payload["wait"] = wait_run(run_id)
             payload["ok"] = bool(payload["wait"].get("ok"))
+            if payload["wait"].get("run"):
+                payload["run"] = payload["wait"]["run"]
+            payload["status"] = "WORKFLOW_ALREADY_RUNNING_COMPLETED" if payload["ok"] else "WORKFLOW_ALREADY_RUNNING_FAILED"
         return payload
     if workflow == DEPLOY_WORKFLOW:
         args = ["gh", "workflow", "run", workflow, "--ref", "main", "-f", f"confirm={CONFIRM_PHRASE}", "-f", "ref=main"]
@@ -600,11 +628,45 @@ def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
     if not latest.get("ok"):
         return {"ok": False, "dispatch": dispatched, "latest": latest}
     run_id = str(latest["run"].get("databaseId"))
-    payload = {"ok": True, "dispatch": dispatched, "run": latest["run"]}
+    payload = {"ok": True, "status": "WORKFLOW_DISPATCHED", "dispatch": dispatched, "run": latest["run"]}
     if wait:
         payload["wait"] = wait_run(run_id)
         payload["ok"] = bool(payload["wait"].get("ok"))
+        if payload["wait"].get("run"):
+            payload["run"] = payload["wait"]["run"]
+        payload["status"] = "WORKFLOW_COMPLETED" if payload["ok"] else "WORKFLOW_FAILED"
     return payload
+
+
+def workflow_run_successful(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+    run_payload = payload.get("run") or {}
+    return (
+        str(run_payload.get("status") or "").lower() == SUCCESSFUL_WORKFLOW_STATUS
+        and str(run_payload.get("conclusion") or "").lower() == SUCCESSFUL_WORKFLOW_CONCLUSION
+    )
+
+
+def record_task_workflow_run(task_id: str, kind: str, run_payload: dict[str, Any], result_status: str = "") -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "error": "task_not_found"}
+    prefix = "deploy" if kind == "deploy" else "smoke"
+    run_id = str(run_payload.get("databaseId") or "")
+    run_url = str(run_payload.get("url") or "")
+    head_sha = str(run_payload.get("headSha") or "")
+    task[f"{prefix}_run_id"] = run_id
+    task[f"{prefix}_run_url"] = run_url
+    if head_sha:
+        task[f"{prefix}_commit"] = head_sha
+    task[f"{prefix}_workflow_status"] = str(run_payload.get("status") or "")
+    task[f"{prefix}_workflow_conclusion"] = str(run_payload.get("conclusion") or "")
+    if result_status:
+        task[f"{prefix}_workflow_result"] = result_status
+    task["updated_at"] = now()
+    atomic_write_json(QUEUE, queue)
+    return {"ok": True, "task_id": task_id, "kind": prefix, "run_id": run_id, "run_url": run_url}
 
 
 def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -618,9 +680,17 @@ def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict
     task["deployment_status"] = "DEPLOYED"
     task["deploy_run_id"] = str(deploy_run.get("databaseId") or deploy_run.get("run", {}).get("databaseId") or "")
     task["deploy_run_url"] = deploy_run.get("url") or deploy_run.get("run", {}).get("url") or ""
+    task["deploy_workflow_status"] = str(deploy_run.get("status") or "")
+    task["deploy_workflow_conclusion"] = str(deploy_run.get("conclusion") or "")
+    if deploy_run.get("headSha"):
+        task["deploy_commit"] = str(deploy_run.get("headSha"))
     if smoke_run:
         task["smoke_run_id"] = str(smoke_run.get("databaseId") or smoke_run.get("run", {}).get("databaseId") or "")
         task["smoke_run_url"] = smoke_run.get("url") or smoke_run.get("run", {}).get("url") or ""
+        task["smoke_workflow_status"] = str(smoke_run.get("status") or "")
+        task["smoke_workflow_conclusion"] = str(smoke_run.get("conclusion") or "")
+        if smoke_run.get("headSha"):
+            task["smoke_commit"] = str(smoke_run.get("headSha"))
     task["updated_at"] = now()
     atomic_write_json(QUEUE, queue)
 
@@ -753,6 +823,7 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
 
     in_progress = mark_task_deploy_in_progress(task_id)
     deploy = dispatch_workflow(DEPLOY_WORKFLOW, wait=wait)
+    deploy_record = record_task_workflow_run(task_id, "deploy", deploy.get("run", {}), deploy.get("status", "")) if deploy.get("run") else {}
     if not deploy["ok"]:
         marked = mark_task_deploy_retry(task_id, "DEPLOY_WORKFLOW_FAILED")
         return {
@@ -762,11 +833,24 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
             "readiness": readiness,
             "deploy": deploy,
             "in_progress": in_progress,
+            "deploy_record": deploy_record,
             "marked": marked,
         }
+    if not workflow_run_successful(deploy):
+        return {
+            "ok": True,
+            "status": "DEPLOY_IN_PROGRESS",
+            "evaluation": evaluation,
+            "readiness": readiness,
+            "deploy": deploy,
+            "in_progress": in_progress,
+            "deploy_record": deploy_record,
+        }
     smoke_result: dict[str, Any] | None = None
+    smoke_record: dict[str, Any] = {}
     if smoke:
         smoke_result = dispatch_workflow(SMOKE_WORKFLOW, wait=wait)
+        smoke_record = record_task_workflow_run(task_id, "smoke", smoke_result.get("run", {}), smoke_result.get("status", "")) if smoke_result.get("run") else {}
         if not smoke_result["ok"]:
             marked = mark_task_deploy_retry(task_id, "SMOKE_WORKFLOW_FAILED")
             return {
@@ -777,7 +861,21 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
                 "deploy": deploy,
                 "smoke": smoke_result,
                 "in_progress": in_progress,
+                "deploy_record": deploy_record,
+                "smoke_record": smoke_record,
                 "marked": marked,
+            }
+        if not workflow_run_successful(smoke_result):
+            return {
+                "ok": True,
+                "status": "SMOKE_IN_PROGRESS",
+                "evaluation": evaluation,
+                "readiness": readiness,
+                "deploy": deploy,
+                "smoke": smoke_result,
+                "in_progress": in_progress,
+                "deploy_record": deploy_record,
+                "smoke_record": smoke_record,
             }
     marked = mark_task_deployed(task_id, deploy.get("run", {}), smoke_result.get("run", {}) if smoke_result else None)
     return {
@@ -788,6 +886,8 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
         "deploy": deploy,
         "smoke": smoke_result,
         "in_progress": in_progress,
+        "deploy_record": deploy_record,
+        "smoke_record": smoke_record,
         "marked": marked,
     }
 

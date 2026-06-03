@@ -86,6 +86,22 @@ SAFE_POLICY_MARKERS = (
     "critical exception",
     "kritik altyapi",
     "kritik altyapı",
+    "dokunulmayacak",
+    "dokunulmaz",
+    "riskler",
+    "risk:",
+    "high risk",
+    "yuksek risk",
+    "yüksek risk",
+    "riskli",
+    "ornek",
+    "örnek",
+    "example",
+    "donmeli",
+    "dönmeli",
+    "azaltim",
+    "azaltım",
+    "mitigation",
 )
 
 
