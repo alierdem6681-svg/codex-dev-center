@@ -9,11 +9,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from supervisor import cto_autonomous_delivery, lifecycle_manager, worker_runner  # noqa: E402
+from supervisor import cto_autonomous_delivery, lifecycle_manager, task_validation_engine, worker_runner  # noqa: E402
 from supervisor.task_status_constants import (  # noqa: E402
+    TASK_STATUS_APPROVAL_REQUIRED,
     TASK_STATUS_DONE,
     TASK_STATUS_FAILED_RETRYABLE,
     TASK_STATUS_FAILED_TIMEOUT,
+    TASK_STATUS_PIPELINE_FAILED,
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
@@ -59,6 +61,45 @@ class WorkerStatusModelTest(unittest.TestCase):
         status, _reason = worker_runner.classify_worker_result(1, [], "", False)
 
         self.assertEqual(status, TASK_STATUS_FAILED_RETRYABLE)
+
+    def test_worker_restart_reconciles_own_stale_running_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STALE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-3",
+                            },
+                            {
+                                "id": "TASK-OTHER",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-2",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                recovered = worker_runner.reconcile_stale_running_tasks_for_worker("worker-3")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(recovered, ["TASK-STALE"])
+        self.assertEqual(payload["tasks"][0]["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertEqual(payload["tasks"][0]["result"], "worker_service_restarted_before_completion")
+        self.assertEqual(payload["tasks"][1]["status"], "RUNNING")
 
 
 class DeployGateStatusModelTest(unittest.TestCase):
@@ -220,6 +261,79 @@ class WorkerLifecycleRepairTest(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertTrue(any("RUNNING task assigned to worker-1" in item for item in result["errors"]))
+
+
+class TaskValidationEngineTest(unittest.TestCase):
+    def write_ready_runtime(self, tmp: str, pipeline_status: str = "PASS", title: str = "normal worker task") -> Path:
+        runtime = Path(tmp)
+        state = runtime / "state"
+        workspace = runtime / "workspaces" / "worker_worker-1_TASK-VAL_20260603_000000"
+        state.mkdir(parents=True)
+        workspace.mkdir(parents=True)
+        for name in task_validation_engine.EXPECTED_WORKER_FILES[:4]:
+            (workspace / name).write_text(
+                "# Test\n\nDo not change token/private key/env values.\nValid worker output.\n",
+                encoding="utf-8",
+            )
+        (state / "production_readiness_status.json").write_text(
+            json.dumps({"status": pipeline_status, "ok": pipeline_status == "PASS", "checked_at": "2026-06-03T00:00:00+00:00"}),
+            encoding="utf-8",
+        )
+        (state / "task_queue.json").write_text(
+            json.dumps(
+                {
+                    "tasks": [
+                        {
+                            "id": "TASK-VAL",
+                            "title": title,
+                            "description": "Validate safe worker output.",
+                            "status": TASK_STATUS_READY_FOR_VALIDATION,
+                            "source": "cto",
+                            "risk": "low",
+                            "assigned_worker": "worker-1",
+                            "workspace": str(workspace),
+                            "repo_applied": False,
+                            "production_deployed": False,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return runtime
+
+    def test_ready_task_becomes_done_only_with_pipeline_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
+        self.assertEqual(queue["tasks"][0]["pipeline_status"], "PASS")
+        self.assertFalse(queue["tasks"][0]["production_deployed"])
+
+    def test_pipeline_failure_does_not_mark_task_done(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="FAIL")
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PIPELINE_FAILED)
+        self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
+        self.assertEqual(queue["tasks"][0]["pipeline_status"], "FAIL")
+
+    def test_critical_operation_stays_approval_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS", title="production token rotate")
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_APPROVAL_REQUIRED)
+        self.assertTrue(queue["tasks"][0]["critical_operation_findings"])
 
 
 if __name__ == "__main__":

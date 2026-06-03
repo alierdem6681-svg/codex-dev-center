@@ -70,6 +70,9 @@ BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_READY_FOR_VALIDATION,
     TASK_STATUS_VALIDATION_FAILED,
 }
+VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "5"))
+VALIDATION_INTERVAL_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_INTERVAL_SECONDS", "60"))
+VALIDATION_PIPELINE_MAX_AGE_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_PIPELINE_MAX_AGE_SECONDS", "86400"))
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -332,6 +335,45 @@ def ensure_single_backlog_task() -> bool:
     log(f"BACKLOG_DISPATCH created child={child_id} parent={parent_id} mode={mode}")
     return True
 
+def validation_candidate_count() -> int:
+    queue = read_json(QUEUE_PATH, {"tasks": []})
+    queue, _changes = normalize_queue_payload(queue)
+    return sum(
+        1
+        for task in queue.get("tasks", [])
+        if normalize_status(task.get("status")) == TASK_STATUS_READY_FOR_VALIDATION
+    )
+
+def run_validation_engine() -> bool:
+    try:
+        p = subprocess.run(
+            [
+                "python3",
+                "supervisor/task_validation_engine.py",
+                "--limit",
+                str(VALIDATION_BATCH_SIZE),
+                "--pipeline-max-age-seconds",
+                str(VALIDATION_PIPELINE_MAX_AGE_SECONDS),
+                "--json",
+            ],
+            cwd=str(APP),
+            text=True,
+            capture_output=True,
+            timeout=180,
+        )
+        changed = 0
+        if p.stdout.strip():
+            try:
+                payload = json.loads(p.stdout)
+                changed = int(payload.get("changed", 0) or 0)
+            except Exception:
+                changed = 0
+        log(f"VALIDATION_ENGINE rc={p.returncode} changed={changed} stdout={p.stdout[-500:]} stderr={p.stderr[-500:]}")
+        return p.returncode == 0 and changed > 0
+    except Exception as exc:
+        log(f"VALIDATION_ENGINE_ERROR {exc}")
+        return False
+
 def dispatch():
     try:
         p = subprocess.run(
@@ -385,10 +427,18 @@ def update_system_state(**updates):
 def daemon():
     log("LIFECYCLE_DAEMON started")
     idle_cycles = 0
+    last_validation = 0.0
     update_system_state(worker_lifecycle_daemon_active=True)
 
     while True:
         pending, running, active = queue_counts()
+        if active == 0 and validation_candidate_count() > 0:
+            current = time.monotonic()
+            if current - last_validation >= VALIDATION_INTERVAL_SECONDS:
+                last_validation = current
+                run_validation_engine()
+                pending, running, active = queue_counts()
+
         if active == 0:
             created = ensure_single_backlog_task()
             if created:
