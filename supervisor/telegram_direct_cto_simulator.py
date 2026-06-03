@@ -70,7 +70,7 @@ def reply_kind(reply: str | None) -> str:
 def simulate_case(label: str, message: str, allow_codex: bool = False, write_audit: bool = False) -> dict[str, Any]:
     safe_text = redact_sensitive_text(message)
     local_reply = local_natural_reply(safe_text)
-    route = "local_natural_reply" if local_reply else "async_job" if is_long_task_message(safe_text) else "codex_exec"
+    route = "local_natural_reply" if local_reply else "async_job"
     reply = local_reply
     if allow_codex and not reply and route == "codex_exec":
         reply = run_codex(safe_text)
@@ -93,6 +93,7 @@ def simulate_case(label: str, message: str, allow_codex: bool = False, write_aud
         "critical_operation_findings": critical_operation_findings(safe_text),
         "action_command": is_action_command(safe_text),
         "long_task": is_long_task_message(safe_text),
+        "async_ack_expected": route == "async_job",
         "route": route,
         "reply_kind": reply_kind(reply),
         "reply_available": bool(reply),

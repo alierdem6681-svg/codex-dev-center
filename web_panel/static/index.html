@@ -216,6 +216,8 @@
         PIPELINE_FAILED: 'Pipeline kaldı',
         FAILED_TIMEOUT: 'Timeout',
         FAILED_RETRYABLE: 'Tekrar denenebilir',
+        STALLED: 'İlerleme durdu',
+        FINAL_REPORTED: 'Raporlandı',
         DONE: 'Tamamlandı',
         DEPLOYED: 'Canlıda',
         PASS: 'Geçti',
@@ -231,7 +233,7 @@
         let cls = 'badge';
         if (['PASS','OK','DONE','TRUE','ACTIVE'].includes(u)) cls += ' ok';
         if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN'].includes(u)) cls += ' warn';
-        if (['FAIL','FAILED','ERROR','FALSE','INACTIVE'].includes(u)) cls += ' bad';
+        if (['FAIL','FAILED','ERROR','FALSE','INACTIVE','STALLED'].includes(u)) cls += ' bad';
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
@@ -286,6 +288,7 @@
         const doctor = data.cto_doctor || {};
         const delivery = data.cto_delivery || {};
         const ops = data.operations || {};
+        const directJobs = data.direct_cto_jobs || {};
         clock.textContent = new Date().toLocaleTimeString();
         deployMetric.textContent = actionsState.last_deploy_status || runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
@@ -343,6 +346,11 @@
         ].map(badge).join(' ');
         opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Blok örnekleri</div><div>${blocked}</div>`;
         opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Toparlanabilir örnekler</div><div>${recoverable}</div>`;
+        const jobRows = (directJobs.jobs || []).slice(0, 4).map(j => {
+          const p = j.progress || {};
+          return `<div>${badge(j.status)} ${esc(j.generic_task_name || j.id)} <span class="muted">süre ${p.elapsed_seconds ?? '-'}s, anlamlı ilerleme ${p.meaningful_event_count ?? 0}</span></div>`;
+        }).join('') || '-';
+        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Telegram CTO işleri (${directJobs.active_count ?? 0} aktif)</div><div>${jobRows}</div>`;
         const s = data.dashboard_settings?.production || {};
         settingsBadges.innerHTML = Object.entries({
           'Otomatik production': s.automatic_production_enabled,

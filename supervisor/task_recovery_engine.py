@@ -13,6 +13,7 @@ try:
         TASK_STATUS_PROPOSAL_DONE,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_STALLED,
         normalize_queue_payload,
         normalize_status,
         worker_block_reason,
@@ -27,6 +28,7 @@ except ImportError:
         TASK_STATUS_PROPOSAL_DONE,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_STALLED,
         normalize_queue_payload,
         normalize_status,
         worker_block_reason,
@@ -51,6 +53,7 @@ RECOVERABLE_FAILURE_STATUSES = {
     TASK_STATUS_FAILED_NO_PROPOSAL,
     TASK_STATUS_FAILED_RETRYABLE,
     TASK_STATUS_FAILED_TIMEOUT,
+    TASK_STATUS_STALLED,
 }
 RECOVERABLE_OUTPUT_STATUSES = RECOVERABLE_FAILURE_STATUSES | {
     TASK_STATUS_PROPOSAL_DONE,

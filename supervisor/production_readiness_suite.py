@@ -201,6 +201,7 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
         ROOT / "supervisor" / "task_recovery_engine.py",
         ROOT / "supervisor" / "action_result_watcher.py",
         ROOT / "supervisor" / "task_validation_engine.py",
+        ROOT / "supervisor" / "progress_aware_runner.py",
     ]
     record(results, "worker_queue_recovery_test", all(p.exists() for p in files), {"files": [str(p.relative_to(ROOT)) for p in files]})
 
@@ -220,6 +221,7 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Pipeline Gözlemi",
         "Runner",
         "Run ID",
+        "Telegram CTO işleri",
     ]
     missing = [item for item in required_text if item not in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
