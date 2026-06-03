@@ -448,6 +448,53 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(payload["workers"][0]["status"], "RUNNING")
         self.assertEqual(payload["workers"][0]["current_task"], "TASK-1")
 
+    def test_no_standard_candidate_uses_autonomous_backlog_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            system_state_path = state / "system_state.json"
+            queue_path.write_text(
+                json.dumps({"tasks": [{"id": "DONE-PARENT", "status": TASK_STATUS_DONE, "risk": "low"}]}),
+                encoding="utf-8",
+            )
+
+            calls = []
+
+            def fake_start_next_backlog(execute=False):
+                calls.append(execute)
+                return {
+                    "ok": True,
+                    "status": "BACKLOG_CONTINUATION_CREATED",
+                    "parent_task_id": "DONE-PARENT",
+                    "child_task": {"id": "CHILD"},
+                }
+
+            originals = (
+                lifecycle_manager.QUEUE_PATH,
+                lifecycle_manager.SYSTEM_STATE_PATH,
+                lifecycle_manager.cto_autonomous_delivery.start_next_backlog,
+            )
+            lifecycle_manager.QUEUE_PATH = queue_path
+            lifecycle_manager.SYSTEM_STATE_PATH = system_state_path
+            lifecycle_manager.cto_autonomous_delivery.start_next_backlog = fake_start_next_backlog
+            try:
+                created = lifecycle_manager.ensure_single_backlog_task()
+            finally:
+                (
+                    lifecycle_manager.QUEUE_PATH,
+                    lifecycle_manager.SYSTEM_STATE_PATH,
+                    lifecycle_manager.cto_autonomous_delivery.start_next_backlog,
+                ) = originals
+
+            system_state = json.loads(system_state_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(created)
+        self.assertEqual(calls, [True])
+        self.assertEqual(system_state["backlog_dispatcher_last_result"], "autonomous_backlog_created")
+        self.assertEqual(system_state["backlog_dispatcher_last_child"], "CHILD")
+
 
 class WorkerLifecycleRepairTest(unittest.TestCase):
     def test_repair_marks_stale_running_retryable_and_clears_idle_worker(self):

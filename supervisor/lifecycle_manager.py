@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from . import cto_autonomous_delivery
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_FAILED,
@@ -30,6 +31,7 @@ try:
         worker_block_reason,
     )
 except ImportError:
+    import cto_autonomous_delivery
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_FAILED,
@@ -262,6 +264,39 @@ def dispatcher_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
         return task
     return None
 
+def ensure_autonomous_backlog_fallback() -> bool:
+    try:
+        payload = cto_autonomous_delivery.start_next_backlog(execute=True)
+    except Exception as exc:
+        update_system_state(
+            backlog_dispatcher_last_result="autonomous_backlog_error",
+            backlog_dispatcher_fallback_error=str(exc)[:300],
+        )
+        log(f"BACKLOG_DISPATCH autonomous_fallback_error err={exc}")
+        return False
+
+    status = str(payload.get("status") or "UNKNOWN")
+    if payload.get("ok") and status == "BACKLOG_CONTINUATION_CREATED":
+        child = payload.get("child_task") or {}
+        update_system_state(
+            backlog_dispatcher_last_result="autonomous_backlog_created",
+            backlog_dispatcher_last_parent=payload.get("parent_task_id"),
+            backlog_dispatcher_last_child=child.get("id"),
+            backlog_dispatcher_last_mode="autonomous_backlog_continuation",
+        )
+        log(
+            "BACKLOG_DISPATCH autonomous_fallback_created "
+            f"parent={payload.get('parent_task_id')} child={child.get('id')}"
+        )
+        return True
+
+    update_system_state(
+        backlog_dispatcher_last_result=f"autonomous_backlog_{status.lower()}",
+        backlog_dispatcher_fallback_ok=bool(payload.get("ok")),
+    )
+    log(f"BACKLOG_DISPATCH autonomous_fallback_noop status={status} ok={payload.get('ok')}")
+    return False
+
 def ensure_single_backlog_task() -> bool:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     queue, _changes = normalize_queue_payload(queue)
@@ -284,6 +319,8 @@ def ensure_single_backlog_task() -> bool:
 
     parent = dispatcher_candidate(tasks)
     if not parent:
+        if ensure_autonomous_backlog_fallback():
+            return True
         recoverable = sum(1 for t in tasks if normalize_status(t.get("status")) in BACKLOG_RECOVERABLE_STATUSES)
         update_system_state(
             **state_updates,
