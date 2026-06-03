@@ -52,6 +52,7 @@ RECOVERABLE_STATUSES = {
     "PROPOSAL_DONE",
     "PROPOSAL_READY",
     "READY_FOR_VALIDATION",
+    "STALLED",
     "VALIDATION_FAILED",
 }
 
@@ -215,6 +216,40 @@ def deploy_commands():
     return result
 
 
+def direct_cto_jobs_summary(limit: int = 12):
+    jobs_dir = STATE / "direct_cto_jobs"
+    if not jobs_dir.exists():
+        return {"count": 0, "active_count": 0, "jobs": []}
+    jobs = []
+    for path in sorted(jobs_dir.glob("JOB-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
+        payload = read_json(path, {})
+        if not isinstance(payload, dict):
+            continue
+        progress = payload.get("progress_watchdog") if isinstance(payload.get("progress_watchdog"), dict) else {}
+        jobs.append(
+            {
+                "id": payload.get("id") or path.stem,
+                "status": payload.get("status"),
+                "generic_task_name": payload.get("generic_task_name"),
+                "created_at": payload.get("created_at"),
+                "started_at": payload.get("started_at"),
+                "finished_at": payload.get("finished_at"),
+                "updated_at": payload.get("updated_at"),
+                "router_task_id": payload.get("router_task_id"),
+                "action_command": bool(payload.get("action_command")),
+                "progress": {
+                    "status": progress.get("status"),
+                    "elapsed_seconds": progress.get("elapsed_seconds"),
+                    "last_meaningful_progress_seconds_ago": progress.get("last_meaningful_progress_seconds_ago"),
+                    "last_output_activity_seconds_ago": progress.get("last_output_activity_seconds_ago"),
+                    "meaningful_event_count": progress.get("meaningful_event_count"),
+                },
+            }
+        )
+    active = [job for job in jobs if str(job.get("status", "")).upper() in {"QUEUED", "RUNNING"}]
+    return {"count": len(jobs), "active_count": len(active), "jobs": jobs}
+
+
 def status_payload():
     system_state = read_json(STATE / "system_state.json", {})
     workers_payload = read_json(STATE / "workers.json", {"workers": []})
@@ -244,6 +279,7 @@ def status_payload():
         "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
         "github_actions": github_actions,
         "pipeline_status": pipeline_status,
+        "direct_cto_jobs": direct_cto_jobs_summary(),
         "rollback": read_json(STATE / "rollback_status.json", {}),
         "rollback_point": read_json(STATE / "rollback_point.json", {}),
         "last_health_check": read_json(STATE / "last_health_check_status.json", {}),

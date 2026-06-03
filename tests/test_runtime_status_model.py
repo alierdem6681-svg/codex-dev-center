@@ -9,7 +9,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from supervisor import cto_autonomous_delivery, lifecycle_manager, task_validation_engine, worker_runner  # noqa: E402
+from supervisor import (  # noqa: E402
+    cto_autonomous_delivery,
+    lifecycle_manager,
+    progress_aware_runner,
+    task_validation_engine,
+    telegram_direct_cto_simulator,
+    worker_runner,
+)
 from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_APPROVAL_REQUIRED,
     TASK_STATUS_DONE,
@@ -100,6 +107,76 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(payload["tasks"][0]["status"], TASK_STATUS_FAILED_RETRYABLE)
         self.assertEqual(payload["tasks"][0]["result"], "worker_service_restarted_before_completion")
         self.assertEqual(payload["tasks"][1]["status"], "RUNNING")
+
+
+class ProgressAwareRunnerTest(unittest.TestCase):
+    def test_output_noise_without_meaningful_progress_stalls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = root / "out.txt"
+            err = root / "err.txt"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            result = progress_aware_runner.run_progress_aware(
+                ["bash", "-lc", "while true; do echo noise; sleep 0.2; done"],
+                cwd=root,
+                stdout_path=out,
+                stderr_path=err,
+                progress_paths=[workspace],
+                progress_state_path=workspace / "progress_watchdog.json",
+                stall_seconds=1,
+                grace_seconds=0,
+                poll_seconds=0.2,
+                max_wall_seconds=5,
+            )
+
+        self.assertEqual(result["status"], "STALLED")
+        self.assertEqual(result["stall_reason"], "no_meaningful_progress")
+        self.assertGreater(result["output_activity_count"], 0)
+        self.assertEqual(result["meaningful_event_count"], 0)
+
+    def test_file_change_counts_as_meaningful_progress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            out = root / "out.txt"
+            err = root / "err.txt"
+            result = progress_aware_runner.run_progress_aware(
+                ["bash", "-lc", "sleep 0.3; echo plan > workspace/PLAN.md; sleep 0.3"],
+                cwd=root,
+                stdout_path=out,
+                stderr_path=err,
+                progress_paths=[workspace],
+                stall_seconds=1,
+                grace_seconds=0,
+                poll_seconds=0.1,
+                max_wall_seconds=5,
+            )
+
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["returncode"], 0)
+        self.assertGreaterEqual(result["meaningful_event_count"], 1)
+
+
+class TelegramAsyncRoutingTest(unittest.TestCase):
+    def test_nonlocal_short_message_routes_to_async_job(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "short_async",
+            "Bana sistem mimarisi için kısa bir öneri hazırla.",
+        )
+
+        self.assertEqual(result["route"], "async_job")
+        self.assertTrue(result["async_ack_expected"])
+
+    def test_action_command_routes_to_async_job(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "action_async",
+            "Pipeline başlat ve workerlara dağıt.",
+        )
+
+        self.assertTrue(result["action_command"])
+        self.assertEqual(result["route"], "async_job")
 
 
 class DeployGateStatusModelTest(unittest.TestCase):

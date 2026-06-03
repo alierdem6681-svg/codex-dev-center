@@ -11,21 +11,40 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from progress_aware_runner import run_progress_aware
     from cto_task_router import mark_task_status
     from task_status_constants import (
-        TASK_STATUS_DONE,
         TASK_STATUS_ERROR,
         TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_RUNNING,
+        TASK_STATUS_STALLED,
         TASK_STATUS_TIMEOUT,
         redact_sensitive_text,
     )
 except ImportError:
+    from .progress_aware_runner import run_progress_aware
+    from .cto_task_router import mark_task_status
+    from .task_status_constants import (
+        TASK_STATUS_ERROR,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_RUNNING,
+        TASK_STATUS_STALLED,
+        TASK_STATUS_TIMEOUT,
+        redact_sensitive_text,
+    )
+except Exception:
+    run_progress_aware = None
     mark_task_status = None
-    TASK_STATUS_DONE = "DONE"
     TASK_STATUS_ERROR = "ERROR"
     TASK_STATUS_FAILED = "FAILED"
+    TASK_STATUS_FAILED_RETRYABLE = "FAILED_RETRYABLE"
+    TASK_STATUS_PROPOSAL_READY = "PROPOSAL_READY"
     TASK_STATUS_RUNNING = "RUNNING"
+    TASK_STATUS_STALLED = "STALLED"
     TASK_STATUS_TIMEOUT = "TIMEOUT"
     def redact_sensitive_text(value):
         return str(value or "")
@@ -35,6 +54,9 @@ APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 LOGS = APP / "logs"
 JOBS = STATE / "direct_cto_jobs"
+ASYNC_STALL_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_STALL_SECONDS", "900"))
+ASYNC_GRACE_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_GRACE_SECONDS", "180"))
+ASYNC_MAX_WALL_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_MAX_WALL_SECONDS", "14400"))
 
 def compact_text(value, limit=1600):
     text = redact_sensitive_text(value or "")
@@ -88,6 +110,22 @@ def send_message(chat_id, text):
         tg_call(token, "sendMessage", {"chat_id": chat_id, "text": part, "disable_web_page_preview": "true"})
         text = text[3400:].lstrip()
     tg_call(token, "sendMessage", {"chat_id": chat_id, "text": text, "disable_web_page_preview": "true"})
+
+def save_job(job_file, job):
+    job["updated_at"] = now()
+    job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
+
+def update_job_progress(job_file, job, progress):
+    job["status"] = "RUNNING"
+    job["progress_watchdog"] = {
+        "status": progress.get("status"),
+        "updated_at": progress.get("updated_at"),
+        "elapsed_seconds": progress.get("elapsed_seconds"),
+        "last_meaningful_progress_seconds_ago": progress.get("last_meaningful_progress_seconds_ago"),
+        "last_output_activity_seconds_ago": progress.get("last_output_activity_seconds_ago"),
+        "meaningful_event_count": progress.get("meaningful_event_count"),
+    }
+    save_job(job_file, job)
 
 def output_guard(raw):
     text = raw or ""
@@ -152,9 +190,34 @@ def run_job(job_id):
 
     job["status"] = "RUNNING"
     job["started_at"] = now()
-    job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
+    save_job(job_file, job)
     if router_task_id and mark_task_status is not None:
         mark_task_status(APP, router_task_id, TASK_STATUS_RUNNING, "async_cto_job_started")
+
+    if job.get("action_command"):
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "direct_cto_action_mode",
+                APP / "supervisor/direct_cto_action_mode.py",
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            reply = mod.run_action_mode(raw_text)
+            send_message(chat_id, reply)
+            job["status"] = "FINAL_REPORTED"
+            job["result"] = "action_queued_and_reported"
+            if router_task_id and mark_task_status is not None:
+                mark_task_status(APP, router_task_id, TASK_STATUS_PROPOSAL_READY, "async_cto_action_queued")
+        except Exception as exc:
+            send_message(chat_id, "CTO action job hata aldı. Teknik çıktı Telegram'a gönderilmedi; işi retry kuyruğunda ele alacağım.")
+            job["status"] = TASK_STATUS_ERROR
+            job["result"] = redact_sensitive_text(str(exc))[:300]
+            if router_task_id and mark_task_status is not None:
+                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED_RETRYABLE, "async_cto_action_error")
+        job["finished_at"] = now()
+        save_job(job_file, job)
+        return
 
     LOGS.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
@@ -165,7 +228,6 @@ def run_job(job_id):
     prompt_file.write_text(prompt, encoding="utf-8")
 
     cmd = [
-        "timeout", "1800",
         "codex", "exec",
         "--sandbox", "read-only",
         "--skip-git-repo-check",
@@ -174,42 +236,78 @@ def run_job(job_id):
     ]
 
     try:
-        with prompt_file.open("rb") as stdin, out_file.open("wb") as out, err_file.open("wb") as err:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(APP),
-                stdin=stdin,
-                stdout=out,
-                stderr=err,
-                timeout=1900
-            )
+        if run_progress_aware is None:
+            raise RuntimeError("progress_aware_runner_unavailable")
+        progress_state = JOBS / (job_id + ".progress.json")
+        progress = run_progress_aware(
+            cmd,
+            cwd=APP,
+            stdin_path=prompt_file,
+            stdout_path=out_file,
+            stderr_path=err_file,
+            progress_paths=[
+                REPORTS,
+                STATE / "task_queue.json",
+                STATE / "production_readiness_status.json",
+                STATE / "production_deploy_status.json",
+                STATE / "production_runtime_status.json",
+                STATE / "github_actions_status.json",
+            ],
+            progress_state_path=progress_state,
+            stall_seconds=ASYNC_STALL_SECONDS,
+            grace_seconds=ASYNC_GRACE_SECONDS,
+            max_wall_seconds=ASYNC_MAX_WALL_SECONDS,
+            on_progress=lambda payload: update_job_progress(job_file, job, payload),
+        )
 
         raw_out = out_file.read_text(errors="replace")
         raw_err = err_file.read_text(errors="replace")
 
-        if proc.returncode == 0 and raw_out.strip():
+        if progress.get("status") == "STALLED":
+            with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "created_at": now(),
+                    "job": job_id,
+                    "returncode": 124,
+                    "stderr_summary": compact_text(raw_err),
+                    "stdout_bytes": len(raw_out or ""),
+                    "stderr_bytes": len(raw_err or ""),
+                    "progress_status": progress.get("status"),
+                    "stall_reason": progress.get("stall_reason"),
+                    "prompt_or_message_content_logged": False,
+                }, ensure_ascii=False, sort_keys=True) + "\n")
+            send_message(chat_id, "CTO arka plan işi STALLED oldu: anlamlı ilerleme görülmedi. Teknik çıktı gönderilmedi; işi daha küçük parçalara bölüp retry edilebilir hale getirdim.")
+            job["status"] = TASK_STATUS_STALLED
+            job["result"] = "progress_watchdog_stalled"
+            job["progress_watchdog"] = progress
+            if router_task_id and mark_task_status is not None:
+                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED_RETRYABLE, "async_cto_job_stalled")
+        elif progress.get("returncode") == 0 and raw_out.strip():
             msg = output_guard(raw_out)
             send_message(chat_id, msg)
-            job["status"] = TASK_STATUS_DONE
+            job["status"] = "FINAL_REPORTED"
             job["result"] = "telegram_notified"
+            job["progress_watchdog"] = progress
             if router_task_id and mark_task_status is not None:
-                mark_task_status(APP, router_task_id, TASK_STATUS_DONE, "async_cto_job_done")
+                mark_task_status(APP, router_task_id, TASK_STATUS_PROPOSAL_READY, "async_cto_job_final_reported")
         else:
             with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
                 f.write(json.dumps({
                     "created_at": now(),
                     "job": job_id,
-                    "returncode": proc.returncode,
+                    "returncode": progress.get("returncode"),
                     "stderr_summary": compact_text(raw_err),
                     "stdout_bytes": len(raw_out or ""),
                     "stderr_bytes": len(raw_err or ""),
+                    "progress_status": progress.get("status"),
                     "prompt_or_message_content_logged": False,
                 }, ensure_ascii=False, sort_keys=True) + "\n")
             send_message(chat_id, "Teknik hata oluştu, düzeltiyorum. Kısa özet: CTO arka plan işi tamamlanamadı; teknik çıktı Telegram'a gönderilmedi.")
             job["status"] = TASK_STATUS_FAILED
             job["result"] = "codex_failed"
+            job["progress_watchdog"] = progress
             if router_task_id and mark_task_status is not None:
-                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED, "async_cto_job_failed")
+                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED_RETRYABLE, "async_cto_job_failed")
 
     except subprocess.TimeoutExpired:
         send_message(chat_id, "CTO arka plan işi süre sınırına takıldı. Teknik çıktı gönderilmedi. İşi daha küçük parçalara bölelim.")
@@ -225,7 +323,7 @@ def run_job(job_id):
             mark_task_status(APP, router_task_id, TASK_STATUS_ERROR, "async_cto_job_error")
 
     job["finished_at"] = now()
-    job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
+    save_job(job_file, job)
 
 if __name__ == "__main__":
     run_job(sys.argv[1])

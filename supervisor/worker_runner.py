@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .progress_aware_runner import run_progress_aware
     from .task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -24,6 +25,7 @@ try:
         redact_sensitive_text,
     )
 except ImportError:
+    from progress_aware_runner import run_progress_aware
     from task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -48,6 +50,9 @@ WORKERS_PATH = STATE_DIR / "workers.json"
 SYSTEM_STATE_PATH = STATE_DIR / "system_state.json"
 
 POLL_SECONDS = 3
+WORKER_STALL_SECONDS = int(os.environ.get("CODEX_WORKER_STALL_SECONDS", "420"))
+WORKER_GRACE_SECONDS = int(os.environ.get("CODEX_WORKER_GRACE_SECONDS", "180"))
+WORKER_MAX_WALL_SECONDS = int(os.environ.get("CODEX_WORKER_MAX_WALL_SECONDS", "14400"))
 
 EXPECTED_WORKER_FILES = [
     "PLAN.md",
@@ -325,6 +330,26 @@ def finish_task(
     if not found_executor:
         update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {status}")
 
+def update_task_progress(task_id: str, worker_id: str, progress: dict[str, Any]) -> None:
+    queue = read_json(QUEUE_PATH, {"tasks": []})
+    changed = False
+    for task in queue.get("tasks", []):
+        if task.get("id") == task_id:
+            task["progress_watchdog"] = {
+                "status": progress.get("status"),
+                "updated_at": progress.get("updated_at"),
+                "elapsed_seconds": progress.get("elapsed_seconds"),
+                "last_meaningful_progress_seconds_ago": progress.get("last_meaningful_progress_seconds_ago"),
+                "last_output_activity_seconds_ago": progress.get("last_output_activity_seconds_ago"),
+                "meaningful_event_count": progress.get("meaningful_event_count"),
+            }
+            task["updated_at"] = now()
+            changed = True
+            break
+    if changed:
+        write_json(QUEUE_PATH, queue)
+    update_worker(worker_id, "RUNNING", task_id, "progress_watchdog_running")
+
 def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str, str, dict[str, Any]]:
     import subprocess
     from pathlib import Path
@@ -382,7 +407,6 @@ Bu workspace içinde şu dosyaları oluştur:
     append_log(task_log, f"{now()} WORKER={worker_id} TASK={task_id} CONTROLLED_CODEX_START workspace={workspace}")
 
     cmd = [
-        "timeout", "180",
         "codex", "exec",
         "--sandbox", "workspace-write",
         "--skip-git-repo-check",
@@ -391,31 +415,34 @@ Bu workspace içinde şu dosyaları oluştur:
     ]
 
     returncode = 1
-    timed_out_by_python = False
-    try:
-        with out_file.open("wb") as out, err_file.open("wb") as err:
-            proc = subprocess.run(
-                cmd,
-                cwd="/opt/codex-dev-center",
-                stdin=subprocess.DEVNULL,
-                stdout=out,
-                stderr=err,
-                timeout=210
-            )
-            returncode = proc.returncode
-    except subprocess.TimeoutExpired:
-        returncode = 124
-        timed_out_by_python = True
+    progress_state = workspace / "progress_watchdog.json"
+    progress_result = run_progress_aware(
+        cmd,
+        cwd=APP_DIR,
+        stdout_path=out_file,
+        stderr_path=err_file,
+        progress_paths=[workspace],
+        progress_state_path=progress_state,
+        stall_seconds=WORKER_STALL_SECONDS,
+        grace_seconds=WORKER_GRACE_SECONDS,
+        max_wall_seconds=WORKER_MAX_WALL_SECONDS,
+        on_progress=lambda payload: update_task_progress(task_id, worker_id, payload),
+    )
+    returncode = int(progress_result.get("returncode") if progress_result.get("returncode") is not None else 1)
+    progress_stalled = progress_result.get("status") == "STALLED"
 
     created = [name for name in EXPECTED_WORKER_FILES if (workspace / name).exists()]
     raw_output = tail_file(out_file) + "\n" + tail_file(err_file)
     fallback_used = False
-    if len(created) < 4 and (raw_output.strip() or returncode == 0):
+    if not progress_stalled and len(created) < 4 and (raw_output.strip() or returncode == 0):
         fallback_reason = "codex_timeout_or_incomplete_output" if returncode != 0 else "incomplete_worker_output"
         created = write_fallback_proposal_files(workspace, task, worker_id, fallback_reason)
         fallback_used = True
 
-    status, result = classify_worker_result(returncode, created, raw_output, fallback_used)
+    if progress_stalled and len(created) < 4:
+        status, result = TASK_STATUS_FAILED_RETRYABLE, "progress_watchdog_stalled_without_meaningful_progress"
+    else:
+        status, result = classify_worker_result(returncode, created, raw_output, fallback_used)
     validation_status = "PENDING" if status == TASK_STATUS_READY_FOR_VALIDATION else "NOT_READY"
     pipeline_status = "NOT_RUN"
 
@@ -431,7 +458,9 @@ Risk: {risk}
 Sonuç: {status}
 Result: {result}
 Codex return code: {returncode}
-Timed out by python supervisor: {str(timed_out_by_python).lower()}
+Progress watchdog status: {progress_result.get("status")}
+Progress watchdog reason: {progress_result.get("stall_reason", "-")}
+Progress watchdog meaningful events: {progress_result.get("meaningful_event_count", 0)}
 Fallback used: {str(fallback_used).lower()}
 Workspace: {workspace}
 Validation status: {validation_status}
@@ -451,7 +480,7 @@ Log:
     report_path.write_text(report, encoding="utf-8")
     append_log(
         task_log,
-        f"{now()} WORKER={worker_id} TASK={task_id} CONTROLLED_CODEX_DONE status={status} rc={returncode} created={len(created)} fallback={fallback_used}",
+        f"{now()} WORKER={worker_id} TASK={task_id} CONTROLLED_CODEX_DONE status={status} rc={returncode} progress={progress_result.get('status')} created={len(created)} fallback={fallback_used}",
     )
 
     metadata = {
@@ -459,6 +488,7 @@ Log:
         "created_files": created,
         "codex_return_code": returncode,
         "fallback_used": fallback_used,
+        "progress_watchdog": progress_result,
         "validation_status": validation_status,
         "pipeline_status": pipeline_status,
         "delivery_level": status,

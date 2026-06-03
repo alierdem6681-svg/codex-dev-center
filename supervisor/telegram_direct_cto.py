@@ -429,7 +429,7 @@ def is_long_task_message(text):
 
     return False
 
-def start_async_job(chat_id, raw_text, router_task_id=None):
+def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False):
     import subprocess
     JOBS = STATE / "direct_cto_jobs"
     JOBS.mkdir(parents=True, exist_ok=True)
@@ -443,6 +443,7 @@ def start_async_job(chat_id, raw_text, router_task_id=None):
         "chat_id": str(chat_id),
         "text": safe_text,
         "router_task_id": router_task_id,
+        "action_command": bool(action_command),
         "generic_task_name": meta["name"],
         "estimated_duration": meta["eta"],
         "first_update": meta["first_update"],
@@ -591,10 +592,12 @@ def handle_message(token, expected_chat_id, msg):
     safe_text = redact_sensitive_text(text)
     audit_passthrough(chat_id, from_user, text, safe_text, "intake")
 
-    # Açık uygulama/başlatma komutlarında CTO Action Mode devreye girer.
+    # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
+    # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
     if is_action_command(text):
+        router_task_id = None
         if submit_task is not None:
-            submit_task(
+            routed = submit_task(
                 APP,
                 source="telegram",
                 title="Telegram action command",
@@ -604,8 +607,9 @@ def handle_message(token, expected_chat_id, msg):
                 split=False,
                 worker_eligible=False,
             )
-        reply = run_direct_action(safe_text)
-        send_message(token, chat_id, reply)
+            router_task_id = routed.get("task", {}).get("id")
+        job_id = start_async_job(chat_id, safe_text, router_task_id=router_task_id, action_command=True)
+        send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")
         return
 
     # Uzun görevlerde Telegram yanıtını bloklama; CTO işi arka planda sürdürür.
@@ -625,18 +629,19 @@ def handle_message(token, expected_chat_id, msg):
             router_task_id = routed.get("task", {}).get("id")
             if trigger_lifecycle is not None and routed.get("subtasks"):
                 trigger_lifecycle(APP)
-        start_async_job(chat_id, safe_text, router_task_id=router_task_id)
-        send_message(token, chat_id, "Başladım. Kısa bir ilk kontrol yapıp birazdan ilerleme paylaşacağım.")
+        job_id = start_async_job(chat_id, safe_text, router_task_id=router_task_id)
+        send_message(token, chat_id, f"Başladım. Kısa bir ilk kontrol yapıp arkada sürdürüyorum. Job: {job_id}.")
         return
 
-    # Normal kısa mesajda ACK yok. Mesaj doğrudan Codex CTO'ya gider.
     local_reply = local_natural_reply(safe_text)
     if local_reply:
         audit_passthrough(chat_id, from_user, text, safe_text, "local_natural_reply")
         send_message(token, chat_id, local_reply)
         return
-    reply = run_codex(safe_text)
-    send_message(token, chat_id, reply)
+
+    # Lokal/deterministik cevap gerektirmeyen her CTO/Codex işi async yürür.
+    job_id = start_async_job(chat_id, safe_text)
+    send_message(token, chat_id, f"Aldım. CTO işi arkada çalışıyor; hazır olunca güvenli özet göndereceğim. Job: {job_id}.")
 
 def main():
     STATE.mkdir(parents=True, exist_ok=True)
