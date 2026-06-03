@@ -254,3 +254,21 @@ Yeni davranış:
 - `restart_simulation` canlı servis restart etmeden service watchdog ve safe rollback sözleşmesini kontrol eder.
 - `failure_injection_simulation` canlı işlem yapmadan JSON hata yakalama, security scan ve critical approval sözleşmesini kontrol eder.
 - Production deploy, secret, IAM, billing, DNS/firewall, database veya Google Ads live mutate yapılmadı.
+
+---
+
+## Controlled Apply Pipeline v1 Validation
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-164346 / CTO-DISPATCH-20260603-072953-CTO-ACTION-20260601-153520-01-CONTROLLED-APPLY
+
+Eklenenler:
+- `supervisor/worker_runner.py` repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
+- `tests/test_runtime_status_model.py` Windows path, `./` prefix, exact `AGENTS.md` match ve traversal blokajını doğrular.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` controlled apply validation davranışını görünür kılar.
+
+Yeni davranış:
+- `AGENTS.md.bak` veya `AGENTS.md/child` gibi tekil dosya varyantları repo apply allowlist'ten geçmez.
+- `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
+- Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmadı.

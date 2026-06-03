@@ -84,6 +84,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_quality_gate.py
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
+- supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -93,6 +94,11 @@ Ajan şu klasörleri inceler:
 
 Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
+
+Controlled apply notu:
+- Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
+- Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
+- Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 
 ## Servis Keşfi
 

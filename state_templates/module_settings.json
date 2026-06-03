@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-03T16:47:10+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -47,7 +47,10 @@
     "restart_on_failure": true,
     "safe_mode": true,
     "codex_execution_enabled": false,
-    "worker_recovery_required": true
+    "worker_recovery_required": true,
+    "repo_apply_path_normalization": true,
+    "repo_apply_exact_file_allowlist": true,
+    "repo_apply_runtime_artifacts_ignored": true
   },
   "telegram": {
     "enabled": false,

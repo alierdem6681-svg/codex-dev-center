@@ -135,12 +135,18 @@ class WorkerStatusModelTest(unittest.TestCase):
     def test_repo_apply_path_allowlist_blocks_runtime_state(self):
         self.assertTrue(worker_runner.is_safe_repo_apply_path("supervisor/worker_runner.py"))
         self.assertTrue(worker_runner.is_safe_repo_apply_path("tests/test_runtime_status_model.py"))
+        self.assertTrue(worker_runner.is_safe_repo_apply_path("./docs/ROADMAP.md"))
+        self.assertTrue(worker_runner.is_safe_repo_apply_path("web_panel\\panel_server.py"))
         self.assertFalse(worker_runner.is_safe_repo_apply_path("state/task_queue.json"))
         self.assertFalse(worker_runner.is_safe_repo_apply_path(".env"))
+        self.assertFalse(worker_runner.is_safe_repo_apply_path("AGENTS.md.bak"))
+        self.assertFalse(worker_runner.is_safe_repo_apply_path("AGENTS.md/child"))
+        self.assertFalse(worker_runner.is_safe_repo_apply_path("docs/../state/task_queue.json"))
 
     def test_repo_apply_ignores_generated_runtime_artifacts_only(self):
         self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("reports/apply-worker.md"))
         self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("logs/apply-worker.log"))
+        self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("./tmp/apply-worker.log"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
 
