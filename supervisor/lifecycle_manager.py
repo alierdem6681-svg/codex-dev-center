@@ -117,6 +117,11 @@ def update_worker_state(worker_id, status, note=""):
     found = False
     for w in data.get("workers", []):
         if w.get("id") == worker_id:
+            if status == "IDLE" and str(w.get("status", "")).upper() == "RUNNING" and w.get("current_task"):
+                w["last_seen"] = now()
+                w["note"] = note
+                found = True
+                break
             w["status"] = status
             if status in {"IDLE", "SLEEPING", "STOPPED"}:
                 w["current_task"] = None
