@@ -1152,6 +1152,95 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertTrue(updated["merge_blocked"])
         self.assertEqual(candidate, "")
 
+    def test_finalizer_skips_conflicting_pr_and_deploys_next_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ready = self.deployable_task("TASK-READY-NEXT")
+            ready["status"] = TASK_STATUS_DONE
+            ready["repo_applied"] = False
+            ready["branch_merged"] = False
+            ready["delivery_level"] = "PR_READY"
+            ready["pull_request_number"] = 59
+            conflict = self.deployable_task("TASK-CONFLICT-FIRST")
+            conflict["status"] = TASK_STATUS_DONE
+            conflict["repo_applied"] = False
+            conflict["branch_merged"] = False
+            conflict["delivery_level"] = "PR_READY"
+            conflict["pull_request_number"] = 47
+            original_run = cto_autonomous_delivery.run
+            original_dispatch = cto_autonomous_delivery.dispatch_workflow
+            original_sleep = cto_autonomous_delivery.time.sleep
+            calls: list[list[str]] = []
+
+            def fake_run(args, cwd=None, timeout=300):
+                calls.append(args)
+                if args[:3] == ["gh", "pr", "merge"]:
+                    return {"ok": True, "returncode": 0, "stdout": "", "stderr": "", "cmd": "gh pr merge 59"}
+                if args[:3] == ["gh", "pr", "view"]:
+                    number = str(args[3])
+                    merged = any(call[:3] == ["gh", "pr", "merge"] for call in calls)
+                    if number == "47":
+                        payload = {
+                            "number": 47,
+                            "url": "https://example.invalid/pr/47",
+                            "state": "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "DIRTY",
+                            "headRefName": "worker/conflict",
+                            "baseRefName": "main",
+                            "mergeCommit": None,
+                        }
+                    else:
+                        payload = {
+                            "number": 59,
+                            "url": "https://example.invalid/pr/59",
+                            "state": "MERGED" if merged else "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "CLEAN",
+                            "headRefName": "worker/ready",
+                            "baseRefName": "main",
+                            "mergeCommit": {"oid": "merge59"} if merged else None,
+                        }
+                    return {"ok": True, "returncode": 0, "stdout": json.dumps(payload), "stderr": "", "cmd": "gh pr view"}
+                return {"ok": False, "returncode": 1, "stdout": "", "stderr": "unexpected command", "cmd": " ".join(args)}
+
+            def fake_dispatch(workflow, wait=False):
+                run_id = "100" if workflow == cto_autonomous_delivery.DEPLOY_WORKFLOW else "101"
+                return {
+                    "ok": True,
+                    "status": "WORKFLOW_SUCCESS_REUSED",
+                    "deduped": True,
+                    "run": {
+                        "databaseId": run_id,
+                        "url": f"https://example.invalid/runs/{run_id}",
+                        "headSha": "main-sha",
+                        "status": "completed",
+                        "conclusion": "success",
+                    },
+                }
+
+            cto_autonomous_delivery.run = fake_run
+            cto_autonomous_delivery.dispatch_workflow = fake_dispatch
+            cto_autonomous_delivery.time.sleep = lambda _seconds: None
+            try:
+                with self.patched_delivery_runtime(tmp, [ready, conflict]) as queue_path:
+                    result = cto_autonomous_delivery.finalize_latest(execute=True, wait=True, smoke=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.run = original_run
+                cto_autonomous_delivery.dispatch_workflow = original_dispatch
+                cto_autonomous_delivery.time.sleep = original_sleep
+
+        by_id = {task["id"]: task for task in queue["tasks"]}
+        self.assertEqual(result["status"], "DEPLOYED")
+        self.assertEqual(result["task_id"], "TASK-READY-NEXT")
+        self.assertEqual(result["skipped"][0]["task_id"], "TASK-CONFLICT-FIRST")
+        self.assertEqual(by_id["TASK-CONFLICT-FIRST"]["delivery_level"], "PR_CONFLICT")
+        self.assertEqual(by_id["TASK-CONFLICT-FIRST"]["deployment_status"], "MERGE_CONFLICT")
+        self.assertFalse(by_id["TASK-CONFLICT-FIRST"]["worker_eligible"])
+        self.assertEqual(by_id["TASK-READY-NEXT"]["status"], TASK_STATUS_DEPLOYED)
+        self.assertEqual(by_id["TASK-READY-NEXT"]["deploy_run_id"], "100")
+        self.assertEqual(by_id["TASK-READY-NEXT"]["smoke_run_id"], "101")
+
     def test_failed_merge_rechecks_and_marks_already_merged(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-MERGE-RACE")
@@ -1258,6 +1347,100 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertEqual(updated["delivery_level"], "PR_CONFLICT")
         self.assertEqual(updated["deployment_status"], "MERGE_CONFLICT")
         self.assertEqual(updated["merge_blocked_reason"], "merge_command_git_exit_status_1")
+
+    def test_successful_deploy_and_smoke_runs_for_same_commit_are_reused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-DEDUPE")
+            original_main_head = cto_autonomous_delivery.main_head
+            original_workflow_runs = cto_autonomous_delivery.workflow_runs
+            requested: list[str] = []
+
+            def fake_workflow_runs(workflow):
+                requested.append(workflow)
+                run_id = "200" if workflow == cto_autonomous_delivery.DEPLOY_WORKFLOW else "201"
+                return {
+                    "ok": True,
+                    "runs": [
+                        {
+                            "databaseId": run_id,
+                            "url": f"https://example.invalid/runs/{run_id}",
+                            "headSha": "origin-main-sha",
+                            "status": "completed",
+                            "conclusion": "success",
+                        }
+                    ],
+                }
+
+            cto_autonomous_delivery.main_head = lambda: "origin-main-sha"
+            cto_autonomous_delivery.workflow_runs = fake_workflow_runs
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    result = cto_autonomous_delivery.deploy_task("TASK-DEDUPE", execute=True, wait=False, smoke=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.main_head = original_main_head
+                cto_autonomous_delivery.workflow_runs = original_workflow_runs
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "DEPLOYED")
+        self.assertEqual(result["deploy"]["status"], "WORKFLOW_SUCCESS_REUSED")
+        self.assertEqual(result["smoke"]["status"], "WORKFLOW_SUCCESS_REUSED")
+        self.assertEqual(requested, [cto_autonomous_delivery.DEPLOY_WORKFLOW, cto_autonomous_delivery.SMOKE_WORKFLOW])
+        self.assertEqual(updated["deploy_run_id"], "200")
+        self.assertEqual(updated["deploy_run_url"], "https://example.invalid/runs/200")
+        self.assertEqual(updated["deploy_commit"], "origin-main-sha")
+        self.assertEqual(updated["smoke_run_id"], "201")
+        self.assertEqual(updated["smoke_run_url"], "https://example.invalid/runs/201")
+        self.assertEqual(updated["smoke_commit"], "origin-main-sha")
+
+    def test_deploy_success_without_successful_smoke_is_not_deployed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-SMOKE-PENDING")
+            original_dispatch = cto_autonomous_delivery.dispatch_workflow
+            calls: list[str] = []
+
+            def fake_dispatch(workflow, wait=False):
+                calls.append(workflow)
+                if workflow == cto_autonomous_delivery.DEPLOY_WORKFLOW:
+                    return {
+                        "ok": True,
+                        "status": "WORKFLOW_SUCCESS_REUSED",
+                        "run": {
+                            "databaseId": "300",
+                            "url": "https://example.invalid/runs/300",
+                            "headSha": "origin-main-sha",
+                            "status": "completed",
+                            "conclusion": "success",
+                        },
+                    }
+                return {
+                    "ok": True,
+                    "status": "WORKFLOW_DISPATCHED",
+                    "run": {
+                        "databaseId": "301",
+                        "url": "https://example.invalid/runs/301",
+                        "headSha": "origin-main-sha",
+                        "status": "queued",
+                        "conclusion": "",
+                    },
+                }
+
+            cto_autonomous_delivery.dispatch_workflow = fake_dispatch
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    result = cto_autonomous_delivery.deploy_task("TASK-SMOKE-PENDING", execute=True, wait=False, smoke=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.dispatch_workflow = original_dispatch
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "SMOKE_IN_PROGRESS")
+        self.assertEqual(calls, [cto_autonomous_delivery.DEPLOY_WORKFLOW, cto_autonomous_delivery.SMOKE_WORKFLOW])
+        self.assertEqual(updated["status"], TASK_STATUS_DONE)
+        self.assertEqual(updated["deployment_status"], "DEPLOY_IN_PROGRESS")
+        self.assertFalse(updated.get("production_deployed", False))
+        self.assertEqual(updated["deploy_run_id"], "300")
+        self.assertEqual(updated["smoke_run_id"], "301")
 
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1790,6 +1973,29 @@ class TaskValidationEngineTest(unittest.TestCase):
                 task_status=TASK_STATUS_APPROVAL_REQUIRED,
                 result="critical_operation_requires_user_approval",
                 validation_status="APPROVAL_REQUIRED",
+            )
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
+        self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
+
+    def test_risk_review_boundary_examples_do_not_require_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
+            workspace = next((runtime / "workspaces").glob("worker_worker-1_TASK-VAL_*"))
+            (workspace / "RISK_REVIEW.md").write_text(
+                "# RISK_REVIEW\n\n"
+                "## Dokunulmayacak Alanlar\n\n"
+                "- Production deploy.\n"
+                "- IAM, billing, DNS, firewall.\n"
+                "- Database destructive islemleri.\n"
+                "- Secret, env, token, private key ve credential rotation.\n\n"
+                "## Riskler\n\n"
+                "- yuksek risk: secret, IAM, deploy, DNS, firewall, database destructive.\n"
+                "- `gcloud projects add-iam-policy-binding` high risk donmeli.\n",
+                encoding="utf-8",
             )
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
