@@ -395,6 +395,28 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertTrue(result["ready_for_deploy_gate"])
 
+    def test_choose_worker_prefers_least_active_worker(self):
+        queue = {
+            "tasks": [
+                {
+                    "id": "TASK-1",
+                    "status": "RUNNING",
+                    "source": "cto",
+                    "worker_eligible": True,
+                    "assigned_worker": "worker-1",
+                },
+                {
+                    "id": "TASK-2",
+                    "status": "QUEUED",
+                    "source": "cto",
+                    "worker_eligible": True,
+                    "assigned_worker": "worker-2",
+                },
+            ]
+        }
+
+        self.assertEqual(cto_autonomous_delivery.choose_worker(queue), "worker-3")
+
 
 class BacklogDispatcherModelTest(unittest.TestCase):
     def test_completed_child_prevents_duplicate_dispatch(self):
@@ -489,6 +511,41 @@ class BacklogDispatcherModelTest(unittest.TestCase):
                 lifecycle_manager.QUEUE_PATH = original
 
         self.assertEqual(selected, ["worker-1", "worker-2", "worker-3"])
+
+    def test_active_mode_uses_idle_worker_when_pending_is_assigned_to_busy_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "task_queue.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-1",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                            },
+                            {
+                                "id": "TASK-2",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original = lifecycle_manager.QUEUE_PATH
+            lifecycle_manager.QUEUE_PATH = path
+            try:
+                selected = lifecycle_manager.selected_workers_for_active_mode()
+            finally:
+                lifecycle_manager.QUEUE_PATH = original
+
+        self.assertEqual(selected, ["worker-1", "worker-2"])
 
     def test_no_standard_candidate_uses_autonomous_backlog_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:

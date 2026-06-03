@@ -187,18 +187,28 @@ def selected_workers_for_active_mode() -> list[str]:
     ]
     selected: list[str] = []
     max_workers = max_parallel_workers()
+    def append_worker(worker_id: str) -> bool:
+        chosen = worker_id if worker_id in WORKERS else ""
+        if not chosen or chosen in selected:
+            for fallback in WORKERS:
+                if fallback not in selected:
+                    chosen = fallback
+                    break
+        if not chosen or chosen in selected:
+            return False
+        selected.append(chosen)
+        return len(selected) >= max_workers
+
     for status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
         for task in tasks:
             if normalize_status(task.get("status")) != status:
                 continue
             worker_id = task.get("assigned_worker")
             if worker_id in WORKERS:
-                chosen = worker_id
+                preferred = worker_id
             else:
-                chosen = choose_worker(task.get("title") or task.get("id"))
-            if chosen not in selected:
-                selected.append(chosen)
-            if len(selected) >= max_workers:
+                preferred = choose_worker(task.get("title") or task.get("id"))
+            if append_worker(preferred):
                 return selected
     return selected or ["worker-1"]
 
