@@ -224,6 +224,32 @@ def update_worker(worker_id: str, status: str, current_task: str | None = None, 
     data["updated_at"] = now()
     write_json(WORKERS_PATH, data)
 
+def reconcile_stale_running_tasks_for_worker(worker_id: str) -> list[str]:
+    queue = read_json(QUEUE_PATH, {"tasks": []})
+    queue, _changes = normalize_queue_payload(queue)
+    recovered: list[str] = []
+
+    for task in queue.get("tasks", []):
+        if task.get("assigned_worker") != worker_id:
+            continue
+        if normalize_status(task.get("status")) != TASK_STATUS_RUNNING:
+            continue
+        task["status"] = TASK_STATUS_FAILED_RETRYABLE
+        task["result"] = "worker_service_restarted_before_completion"
+        task["delivery_level"] = TASK_STATUS_FAILED_RETRYABLE
+        task["production_deployed"] = False
+        task["repo_applied"] = False
+        task["recovered_by_worker_restart"] = True
+        task["finished_at"] = now()
+        task["updated_at"] = now()
+        recovered.append(str(task.get("id") or ""))
+
+    if recovered:
+        queue["updated_at"] = now()
+        write_json(QUEUE_PATH, queue)
+
+    return recovered
+
 def claim_task(worker_id: str) -> dict[str, Any] | None:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     queue, _changes = normalize_queue_payload(queue)
@@ -444,7 +470,13 @@ Log:
 def run_worker(worker_id: str) -> None:
     log_file = LOG_DIR / f"{worker_id}.service.log"
     append_log(log_file, f"{now()} {worker_id} service started pid={os.getpid()}")
-    update_worker(worker_id, "IDLE", None, "service_started")
+    recovered = reconcile_stale_running_tasks_for_worker(worker_id)
+    if recovered:
+        append_log(log_file, f"{now()} {worker_id} recovered stale RUNNING tasks on restart: {','.join(recovered)}")
+    note = "service_started"
+    if recovered:
+        note = f"service_started_recovered_stale_running={len(recovered)}"
+    update_worker(worker_id, "IDLE", None, note)
 
     while True:
         try:

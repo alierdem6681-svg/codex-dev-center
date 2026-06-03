@@ -200,6 +200,7 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
         ROOT / "supervisor" / "lifecycle_manager.py",
         ROOT / "supervisor" / "task_recovery_engine.py",
         ROOT / "supervisor" / "action_result_watcher.py",
+        ROOT / "supervisor" / "task_validation_engine.py",
     ]
     record(results, "worker_queue_recovery_test", all(p.exists() for p in files), {"files": [str(p.relative_to(ROOT)) for p in files]})
 
