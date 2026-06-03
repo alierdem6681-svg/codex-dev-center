@@ -106,6 +106,23 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertEqual(lifecycle_manager.dispatcher_candidate(tasks)["id"], "PARENT")
 
+    def test_idle_worker_state_clears_current_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "workers.json"
+            path.write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": "TASK-1"}]}),
+                encoding="utf-8",
+            )
+            original = lifecycle_manager.WORKERS_PATH
+            lifecycle_manager.WORKERS_PATH = path
+            try:
+                lifecycle_manager.update_worker_state("worker-1", "IDLE", "single_mode_test")
+            finally:
+                lifecycle_manager.WORKERS_PATH = original
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(payload["workers"][0]["current_task"])
+
 
 class WorkerLifecycleRepairTest(unittest.TestCase):
     def test_repair_marks_stale_running_retryable_and_clears_idle_worker(self):
