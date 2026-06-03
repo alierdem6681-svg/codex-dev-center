@@ -142,7 +142,7 @@ def normalize_status(value: Any, default: str = TASK_STATUS_QUEUED) -> str:
     upper = raw.upper()
     if upper in KNOWN_TASK_STATUSES:
         return upper
-    alias_key = re.sub(r"[\s-]+", "_", raw.lower())
+    alias_key = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
     return STATUS_ALIASES.get(alias_key, default)
 
 

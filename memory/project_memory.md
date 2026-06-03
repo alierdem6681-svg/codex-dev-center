@@ -153,3 +153,9 @@ Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma se
 Queue task status normalizer case, bosluk ve tire aliaslarini standart enumlara cevirecek sekilde guclendirildi. `ready for validation`, `ready-for-validation`, `FAILED-TIMEOUT`, `in-progress` ve `completed` gibi girdiler artik yanlislikla `QUEUED` default'una dusmez.
 
 Davranis `tests/test_runtime_status_model.py` icindeki unit testlerle sabitlendi. Bu paket production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-03 Queue / Status Normalizer Separator Hardening
+
+Queue task status normalizer yaygin noktalama/ayirici farklarina karsi guclendirildi. `ready/for.validation` artik `READY_FOR_VALIDATION`, `FAILED.TIMEOUT` artik `FAILED_TIMEOUT` olarak normalize edilir.
+
+Davranis `tests/test_runtime_status_model.py` icindeki unit testlerle sabitlendi. Compile, unit test ve gecici `/tmp` repo kopyasinda production readiness suite PASS oldu. Bu sandbox'ta git metadata yolu read-only oldugu icin commit/push/PR olusturulamadi. Bu paket production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

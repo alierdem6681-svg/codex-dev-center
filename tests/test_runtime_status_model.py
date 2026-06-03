@@ -70,9 +70,11 @@ LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 
 
 class WorkerStatusModelTest(unittest.TestCase):
-    def test_task_status_normalizer_accepts_case_space_and_hyphen_variants(self):
+    def test_task_status_normalizer_accepts_case_space_hyphen_and_separator_variants(self):
         self.assertEqual(normalize_status("ready for validation"), TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertEqual(normalize_status("ready/for.validation"), TASK_STATUS_READY_FOR_VALIDATION)
         self.assertEqual(normalize_status("FAILED-TIMEOUT"), TASK_STATUS_FAILED_TIMEOUT)
+        self.assertEqual(normalize_status("FAILED.TIMEOUT"), TASK_STATUS_FAILED_TIMEOUT)
         self.assertEqual(normalize_status("in-progress"), TASK_STATUS_RUNNING)
         self.assertEqual(normalize_status("Completed"), TASK_STATUS_DONE)
 
