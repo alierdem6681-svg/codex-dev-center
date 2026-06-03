@@ -205,7 +205,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          services=(codex-panel codex-lifecycle codex-watchdog codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4)
+          services=(codex-panel codex-direct-cto codex-lifecycle codex-watchdog codex-worker-1 codex-worker-2 codex-worker-3 codex-worker-4)
           for svc in "${services[@]}"; do
             if systemctl list-unit-files "$svc.service" >/dev/null 2>&1; then
               sudo systemctl restart "$svc"
@@ -223,6 +223,9 @@ jobs:
 
           echo "===== REQUIRED SERVICES ====="
           systemctl is-active codex-panel
+          if systemctl list-unit-files codex-direct-cto.service >/dev/null 2>&1; then
+            systemctl is-active codex-direct-cto
+          fi
           if systemctl list-unit-files codex-lifecycle.service >/dev/null 2>&1; then
             systemctl is-active codex-lifecycle
           fi

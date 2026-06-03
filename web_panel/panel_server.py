@@ -22,6 +22,39 @@ HOST = os.environ.get("CODEX_PANEL_HOST", "0.0.0.0")
 PORT = int(os.environ.get("CODEX_PANEL_PORT", "8080"))
 SCOPE = os.environ.get("CODEX_PANEL_SCOPE", "production")
 
+SUPERVISOR_DIR = ROOT / "supervisor"
+if str(SUPERVISOR_DIR) not in sys.path:
+    sys.path.insert(0, str(SUPERVISOR_DIR))
+
+try:
+    from task_status_constants import normalize_status, worker_block_reason
+except Exception:
+    def normalize_status(value, default="QUEUED"):
+        return str(value or default).strip().upper()
+
+    def worker_block_reason(task):
+        if str(task.get("source", "")).lower() == "telegram":
+            return "telegram_reserved_for_cto"
+        if str(task.get("risk") or task.get("risk_level") or "").lower() in {"high", "critical"}:
+            return "approval_required"
+        if task.get("worker_eligible") is False:
+            return "worker_eligible_false"
+        return ""
+
+
+ACTIVE_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
+RECOVERABLE_STATUSES = {
+    "FAILED",
+    "FAILED_NO_PROPOSAL",
+    "FAILED_RETRYABLE",
+    "FAILED_TIMEOUT",
+    "PIPELINE_FAILED",
+    "PROPOSAL_DONE",
+    "PROPOSAL_READY",
+    "READY_FOR_VALIDATION",
+    "VALIDATION_FAILED",
+}
+
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -81,8 +114,79 @@ def service_enabled(name: str):
 
 
 def services():
-    names = ["codex-panel", "codex-lifecycle", "codex-cto", "codex-worker-1", "codex-worker-2", "codex-worker-3", "codex-worker-4", "codex-watchdog"]
+    names = ["codex-panel", "codex-direct-cto", "codex-lifecycle", "codex-cto", "codex-worker-1", "codex-worker-2", "codex-worker-3", "codex-worker-4", "codex-watchdog"]
     return [{"name": n, "active": service_status(n), "enabled": service_enabled(n)} for n in names]
+
+
+def compact_task(task):
+    return {
+        "id": task.get("id"),
+        "title": task.get("title"),
+        "status": normalize_status(task.get("status")),
+        "source": task.get("source"),
+        "risk": task.get("risk") or task.get("risk_level"),
+        "assigned_worker": task.get("assigned_worker"),
+        "reason": worker_block_reason(task),
+        "parent_task": task.get("parent_task"),
+    }
+
+
+def queue_diagnostics(tasks_payload, workers_payload, system_state, production_deploy, github_actions):
+    tasks = tasks_payload.get("tasks", []) if isinstance(tasks_payload, dict) else []
+    workers = workers_payload.get("workers", []) if isinstance(workers_payload, dict) else []
+    counts = {}
+    for task in tasks:
+        status = normalize_status(task.get("status"))
+        counts[status] = counts.get(status, 0) + 1
+
+    active = [task for task in tasks if normalize_status(task.get("status")) in ACTIVE_STATUSES]
+    blocked_active = [task for task in active if worker_block_reason(task)]
+    worker_eligible = [task for task in active if not worker_block_reason(task)]
+    sleeping = [worker for worker in workers if str(worker.get("status", "")).upper() == "SLEEPING"]
+    running = [worker for worker in workers if str(worker.get("status", "")).upper() == "RUNNING"]
+    recoverable = [task for task in tasks if normalize_status(task.get("status")) in RECOVERABLE_STATUSES and not worker_block_reason(task)]
+
+    if worker_eligible:
+        sleep_reason = "eligible_task_exists"
+    elif active and blocked_active:
+        sleep_reason = "active_tasks_blocked_for_workers"
+    elif recoverable:
+        sleep_reason = "waiting_for_backlog_dispatcher_single_mode"
+    else:
+        sleep_reason = "no_worker_eligible_pending_tasks"
+
+    deploy_status = str(production_deploy.get("status", "") if isinstance(production_deploy, dict) else "").upper()
+    last_deploy = str(github_actions.get("last_deploy_status", "") if isinstance(github_actions, dict) else "").upper()
+    if last_deploy == "PASS" and deploy_status in {"BLOCKED", "FAIL", "FAILED"}:
+        deploy_reconciliation = "dashboard_deploy_state_stale_or_conflicting"
+    else:
+        deploy_reconciliation = "consistent_or_unknown"
+
+    return {
+        "status_counts": counts,
+        "active_task_count": len(active),
+        "worker_eligible_active_count": len(worker_eligible),
+        "blocked_active_count": len(blocked_active),
+        "recoverable_task_count": len(recoverable),
+        "workers_sleeping_count": len(sleeping),
+        "workers_running_count": len(running),
+        "worker_sleep_reason": sleep_reason,
+        "next_worker_eligible_task": compact_task(worker_eligible[0]) if worker_eligible else None,
+        "blocked_active_examples": [compact_task(task) for task in blocked_active[:8]],
+        "recoverable_examples": [compact_task(task) for task in recoverable[:8]],
+        "dispatcher": {
+            "active": bool(system_state.get("backlog_dispatcher_active")),
+            "mode": system_state.get("backlog_dispatcher_mode", "single"),
+            "last_tick": system_state.get("backlog_dispatcher_last_tick"),
+            "last_result": system_state.get("backlog_dispatcher_last_result"),
+            "last_parent": system_state.get("backlog_dispatcher_last_parent"),
+            "last_child": system_state.get("backlog_dispatcher_last_child"),
+            "last_mode": system_state.get("backlog_dispatcher_last_mode"),
+            "worker_active": system_state.get("backlog_dispatcher_worker_active"),
+            "recoverable_count": system_state.get("backlog_dispatcher_recoverable_count"),
+        },
+        "deploy_reconciliation": deploy_reconciliation,
+    }
 
 
 def deploy_commands():
@@ -112,12 +216,19 @@ def deploy_commands():
 
 
 def status_payload():
+    system_state = read_json(STATE / "system_state.json", {})
+    workers_payload = read_json(STATE / "workers.json", {"workers": []})
+    tasks_payload = read_json(STATE / "task_queue.json", {"tasks": []})
+    production_deploy = read_json(STATE / "production_deploy_status.json", {})
+    github_actions = read_json(STATE / "github_actions_status.json", {})
+    pipeline_status = read_json(STATE / "pipeline_status.json", {})
     return {
         "ok": True,
         "time": now(),
-        "system_state": read_json(STATE / "system_state.json", {}),
-        "workers": read_json(STATE / "workers.json", {"workers": []}),
-        "tasks": read_json(STATE / "task_queue.json", {"tasks": []}),
+        "system_state": system_state,
+        "workers": workers_payload,
+        "tasks": tasks_payload,
+        "operations": queue_diagnostics(tasks_payload, workers_payload, system_state, production_deploy, github_actions),
         "services": services(),
         "modules": read_json(STATE / "module_registry.json", read_json(ROOT / "state_templates/module_registry.json", {"modules": []})),
         "actions": read_json(STATE / "action_catalog.json", read_json(ROOT / "state_templates/action_catalog.json", {"actions": []})),
@@ -127,12 +238,12 @@ def status_payload():
         "cto_delivery": read_json(STATE / "cto_delivery_state.json", read_json(ROOT / "state_templates/cto_delivery_policy.json", {})),
         "auth": panel_auth.public_auth_state(),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
-        "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
+        "production_deploy": production_deploy,
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
         "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
-        "github_actions": read_json(STATE / "github_actions_status.json", {}),
-        "pipeline_status": read_json(STATE / "pipeline_status.json", {}),
+        "github_actions": github_actions,
+        "pipeline_status": pipeline_status,
         "rollback": read_json(STATE / "rollback_status.json", {}),
         "rollback_point": read_json(STATE / "rollback_point.json", {}),
         "last_health_check": read_json(STATE / "last_health_check_status.json", {}),

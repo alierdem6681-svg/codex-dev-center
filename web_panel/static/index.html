@@ -111,6 +111,11 @@
       </div>
 
       <section>
+        <h2>Operasyonel Akış</h2>
+        <div id="opsBox"></div>
+      </section>
+
+      <section>
         <h2>Production Pipeline</h2>
         <div class="actions">
           <button class="primary" onclick="runAction('production_readiness_suite')">Kalite Kapılarını Çalıştır</button>
@@ -204,7 +209,15 @@
         ASSIGNED: 'Atandı',
         PENDING: 'Bekliyor',
         QUEUED: 'Kuyrukta',
+        PROPOSAL_READY: 'Proposal hazır',
+        PROPOSAL_DONE: 'Proposal tamam',
+        READY_FOR_VALIDATION: 'Doğrulama bekliyor',
+        VALIDATION_FAILED: 'Doğrulama kaldı',
+        PIPELINE_FAILED: 'Pipeline kaldı',
+        FAILED_TIMEOUT: 'Timeout',
+        FAILED_RETRYABLE: 'Tekrar denenebilir',
         DONE: 'Tamamlandı',
+        DEPLOYED: 'Canlıda',
         PASS: 'Geçti',
         FAIL: 'Kaldı',
         BLOCKED: 'Bloklandı',
@@ -272,6 +285,7 @@
         const router = data.cto_router || {};
         const doctor = data.cto_doctor || {};
         const delivery = data.cto_delivery || {};
+        const ops = data.operations || {};
         clock.textContent = new Date().toLocaleTimeString();
         deployMetric.textContent = runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
@@ -314,6 +328,21 @@
           `Otomatik production: ${data.production_policy?.automatic_production_enabled}`,
           `Gate PASS deploy: ${delivery.policy?.production_deploy_allowed_when_all_gates_pass ?? data.production_policy?.normal_app_deploy_allowed_when_all_gates_pass ?? '-'}`
         ].map(badge).join('');
+        const dispatcher = ops.dispatcher || {};
+        const blocked = (ops.blocked_active_examples || []).map(t => `${t.id || '-'}: ${t.reason || '-'}`).join('<br>') || '-';
+        const recoverable = (ops.recoverable_examples || []).map(t => `${t.id || '-'}: ${t.status || '-'}`).join('<br>') || '-';
+        opsBox.innerHTML = [
+          `Worker uygun aktif: ${ops.worker_eligible_active_count ?? '-'}`,
+          `Bloklu aktif: ${ops.blocked_active_count ?? '-'}`,
+          `Toparlanabilir: ${ops.recoverable_task_count ?? '-'}`,
+          `Uyuyan worker: ${ops.workers_sleeping_count ?? '-'}`,
+          `Uyku nedeni: ${ops.worker_sleep_reason || '-'}`,
+          `Dispatcher: ${dispatcher.last_result || '-'}`,
+          `Son child: ${dispatcher.last_child || '-'}`,
+          `Deploy state: ${ops.deploy_reconciliation || '-'}`
+        ].map(badge).join(' ');
+        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Blok örnekleri</div><div>${blocked}</div>`;
+        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Toparlanabilir örnekler</div><div>${recoverable}</div>`;
         const s = data.dashboard_settings?.production || {};
         settingsBadges.innerHTML = Object.entries({
           'Otomatik production': s.automatic_production_enabled,
