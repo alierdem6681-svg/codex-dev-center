@@ -159,6 +159,40 @@ class ProgressAwareRunnerTest(unittest.TestCase):
         self.assertEqual(result["returncode"], 0)
         self.assertGreaterEqual(result["meaningful_event_count"], 1)
 
+    def test_git_diff_change_counts_as_meaningful_progress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocesses = [
+                ["git", "init"],
+                ["git", "config", "user.email", "test@example.invalid"],
+                ["git", "config", "user.name", "Test User"],
+            ]
+            import subprocess
+
+            for cmd in subprocesses:
+                subprocess.run(cmd, cwd=str(root), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            (root / "tracked.txt").write_text("before\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=str(root), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=str(root), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            out = root / "out.txt"
+            err = root / "err.txt"
+            result = progress_aware_runner.run_progress_aware(
+                ["bash", "-lc", "sleep 0.3; printf after >> tracked.txt; sleep 0.3"],
+                cwd=root,
+                stdout_path=out,
+                stderr_path=err,
+                progress_paths=[],
+                git_roots=[root],
+                stall_seconds=1,
+                grace_seconds=0,
+                poll_seconds=0.1,
+                max_wall_seconds=5,
+            )
+
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertGreaterEqual(result["meaningful_event_count"], 1)
+
 
 class TelegramAsyncRoutingTest(unittest.TestCase):
     def test_direct_cto_async_job_has_progress_paths(self):

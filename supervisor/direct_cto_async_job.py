@@ -254,6 +254,7 @@ def run_job(job_id):
                 STATE / "production_runtime_status.json",
                 STATE / "github_actions_status.json",
             ],
+            git_roots=[APP],
             progress_state_path=progress_state,
             stall_seconds=ASYNC_STALL_SECONDS,
             grace_seconds=ASYNC_GRACE_SECONDS,

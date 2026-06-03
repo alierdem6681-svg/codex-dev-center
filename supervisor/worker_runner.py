@@ -422,6 +422,7 @@ Bu workspace içinde şu dosyaları oluştur:
         stdout_path=out_file,
         stderr_path=err_file,
         progress_paths=[workspace],
+        git_roots=[APP_DIR],
         progress_state_path=progress_state,
         stall_seconds=WORKER_STALL_SECONDS,
         grace_seconds=WORKER_GRACE_SECONDS,
