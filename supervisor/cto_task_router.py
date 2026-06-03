@@ -10,6 +10,7 @@ from typing import Any
 
 try:
     from .critical_operation_policy import critical_operation_findings
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
@@ -27,6 +28,7 @@ try:
     )
 except ImportError:
     from critical_operation_policy import critical_operation_findings
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
@@ -161,11 +163,12 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
 
 def normalize_queue(root: Path, fix: bool = False) -> dict[str, Any]:
     path = queue_path(root)
-    payload = read_json(path, {"tasks": []})
-    normalized, changes = normalize_queue_payload(payload)
-    if fix and changes:
-        atomic_write_json(path, normalized)
-        append_audit(root, "queue_normalized", {"changes": len(changes)})
+    with state_file_lock(path):
+        payload = read_json(path, {"tasks": []})
+        normalized, changes = normalize_queue_payload(payload)
+        if fix and changes:
+            atomic_write_json(path, normalized)
+            append_audit(root, "queue_normalized", {"changes": len(changes)})
     return {
         "ok": True,
         "changes": changes,
@@ -189,9 +192,6 @@ def submit_task(
     state_dir.mkdir(parents=True, exist_ok=True)
 
     qpath = queue_path(root)
-    queue = read_json(qpath, {"tasks": []})
-    tasks = queue.setdefault("tasks", [])
-
     source = str(source or "local").strip().lower()
     effective_risk = classify_risk(f"{title}\n{message}", risk)
     stored_message = redact_sensitive_text(message)
@@ -200,37 +200,41 @@ def submit_task(
     if effective_risk in {"high", "critical"}:
         worker_eligible = False
 
-    parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
-    parent = {
-        "id": next_id("CTO-TASK", title),
-        "title": title,
-        "description": stored_message,
-        "raw_message": stored_message,
-        "source": source,
-        "priority": priority,
-        "status": parent_status,
-        "risk": effective_risk,
-        "risk_level": effective_risk,
-        "assigned_worker": None,
-        "worker_eligible": worker_eligible,
-        "requested_by": requested_by,
-        "created_at": utc_now(),
-        "updated_at": utc_now(),
-        "repo_applied": False,
-        "staging_deployed": False,
-        "production_deployed": False,
-        "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
-    }
-    if worker_eligible:
-        parent["assigned_worker"] = choose_worker(len(tasks))
-    tasks.append(parent)
+    with state_file_lock(qpath):
+        queue = read_json(qpath, {"tasks": []})
+        tasks = queue.setdefault("tasks", [])
 
-    should_create_subtasks = should_split(message) if split is None else split
-    created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
-    tasks.extend(created_subtasks)
+        parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
+        parent = {
+            "id": next_id("CTO-TASK", title),
+            "title": title,
+            "description": stored_message,
+            "raw_message": stored_message,
+            "source": source,
+            "priority": priority,
+            "status": parent_status,
+            "risk": effective_risk,
+            "risk_level": effective_risk,
+            "assigned_worker": None,
+            "worker_eligible": worker_eligible,
+            "requested_by": requested_by,
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
+            "repo_applied": False,
+            "staging_deployed": False,
+            "production_deployed": False,
+            "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
+        }
+        if worker_eligible:
+            parent["assigned_worker"] = choose_worker(len(tasks))
+        tasks.append(parent)
 
-    normalized, changes = normalize_queue_payload(queue)
-    atomic_write_json(qpath, normalized)
+        should_create_subtasks = should_split(message) if split is None else split
+        created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+        tasks.extend(created_subtasks)
+
+        normalized, changes = normalize_queue_payload(queue)
+        atomic_write_json(qpath, normalized)
 
     state = read_json(router_state_path(root), {})
     state.update(
@@ -264,19 +268,20 @@ def submit_task(
 
 def mark_task_status(root: Path, task_id: str, status: str, result: str = "") -> dict[str, Any]:
     qpath = queue_path(root)
-    queue = read_json(qpath, {"tasks": []})
-    found = None
-    for task in queue.get("tasks", []):
-        if task.get("id") == task_id:
-            task["status"] = status
-            task["result"] = result
-            task["updated_at"] = utc_now()
-            found = task
-            break
-    if not found:
-        return {"ok": False, "error": "task_not_found", "task_id": task_id}
-    normalized, changes = normalize_queue_payload(queue)
-    atomic_write_json(qpath, normalized)
+    with state_file_lock(qpath):
+        queue = read_json(qpath, {"tasks": []})
+        found = None
+        for task in queue.get("tasks", []):
+            if task.get("id") == task_id:
+                task["status"] = status
+                task["result"] = result
+                task["updated_at"] = utc_now()
+                found = task
+                break
+        if not found:
+            return {"ok": False, "error": "task_not_found", "task_id": task_id}
+        normalized, changes = normalize_queue_payload(queue)
+        atomic_write_json(qpath, normalized)
     append_audit(root, "cto_task_status", {"task_id": task_id, "status": status, "result": result})
     return {"ok": True, "task": found, "normalization_changes": changes}
 

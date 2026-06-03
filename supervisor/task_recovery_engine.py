@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
@@ -19,6 +20,7 @@ try:
         worker_block_reason,
     )
 except ImportError:
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
@@ -170,132 +172,134 @@ def main():
     wpath = STATE / "workers.json"
     spath = STATE / "system_state.json"
 
-    queue = load_json(qpath, {"tasks": []})
-    queue, _changes = normalize_queue_payload(queue)
-    workers = load_json(wpath, {"workers": []})
-    state = load_json(spath, {})
-
-    tasks = queue.setdefault("tasks", [])
-    existing = {t.get("id") for t in tasks}
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-
     recovered = 0
     stale = 0
     retry_created = 0
     details = []
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
-    for task in list(tasks):
-        tid = str(task.get("id", ""))
+    with state_file_lock(qpath):
+        queue = load_json(qpath, {"tasks": []})
+        queue, _changes = normalize_queue_payload(queue)
+        tasks = queue.setdefault("tasks", [])
+        existing = {t.get("id") for t in tasks}
 
-        status = normalize_status(task.get("status", ""))
-        if status not in RECOVERABLE_OUTPUT_STATUSES:
-            continue
-        if worker_block_reason(task):
-            continue
-        if task.get("parent_task") and str(task.get("source", "")).startswith("cto_"):
-            continue
-        worker = task.get("assigned_worker")
-        title = task.get("title") or tid
+        for task in list(tasks):
+            tid = str(task.get("id", ""))
 
-        workspace = task.get("workspace") or ""
-        if not workspace:
-            found = find_workspace(tid, worker)
-            workspace = str(found) if found else ""
+            status = normalize_status(task.get("status", ""))
+            if status not in RECOVERABLE_OUTPUT_STATUSES:
+                continue
+            if worker_block_reason(task):
+                continue
+            if task.get("parent_task") and str(task.get("source", "")).startswith("cto_"):
+                continue
+            worker = task.get("assigned_worker")
+            title = task.get("title") or tid
 
-        files = created_files(workspace)
-        active = task_has_process(tid)
+            workspace = task.get("workspace") or ""
+            if not workspace:
+                found = find_workspace(tid, worker)
+                workspace = str(found) if found else ""
 
-        if len(files) >= 4:
-            task["status"] = TASK_STATUS_READY_FOR_VALIDATION
-            task["result"] = "worker_output_ready_for_validation_not_done"
-            task["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
-            task["workspace"] = workspace
-            task["validation_status"] = "PENDING"
-            task["pipeline_status"] = "NOT_RUN"
-            task["repo_applied"] = False
-            task["staging_deployed"] = False
-            task["production_deployed"] = False
-            task["updated_at"] = now()
-            recovered += 1
-            details.append(f"{tid}|READY_FOR_VALIDATION|files={len(files)}")
-            continue
+            files = created_files(workspace)
+            active = task_has_process(tid)
 
-        if 0 < len(files) < 4:
-            task["status"] = TASK_STATUS_PROPOSAL_READY
-            task["result"] = "partial_worker_proposal_ready_for_cto_review"
-            task["delivery_level"] = TASK_STATUS_PROPOSAL_READY
-            task["workspace"] = workspace
-            task["validation_status"] = "NOT_READY"
-            task["pipeline_status"] = "NOT_RUN"
-            task["repo_applied"] = False
-            task["staging_deployed"] = False
-            task["production_deployed"] = False
-            task["updated_at"] = now()
-            recovered += 1
-            details.append(f"{tid}|PROPOSAL_READY|files={len(files)}")
-            continue
+            if len(files) >= 4:
+                task["status"] = TASK_STATUS_READY_FOR_VALIDATION
+                task["result"] = "worker_output_ready_for_validation_not_done"
+                task["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
+                task["workspace"] = workspace
+                task["validation_status"] = "PENDING"
+                task["pipeline_status"] = "NOT_RUN"
+                task["repo_applied"] = False
+                task["staging_deployed"] = False
+                task["production_deployed"] = False
+                task["updated_at"] = now()
+                recovered += 1
+                details.append(f"{tid}|READY_FOR_VALIDATION|files={len(files)}")
+                continue
 
-        if status in ["RUNNING", "ASSIGNED"] and not active:
-            task["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
-            task["result"] = "stale_without_active_codex_process"
-            task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
-            task["repo_applied"] = False
-            task["staging_deployed"] = False
-            task["production_deployed"] = False
-            task["updated_at"] = now()
-            stale += 1
-            status = TASK_STATUS_FAILED_NO_PROPOSAL
-            details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
+            if 0 < len(files) < 4:
+                task["status"] = TASK_STATUS_PROPOSAL_READY
+                task["result"] = "partial_worker_proposal_ready_for_cto_review"
+                task["delivery_level"] = TASK_STATUS_PROPOSAL_READY
+                task["workspace"] = workspace
+                task["validation_status"] = "NOT_READY"
+                task["pipeline_status"] = "NOT_RUN"
+                task["repo_applied"] = False
+                task["staging_deployed"] = False
+                task["production_deployed"] = False
+                task["updated_at"] = now()
+                recovered += 1
+                details.append(f"{tid}|PROPOSAL_READY|files={len(files)}")
+                continue
 
-        if status in RECOVERABLE_FAILURE_STATUSES:
-            reason = classify_failure(workspace, task.get("codex_return_code"))
-            task["failure_class"] = reason
-            if reason == "timeout_empty_output":
-                task["status"] = TASK_STATUS_FAILED_TIMEOUT
-                task["delivery_level"] = TASK_STATUS_FAILED_TIMEOUT
-            else:
+            if status in ["RUNNING", "ASSIGNED"] and not active:
+                task["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
+                task["result"] = "stale_without_active_codex_process"
                 task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
-            task["repo_applied"] = False
-            task["staging_deployed"] = False
-            task["production_deployed"] = False
+                task["repo_applied"] = False
+                task["staging_deployed"] = False
+                task["production_deployed"] = False
+                task["updated_at"] = now()
+                stale += 1
+                status = TASK_STATUS_FAILED_NO_PROPOSAL
+                details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
 
-            retries = int(task.get("recovery_retry_count", 0) or 0)
-            if retries < 2 and retry_created < 1:
-                retry_id = f"RECOVERY-{run_id}-{safe_id(tid)}-R{retries + 1}"
-                if retry_id not in existing:
-                    retry_worker = choose_worker(title)
-                    tasks.append({
-                        "id": retry_id,
-                        "title": "Recovery: " + str(title)[:80],
-                        "description": retry_description(task, reason),
-                        "source": "cto_recovery_engine",
-                        "parent_task": tid,
-                        "status": TASK_STATUS_PENDING,
-                        "risk": "medium",
-                        "assigned_worker": retry_worker,
-                        "created_at": now(),
-                        "updated_at": now(),
-                        "delivery_level": "BACKLOG",
-                        "repo_applied": False,
-                        "staging_deployed": False,
-                        "production_deployed": False,
-                        "failure_class": reason,
-                    })
-                    existing.add(retry_id)
-                    task["recovery_retry_count"] = retries + 1
-                    task["recovery_retry_task"] = retry_id
-                    retry_created += 1
-                    details.append(f"{tid}|RETRY_CREATED|{retry_id}|reason={reason}")
+            if status in RECOVERABLE_FAILURE_STATUSES:
+                reason = classify_failure(workspace, task.get("codex_return_code"))
+                task["failure_class"] = reason
+                if reason == "timeout_empty_output":
+                    task["status"] = TASK_STATUS_FAILED_TIMEOUT
+                    task["delivery_level"] = TASK_STATUS_FAILED_TIMEOUT
+                else:
+                    task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
+                task["repo_applied"] = False
+                task["staging_deployed"] = False
+                task["production_deployed"] = False
 
-    for w in workers.get("workers", []):
-        if w.get("status") in ["IDLE", "SLEEPING"] and w.get("current_task"):
-            w["current_task"] = None
-            w["note"] = "recovery_engine_cleanup"
-            w["last_seen"] = now()
+                retries = int(task.get("recovery_retry_count", 0) or 0)
+                if retries < 2 and retry_created < 1:
+                    retry_id = f"RECOVERY-{run_id}-{safe_id(tid)}-R{retries + 1}"
+                    if retry_id not in existing:
+                        retry_worker = choose_worker(title)
+                        tasks.append({
+                            "id": retry_id,
+                            "title": "Recovery: " + str(title)[:80],
+                            "description": retry_description(task, reason),
+                            "source": "cto_recovery_engine",
+                            "parent_task": tid,
+                            "status": TASK_STATUS_PENDING,
+                            "risk": "medium",
+                            "assigned_worker": retry_worker,
+                            "created_at": now(),
+                            "updated_at": now(),
+                            "delivery_level": "BACKLOG",
+                            "repo_applied": False,
+                            "staging_deployed": False,
+                            "production_deployed": False,
+                            "failure_class": reason,
+                        })
+                        existing.add(retry_id)
+                        task["recovery_retry_count"] = retries + 1
+                        task["recovery_retry_task"] = retry_id
+                        retry_created += 1
+                        details.append(f"{tid}|RETRY_CREATED|{retry_id}|reason={reason}")
 
-    queue["updated_at"] = now()
-    save_json(qpath, queue)
-    save_json(wpath, workers)
+        queue["updated_at"] = now()
+        save_json(qpath, queue)
+
+    with state_file_lock(wpath):
+        workers = load_json(wpath, {"workers": []})
+        for w in workers.get("workers", []):
+            if w.get("status") in ["IDLE", "SLEEPING"] and w.get("current_task"):
+                w["current_task"] = None
+                w["note"] = "recovery_engine_cleanup"
+                w["last_seen"] = now()
+        save_json(wpath, workers)
+
+    state = load_json(spath, {})
 
     state.update({
         "phase": "step_23a_task_recovery_engine_active",

@@ -147,6 +147,109 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(payload["tasks"][0]["result"], "worker_service_restarted_before_completion")
         self.assertEqual(payload["tasks"][1]["status"], "RUNNING")
 
+    def test_worker_does_not_claim_second_task_while_already_running_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-RUNNING",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            },
+                            {
+                                "id": "TASK-NEXT",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                claimed = worker_runner.claim_task("worker-1")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(claimed)
+        self.assertEqual(payload["tasks"][0]["status"], "RUNNING")
+        self.assertEqual(payload["tasks"][1]["status"], "PENDING")
+
+    def test_late_progress_update_does_not_reopen_finished_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            queue_path = state / "task_queue.json"
+            workers_path = state / "workers.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-DONE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            workers_path.write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {
+                                "id": "worker-1",
+                                "status": "RUNNING",
+                                "current_task": "TASK-DONE",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            originals = (worker_runner.QUEUE_PATH, worker_runner.WORKERS_PATH)
+            worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
+            try:
+                worker_runner.finish_task(
+                    "TASK-DONE",
+                    "worker-1",
+                    TASK_STATUS_READY_FOR_VALIDATION,
+                    "worker_output_ready_for_validation",
+                )
+                worker_runner.update_task_progress(
+                    "TASK-DONE",
+                    "worker-1",
+                    {
+                        "status": "RUNNING",
+                        "updated_at": "2026-06-03T10:00:00+00:00",
+                        "elapsed_seconds": 1,
+                        "meaningful_event_count": 1,
+                    },
+                )
+            finally:
+                worker_runner.QUEUE_PATH, worker_runner.WORKERS_PATH = originals
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            workers = json.loads(workers_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertNotIn("progress_watchdog", queue["tasks"][0])
+        self.assertEqual(workers["workers"][0]["status"], "IDLE")
+        self.assertIsNone(workers["workers"][0]["current_task"])
+
 
 class ProgressAwareRunnerTest(unittest.TestCase):
     def test_output_noise_without_meaningful_progress_stalls(self):
