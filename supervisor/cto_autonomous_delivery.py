@@ -179,7 +179,18 @@ def safe_slug(text: Any, limit: int = 56) -> str:
 def choose_worker(queue: dict[str, Any]) -> str:
     workers = ["worker-1", "worker-2", "worker-3", "worker-4"]
     tasks = queue.get("tasks", [])
-    return workers[len(tasks) % len(workers)]
+    active_counts = {worker: 0 for worker in workers}
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        if not is_worker_eligible_task(task):
+            continue
+        if normalize_status(task.get("status")) not in ACTIVE_TASK_STATUSES:
+            continue
+        worker_id = task.get("assigned_worker")
+        if worker_id in active_counts:
+            active_counts[worker_id] += 1
+    return min(workers, key=lambda worker: (active_counts[worker], workers.index(worker)))
 
 
 def task_flag(task: dict[str, Any], key: str) -> bool:
