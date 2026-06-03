@@ -198,6 +198,44 @@ def task_flag(task: dict[str, Any], key: str) -> bool:
     return value is True or str(value).strip().lower() in {"1", "true", "yes"}
 
 
+def gate_status(value: Any) -> str:
+    return str(value or "").strip().upper()
+
+
+def gate_pass(value: Any) -> bool:
+    return gate_status(value) == "PASS"
+
+
+def active_approval_required_payload(task: dict[str, Any]) -> dict[str, Any]:
+    status = normalize_status(task.get("status"))
+    raw_findings = task.get("critical_operation_findings") or []
+    if isinstance(raw_findings, list):
+        findings = [str(item) for item in raw_findings]
+    else:
+        findings = [str(raw_findings)]
+    active = bool(
+        task_flag(task, "approval_required")
+        or status == TASK_STATUS_APPROVAL_REQUIRED
+        or gate_status(task.get("validation_status")) == "APPROVAL_REQUIRED"
+    )
+    return {
+        "approval_required": active,
+        "critical_operation_findings": sorted(set(findings)) if active else [],
+        "status": "APPROVAL_REQUIRED" if active else "ALLOWED_WITH_GATES",
+        "source": "structured_task_state",
+    }
+
+
+def deploy_gate_repo_applied(task: dict[str, Any]) -> bool:
+    delivery_level = str(task.get("delivery_level") or "").upper()
+    return bool(
+        task.get("repo_applied")
+        or task.get("branch_merged")
+        or task.get("merged_commit")
+        or delivery_level in {"READY_FOR_DEPLOY", "MERGED", "DEPLOYED"}
+    )
+
+
 def backlog_candidate_reason(task: dict[str, Any]) -> str:
     status = normalize_status(task.get("status"))
     if task_flag(task, "production_deployed"):
@@ -392,15 +430,18 @@ def delivery_status() -> dict[str, Any]:
 
 
 def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
-    critical = approval_required_payload(task_text(task))
     status = normalize_status(task.get("status"))
     deployable_statuses = {TASK_STATUS_DONE, TASK_STATUS_DEPLOYED}
-    delivery_level = str(task.get("delivery_level") or "").upper()
-    repo_applied = bool(
-        task.get("repo_applied")
-        or task.get("branch_merged")
-        or task.get("merged_commit")
-        or delivery_level in {"READY_FOR_DEPLOY", "MERGED", "DEPLOYED"}
+    critical = active_approval_required_payload(task)
+    repo_applied = deploy_gate_repo_applied(task)
+    validation_pass = gate_pass(task.get("validation_status"))
+    pipeline_pass = gate_pass(task.get("pipeline_status"))
+    ready_for_deploy_gate = (
+        status in deployable_statuses
+        and repo_applied
+        and validation_pass
+        and pipeline_pass
+        and not critical["approval_required"]
     )
     return {
         "task_id": task.get("id"),
@@ -409,9 +450,13 @@ def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
         "assigned_worker": task.get("assigned_worker"),
         "worker_eligible": task.get("worker_eligible"),
         "repo_applied": repo_applied,
+        "validation_status": task.get("validation_status"),
+        "validation_pass": validation_pass,
+        "pipeline_status": task.get("pipeline_status"),
+        "pipeline_pass": pipeline_pass,
         "delivery_level": task.get("delivery_level"),
         "critical": critical,
-        "ready_for_deploy_gate": status in deployable_statuses and repo_applied and not critical["approval_required"],
+        "ready_for_deploy_gate": ready_for_deploy_gate,
         "production_deployed": bool(task.get("production_deployed") or status == TASK_STATUS_DEPLOYED),
     }
 
@@ -557,6 +602,18 @@ def mark_task_merged(task_id: str, commit: str = "") -> dict[str, Any]:
     return {"ok": True, "task_id": task_id, "delivery_level": "READY_FOR_DEPLOY", "merged_commit": commit}
 
 
+def mark_task_deploy_retry(task_id: str, failure_status: str) -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "error": "task_not_found"}
+    task["deployment_status"] = "DEPLOY_RETRY_REQUIRED"
+    task["deploy_retry_required"] = True
+    task["last_deploy_failure_status"] = failure_status
+    task["updated_at"] = now()
+    atomic_write_json(QUEUE, queue)
+    return {"ok": True, "task_id": task_id, "deployment_status": "DEPLOY_RETRY_REQUIRED"}
+
+
 def set_task_approval_required(task_id: str, findings: list[str]) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
@@ -589,8 +646,7 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
         return {"ok": False, "status": "TASK_NOT_FOUND", "task_id": task_id}
     evaluation = evaluate_task(task)
     if evaluation["critical"]["approval_required"]:
-        marked = set_task_approval_required(task_id, evaluation["critical"]["critical_operation_findings"]) if execute else {}
-        return {"ok": False, "status": "APPROVAL_REQUIRED", "evaluation": evaluation, "marked": marked}
+        return {"ok": False, "status": "APPROVAL_REQUIRED", "evaluation": evaluation}
     if cfg["production_deploy_requires_user_approval_for_normal_app_changes"]:
         return {"ok": False, "status": "POLICY_REQUIRES_USER_APPROVAL", "evaluation": evaluation}
     if not cfg["production_deploy_allowed_when_all_gates_pass"]:
@@ -603,14 +659,19 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
         return {"ok": False, "status": "GATES_NOT_PASS", "evaluation": evaluation, "readiness": readiness}
     if not execute:
         return {"ok": True, "status": "DRY_RUN_GATES_PASS_DEPLOY_ALLOWED", "evaluation": evaluation, "readiness": readiness}
+    if not smoke:
+        marked = mark_task_deploy_retry(task_id, "SMOKE_REQUIRED_FOR_DEPLOYED")
+        return {"ok": False, "status": "SMOKE_REQUIRED_FOR_DEPLOYED", "evaluation": evaluation, "readiness": readiness, "marked": marked}
 
     deploy = dispatch_workflow(DEPLOY_WORKFLOW, wait=wait)
     if not deploy["ok"]:
-        return {"ok": False, "status": "DEPLOY_WORKFLOW_FAILED", "evaluation": evaluation, "readiness": readiness, "deploy": deploy}
+        marked = mark_task_deploy_retry(task_id, "DEPLOY_WORKFLOW_FAILED")
+        return {"ok": False, "status": "DEPLOY_WORKFLOW_FAILED", "evaluation": evaluation, "readiness": readiness, "deploy": deploy, "marked": marked}
     smoke_result: dict[str, Any] | None = None
     if smoke:
         smoke_result = dispatch_workflow(SMOKE_WORKFLOW, wait=wait)
         if not smoke_result["ok"]:
+            marked = mark_task_deploy_retry(task_id, "SMOKE_WORKFLOW_FAILED")
             return {
                 "ok": False,
                 "status": "SMOKE_WORKFLOW_FAILED",
@@ -618,6 +679,7 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
                 "readiness": readiness,
                 "deploy": deploy,
                 "smoke": smoke_result,
+                "marked": marked,
             }
     marked = mark_task_deployed(task_id, deploy.get("run", {}), smoke_result.get("run", {}) if smoke_result else None)
     return {"ok": True, "status": "DEPLOYED", "evaluation": evaluation, "readiness": readiness, "deploy": deploy, "smoke": smoke_result, "marked": marked}
@@ -635,7 +697,7 @@ def latest_deploy_candidate() -> str:
 def pr_ready_candidate() -> str:
     queue = load_queue()
     for task in reversed(queue.get("tasks", [])):
-        critical = approval_required_payload(task_text(task))
+        critical = active_approval_required_payload(task)
         if critical["approval_required"]:
             continue
         if bool(task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged")):
@@ -656,10 +718,9 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
         return {"ok": False, "status": "TASK_NOT_FOUND", "task_id": task_id}
-    critical = approval_required_payload(task_text(task))
+    critical = active_approval_required_payload(task)
     if critical["approval_required"]:
-        marked = set_task_approval_required(task_id, critical["critical_operation_findings"]) if execute else {}
-        return {"ok": False, "status": "APPROVAL_REQUIRED", "critical": critical, "marked": marked}
+        return {"ok": False, "status": "APPROVAL_REQUIRED", "critical": critical}
     if str(task.get("delivery_level") or "").upper() != "PR_READY":
         return {"ok": False, "status": "TASK_NOT_PR_READY", "task_id": task_id}
     if str(task.get("validation_status") or "").upper() != "PASS" or str(task.get("pipeline_status") or "").upper() != "PASS":
