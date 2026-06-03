@@ -110,7 +110,7 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "workers.json"
             path.write_text(
-                json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": "TASK-1"}]}),
+                json.dumps({"workers": [{"id": "worker-1", "status": "IDLE", "current_task": "TASK-1"}]}),
                 encoding="utf-8",
             )
             original = lifecycle_manager.WORKERS_PATH
@@ -122,6 +122,24 @@ class BacklogDispatcherModelTest(unittest.TestCase):
             payload = json.loads(path.read_text(encoding="utf-8"))
 
         self.assertIsNone(payload["workers"][0]["current_task"])
+
+    def test_idle_update_does_not_clear_running_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "workers.json"
+            path.write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": "TASK-1"}]}),
+                encoding="utf-8",
+            )
+            original = lifecycle_manager.WORKERS_PATH
+            lifecycle_manager.WORKERS_PATH = path
+            try:
+                lifecycle_manager.update_worker_state("worker-1", "IDLE", "wake_now_test")
+            finally:
+                lifecycle_manager.WORKERS_PATH = original
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["workers"][0]["status"], "RUNNING")
+        self.assertEqual(payload["workers"][0]["current_task"], "TASK-1")
 
 
 class WorkerLifecycleRepairTest(unittest.TestCase):
