@@ -20,6 +20,7 @@
     "dashboard_route_api_test",
     "telegram_bridge_direct_cto_test",
     "deploy_script_command_check",
+    "quality_gate_pipeline_contract",
     "secret_leakage_scan",
     "forbidden_operation_scan",
     "staging_smoke_test",

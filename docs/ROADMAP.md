@@ -141,3 +141,4 @@ Faz 19B-10A Model Policy
 - [x] Production readiness restart simülasyonu non-mutating static contract kanıtına bağlandı.
 - [x] Failure injection simülasyonu JSON hata yakalama, security scan ve critical approval sözleşmelerini doğrular.
 - [x] Simülasyon sözleşmeleri unit test ve state template kayıtlarıyla sabitlendi.
+- [x] Quality gate preflight/test/diff/status pipeline sözleşmesi production readiness kapısına bağlandı.

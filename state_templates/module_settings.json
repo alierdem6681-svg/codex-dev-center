@@ -98,6 +98,8 @@
   "production_readiness": {
     "enabled": true,
     "simulation_contracts_required": true,
+    "quality_gate_pipeline_contract_required": true,
+    "quality_gate_pipeline_contract_mode": "static_non_mutating_contract",
     "restart_simulation_mode": "static_non_mutating_contract",
     "failure_injection_mode": "static_non_mutating_contract"
   },

@@ -391,6 +391,37 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     )
 
 
+def quality_gate_pipeline_contract(results: dict[str, Any]) -> None:
+    contracts = [
+        static_contract(
+            "supervisor/codex_quality_gate.py",
+            [
+                "REQUIRED_FILES",
+                "JSON_FILES",
+                "def preflight(",
+                "def test_suite(",
+                "def diff_report(",
+                "def gate_status(",
+            ],
+        ),
+        static_contract("scripts/codex_preflight.sh", ["supervisor/codex_quality_gate.py preflight"]),
+        static_contract("scripts/codex_test_suite.sh", ["supervisor/codex_quality_gate.py test-suite"]),
+        static_contract("scripts/codex_diff_report.sh", ["supervisor/codex_quality_gate.py diff-report"]),
+        static_contract("scripts/codex_gate_status.sh", ["supervisor/codex_quality_gate.py status"]),
+    ]
+    record(
+        results,
+        "quality_gate_pipeline_contract",
+        all(item["ok"] for item in contracts),
+        {
+            "mode": "static_non_mutating_contract",
+            "contracts": contracts,
+            "production_deploy_performed": False,
+            "mutating_cloud_operations_performed": False,
+        },
+    )
+
+
 def static_contract(rel: str, markers: list[str]) -> dict[str, Any]:
     path = source_path(rel)
     exists = path.exists()
@@ -500,6 +531,7 @@ def run_suite() -> dict[str, Any]:
     dashboard_test(results)
     telegram_test(results)
     deploy_script_checks(results)
+    quality_gate_pipeline_contract(results)
     security_scans(results)
     staging_and_rollback(results)
     chaos_simulations(results)

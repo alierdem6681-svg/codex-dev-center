@@ -254,3 +254,21 @@ Yeni davranış:
 - `restart_simulation` canlı servis restart etmeden service watchdog ve safe rollback sözleşmesini kontrol eder.
 - `failure_injection_simulation` canlı işlem yapmadan JSON hata yakalama, security scan ve critical approval sözleşmesini kontrol eder.
 - Production deploy, secret, IAM, billing, DNS/firewall, database veya Google Ads live mutate yapılmadı.
+
+---
+
+## Quality Gate Pipeline Contract v1
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-164351 / CTO-DISPATCH-20260603-072958-CTO-ACTION-20260601-153520-02-QUALITY-GATE
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` içinde `quality_gate_pipeline_contract` kapısı eklendi.
+- Kapı `codex_quality_gate.py` preflight, test-suite, diff-report ve status yollarının scriptlerle bağlı olduğunu statik doğrular.
+- `tests/test_runtime_status_model.py` bu kapının `static_non_mutating_contract` modunda PASS verdiğini ve production/cloud mutasyonu yapmadığını sabitler.
+- `state_templates/production_readiness_policy.json`, `module_settings.json`, `module_registry.json` ve `action_catalog.json` kayıtları güncellendi.
+
+Yeni davranış:
+- Production readiness suite artık quality gate/test/diff/status pipeline bağlantısı koparsa FAIL olur.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate yapılmadı.

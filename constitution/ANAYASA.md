@@ -40,7 +40,7 @@ Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerin
 
 Workflow manuel çalışır. Confirm alanına tam olarak `DEPLOY-CODEX-VM` yazılmadan deploy ilerlemez. Hedef VM `codex-dev-center-01`, runtime dizini `/opt/codex-dev-center` olmalıdır.
 
-Kalite kapıları ve risk politikaları zorunludur.
+Kalite kapıları ve risk politikaları zorunludur. Quality gate/test/diff/status pipeline sözleşmesi canlı mutasyon yapmadan doğrulanmalıdır.
 
 Kritik istisnalar otomatik yapılamaz:
 

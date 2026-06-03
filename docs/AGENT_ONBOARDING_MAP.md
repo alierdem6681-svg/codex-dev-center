@@ -83,6 +83,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
 - supervisor/production_readiness_suite.py
+- supervisor/production_readiness_suite.py içindeki `quality_gate_pipeline_contract` kapısı
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py

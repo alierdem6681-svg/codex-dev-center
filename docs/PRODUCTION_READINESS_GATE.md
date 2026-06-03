@@ -14,6 +14,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Queue / recovery test PASS
 - Dashboard route/API test PASS
 - Telegram bridge/direct CTO test PASS
+- Quality gate pipeline contract PASS
 - Secret leakage scan PASS
 - Forbidden operation scan PASS
 - Ön canlı smoke test PASS
@@ -25,6 +26,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 
 Restart ve failure injection kapıları canlı servis, cloud veya production deploy çalıştırmadan doğrulanır.
 
+- `quality_gate_pipeline_contract` preflight, test-suite, diff-report ve status yollarının `codex_quality_gate.py` ile bağlı olduğunu statik olarak doğrular.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.

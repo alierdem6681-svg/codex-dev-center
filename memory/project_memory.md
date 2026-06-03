@@ -123,3 +123,9 @@ Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
 Production readiness suite icindeki restart ve failure injection simülasyonları non-mutating static contract kanıtına bağlandı. `restart_simulation` artık service watchdog restart yolu ve safe rollback sözleşmesini, `failure_injection_simulation` ise JSON hata yakalama, security scan ve critical approval sözleşmesini repo dosyaları üzerinden doğrular.
 
 Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı. Davranış `tests/test_runtime_status_model.py` içindeki unit test ile sabitlendi.
+
+## 2026-06-03 Quality Gate Pipeline Contract v1
+
+Production readiness suite'e `quality_gate_pipeline_contract` kapısı eklendi. Kapı `codex_quality_gate.py` preflight, test-suite, diff-report ve status yollarının shell scriptlerle bağlı olduğunu `static_non_mutating_contract` modunda doğrular.
+
+Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı. Davranış unit test ve state template kayıtlarıyla sabitlendi.

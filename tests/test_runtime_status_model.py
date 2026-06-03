@@ -156,6 +156,18 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(contracts[group]["contracts"])
             self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
+    def test_quality_gate_pipeline_contract_is_static_and_non_mutating(self):
+        results = {}
+
+        production_readiness_suite.quality_gate_pipeline_contract(results)
+
+        gate = results["quality_gate_pipeline_contract"]
+        self.assertEqual(gate["status"], "PASS")
+        self.assertEqual(gate["details"]["mode"], "static_non_mutating_contract")
+        self.assertTrue(all(item["ok"] for item in gate["details"]["contracts"]))
+        self.assertFalse(gate["details"]["production_deploy_performed"])
+        self.assertFalse(gate["details"]["mutating_cloud_operations_performed"])
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
