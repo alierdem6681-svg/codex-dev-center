@@ -9,9 +9,19 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
-    from .task_status_constants import normalize_queue_payload, normalize_status
+    from .task_status_constants import (
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_READY_FOR_VALIDATION,
+        normalize_queue_payload,
+        normalize_status,
+    )
 except ImportError:
-    from task_status_constants import normalize_queue_payload, normalize_status
+    from task_status_constants import (
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_READY_FOR_VALIDATION,
+        normalize_queue_payload,
+        normalize_status,
+    )
 
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
@@ -119,7 +129,7 @@ def main():
     latest_key = sorted(keys)[-1] if keys else None
     current = [t for t in action_tasks if run_key(t.get("id")) == latest_key] if latest_key else action_tasks[-10:]
 
-    proposal_done = 0
+    ready_for_validation = 0
     failed_no_proposal = 0
     running = 0
     details = []
@@ -139,37 +149,41 @@ def main():
         status = normalize_status(t.get("status"))
 
         if created >= 4:
-            t["status"] = "PROPOSAL_DONE"
-            t["result"] = "proposal_done_not_applied_not_production"
-            t["delivery_level"] = "PROPOSAL_DONE"
+            t["status"] = TASK_STATUS_READY_FOR_VALIDATION
+            t["result"] = "worker_output_ready_for_validation_not_done"
+            t["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
+            t["validation_status"] = "PENDING"
+            t["pipeline_status"] = "NOT_RUN"
             t["repo_applied"] = False
             t["staging_deployed"] = False
             t["production_deployed"] = False
             t["workspace"] = ws
             t["updated_at"] = now()
-            proposal_done += 1
+            ready_for_validation += 1
 
-            report_path = REPORTS / f"{tid}_{worker}_PROPOSAL_DONE_REPORT.md"
+            report_path = REPORTS / f"{tid}_{worker}_READY_FOR_VALIDATION_REPORT.md"
             report_path.write_text(
-                "ACTION TASK PROPOSAL DONE REPORT\n\n"
+                "ACTION TASK READY FOR VALIDATION REPORT\n\n"
                 f"Task: {tid}\n"
                 f"Worker: {worker}\n"
                 f"Workspace: {ws}\n"
                 f"Created files: {created}/6\n"
+                "Validation status: PENDING\n"
+                "Pipeline status: NOT_RUN\n"
                 "Repo applied: false\n"
                 "Staging deployed: false\n"
                 "Production deployed: false\n",
                 encoding="utf-8"
             )
             t["report_path"] = str(report_path)
-            details.append(f"{tid}: PROPOSAL_DONE ({created}/6)")
+            details.append(f"{tid}: READY_FOR_VALIDATION ({created}/6)")
         elif status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
             running += 1
             details.append(f"{tid}: {status} ({created}/6)")
         else:
-            t["status"] = "FAILED_NO_PROPOSAL"
+            t["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
             t["result"] = "failed_no_proposal_output"
-            t["delivery_level"] = "FAILED_NO_PROPOSAL"
+            t["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
             t["repo_applied"] = False
             t["staging_deployed"] = False
             t["production_deployed"] = False
@@ -197,7 +211,7 @@ def main():
         "phase": "step_22b_action_result_watcher_active",
         "action_result_watcher_active": True,
         "latest_action_run": latest_key,
-        "latest_action_proposal_done": proposal_done,
+        "latest_action_ready_for_validation": ready_for_validation,
         "latest_action_failed_no_proposal": failed_no_proposal,
         "latest_action_running": running,
         "production_deployed": False,
@@ -213,7 +227,7 @@ def main():
     report.write_text(
         "STEP 22B ACTION WATCHER REPORT\n\n"
         f"Run: {latest_key}\n"
-        f"Proposal done: {proposal_done}\n"
+        f"Ready for validation: {ready_for_validation}\n"
         f"Failed no proposal: {failed_no_proposal}\n"
         f"Running: {running}\n"
         "Production deployed: false\n\n"
@@ -224,13 +238,13 @@ def main():
     # Tekrar tekrar spam atmasın.
     notify_marker = STATE / "action_watcher_last_notified.txt"
     previous = notify_marker.read_text().strip() if notify_marker.exists() else ""
-    signature = f"{latest_key}|{proposal_done}|{failed_no_proposal}|{running}"
+    signature = f"{latest_key}|{ready_for_validation}|{failed_no_proposal}|{running}"
 
     if running == 0 and previous != signature:
         text = (
             "CTO Action görev özeti:\n\n"
             f"Run: {latest_key}\n"
-            f"Proposal tamamlanan: {proposal_done}\n"
+            f"Doğrulama bekleyen: {ready_for_validation}\n"
             f"Proposal üretemeyen: {failed_no_proposal}\n"
             f"Devam eden: {running}\n\n"
             "Production yapılmadı.\n"
@@ -241,11 +255,11 @@ def main():
         notify_marker.write_text(signature)
 
     with (LOGS / "action_result_watcher.log").open("a", encoding="utf-8") as f:
-        f.write(now() + f" run={latest_key} proposal_done={proposal_done} failed={failed_no_proposal} running={running}\n")
+        f.write(now() + f" run={latest_key} ready_for_validation={ready_for_validation} failed={failed_no_proposal} running={running}\n")
 
     print("WATCHER=OK")
     print("RUN=" + str(latest_key))
-    print("PROPOSAL_DONE=" + str(proposal_done))
+    print("READY_FOR_VALIDATION=" + str(ready_for_validation))
     print("FAILED_NO_PROPOSAL=" + str(failed_no_proposal))
     print("RUNNING=" + str(running))
     return 0

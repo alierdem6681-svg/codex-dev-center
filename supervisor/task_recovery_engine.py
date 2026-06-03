@@ -7,19 +7,29 @@ try:
     from .task_status_constants import (
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
         TASK_STATUS_PENDING,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_READY_FOR_VALIDATION,
         normalize_queue_payload,
         normalize_status,
+        worker_block_reason,
     )
 except ImportError:
     from task_status_constants import (
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
         TASK_STATUS_PENDING,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_READY_FOR_VALIDATION,
         normalize_queue_payload,
         normalize_status,
+        worker_block_reason,
     )
 
 APP = Path("/opt/codex-dev-center")
@@ -36,7 +46,19 @@ EXPECTED = [
     "WORKER_SUMMARY.md",
 ]
 
-PREFIXES = ("CTO-ACTION-", "CTO-AUTO-", "CTO-P0R", "CTO-P1", "RECOVERY-")
+RECOVERABLE_FAILURE_STATUSES = {
+    TASK_STATUS_FAILED,
+    TASK_STATUS_FAILED_NO_PROPOSAL,
+    TASK_STATUS_FAILED_RETRYABLE,
+    TASK_STATUS_FAILED_TIMEOUT,
+}
+RECOVERABLE_OUTPUT_STATUSES = RECOVERABLE_FAILURE_STATUSES | {
+    TASK_STATUS_PROPOSAL_DONE,
+    TASK_STATUS_PROPOSAL_READY,
+    TASK_STATUS_READY_FOR_VALIDATION,
+    "RUNNING",
+    "ASSIGNED",
+}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -98,14 +120,16 @@ def tail_text(path, limit=1200):
         pass
     return ""
 
-def classify_failure(workspace):
+def classify_failure(workspace, returncode=None):
     if not workspace:
         return "workspace_missing"
     ws = Path(workspace)
     text = (tail_text(ws / "codex.out") + "\n" + tail_text(ws / "codex.err")).lower()
+    if returncode == 124 and not text.strip():
+        return "timeout_empty_output"
     if not text.strip():
         return "empty_output"
-    if "timeout" in text or "return code: 124" in text:
+    if returncode == 124 or "timeout" in text or "return code: 124" in text:
         return "timeout"
     if "permission denied" in text:
         return "permission_denied"
@@ -159,10 +183,14 @@ def main():
 
     for task in list(tasks):
         tid = str(task.get("id", ""))
-        if not tid.startswith(PREFIXES):
-            continue
 
         status = normalize_status(task.get("status", ""))
+        if status not in RECOVERABLE_OUTPUT_STATUSES:
+            continue
+        if worker_block_reason(task):
+            continue
+        if task.get("parent_task") and str(task.get("source", "")).startswith("cto_"):
+            continue
         worker = task.get("assigned_worker")
         title = task.get("title") or tid
 
@@ -175,16 +203,33 @@ def main():
         active = task_has_process(tid)
 
         if len(files) >= 4:
-            task["status"] = TASK_STATUS_PROPOSAL_DONE
-            task["result"] = "proposal_done_not_applied_not_production"
-            task["delivery_level"] = TASK_STATUS_PROPOSAL_DONE
+            task["status"] = TASK_STATUS_READY_FOR_VALIDATION
+            task["result"] = "worker_output_ready_for_validation_not_done"
+            task["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
             task["workspace"] = workspace
+            task["validation_status"] = "PENDING"
+            task["pipeline_status"] = "NOT_RUN"
             task["repo_applied"] = False
             task["staging_deployed"] = False
             task["production_deployed"] = False
             task["updated_at"] = now()
             recovered += 1
-            details.append(f"{tid}|PROPOSAL_DONE|files={len(files)}")
+            details.append(f"{tid}|READY_FOR_VALIDATION|files={len(files)}")
+            continue
+
+        if 0 < len(files) < 4:
+            task["status"] = TASK_STATUS_PROPOSAL_READY
+            task["result"] = "partial_worker_proposal_ready_for_cto_review"
+            task["delivery_level"] = TASK_STATUS_PROPOSAL_READY
+            task["workspace"] = workspace
+            task["validation_status"] = "NOT_READY"
+            task["pipeline_status"] = "NOT_RUN"
+            task["repo_applied"] = False
+            task["staging_deployed"] = False
+            task["production_deployed"] = False
+            task["updated_at"] = now()
+            recovered += 1
+            details.append(f"{tid}|PROPOSAL_READY|files={len(files)}")
             continue
 
         if status in ["RUNNING", "ASSIGNED"] and not active:
@@ -199,10 +244,14 @@ def main():
             status = TASK_STATUS_FAILED_NO_PROPOSAL
             details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
 
-        if status in [TASK_STATUS_FAILED, TASK_STATUS_FAILED_NO_PROPOSAL]:
-            reason = classify_failure(workspace)
+        if status in RECOVERABLE_FAILURE_STATUSES:
+            reason = classify_failure(workspace, task.get("codex_return_code"))
             task["failure_class"] = reason
-            task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
+            if reason == "timeout_empty_output":
+                task["status"] = TASK_STATUS_FAILED_TIMEOUT
+                task["delivery_level"] = TASK_STATUS_FAILED_TIMEOUT
+            else:
+                task["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
             task["repo_applied"] = False
             task["staging_deployed"] = False
             task["production_deployed"] = False
@@ -249,7 +298,7 @@ def main():
         "phase": "step_23a_task_recovery_engine_active",
         "task_recovery_engine_active": True,
         "task_recovery_last_run": now(),
-        "task_recovery_recovered_to_proposal_done": recovered,
+        "task_recovery_ready_for_validation_or_proposal_ready": recovered,
         "task_recovery_normalized_stale": stale,
         "task_recovery_retry_created": retry_created,
         "production_deployed": False,
@@ -263,7 +312,7 @@ def main():
     report = REPORTS / "STEP_23A_TASK_RECOVERY_ENGINE_LAST_REPORT.md"
     report.write_text(
         "STEP 23A TASK RECOVERY ENGINE REPORT\n\n"
-        f"Recovered to proposal done: {recovered}\n"
+        f"Ready for validation or proposal ready: {recovered}\n"
         f"Stale normalized: {stale}\n"
         f"Retry tasks created: {retry_created}\n"
         "Production deployed: false\n"
@@ -284,7 +333,7 @@ def main():
         pass
 
     print("RECOVERY=OK")
-    print("RECOVERED_TO_PROPOSAL_DONE=" + str(recovered))
+    print("READY_FOR_VALIDATION_OR_PROPOSAL_READY=" + str(recovered))
     print("NORMALIZED_STALE=" + str(stale))
     print("RETRY_CREATED=" + str(retry_created))
     print("PHASE=" + state["phase"])

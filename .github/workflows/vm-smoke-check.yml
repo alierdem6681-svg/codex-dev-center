@@ -38,6 +38,7 @@ jobs:
           set -e
           echo "===== SERVICES ====="
           systemctl is-active codex-panel
+          systemctl is-active codex-direct-cto
           systemctl is-active codex-lifecycle
           systemctl is-active codex-watchdog
           systemctl is-active codex-worker-1 || true

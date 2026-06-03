@@ -168,6 +168,7 @@ def queue_counts():
 
 def local_natural_reply(text):
     lowered = (text or "").lower()
+    compact = " ".join(lowered.split())
     critical = critical_operation_findings(text)
     if critical:
         return (
@@ -176,7 +177,7 @@ def local_natural_reply(text):
             "Kısa özet: secret, token/private key/env, credential rotation, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
         )
 
-    if any(x in lowered for x in ["merhaba", "selam", "sistem durumu", "status", "çalışıyor", "calisiyor"]):
+    if compact in {"cto", "hey cto", "ctom"} or any(x in lowered for x in ["merhaba", "selam", "sistem durumu", "status", "çalışıyor", "calisiyor"]):
         total, counts = queue_counts()
         core = {
             "panel": service_status("codex-panel"),
@@ -196,8 +197,12 @@ def local_natural_reply(text):
         return (
             "Kuyruk özeti:\n"
             f"- Toplam: {total}\n"
+            f"- READY_FOR_VALIDATION: {counts.get('READY_FOR_VALIDATION', 0)}\n"
+            f"- PROPOSAL_READY: {counts.get('PROPOSAL_READY', 0)}\n"
             f"- PROPOSAL_DONE: {counts.get('PROPOSAL_DONE', 0)}\n"
             f"- FAILED_NO_PROPOSAL: {counts.get('FAILED_NO_PROPOSAL', 0)}\n"
+            f"- FAILED_TIMEOUT: {counts.get('FAILED_TIMEOUT', 0)}\n"
+            f"- FAILED_RETRYABLE: {counts.get('FAILED_RETRYABLE', 0)}\n"
             f"- FAILED: {counts.get('FAILED', 0)}\n"
             f"- QUEUED: {counts.get('QUEUED', 0)}\n"
             "Tekli modda en düşük riskli uygun işi seçip worker'a verecek şekilde ilerliyorum."

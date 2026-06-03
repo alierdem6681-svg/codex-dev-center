@@ -33,8 +33,9 @@ except ImportError:
 
 
 CASES = [
+    ("cto_ping", "CTO"),
     ("greeting_status", "Merhaba CTO, sistem çalışıyor mu?"),
-    ("queue_summary", "Kuyruk durumunu özetler misin? PROPOSAL_DONE ve FAILED_NO_PROPOSAL sayıları önemli."),
+    ("queue_summary", "Kuyruk durumunu özetler misin? READY_FOR_VALIDATION, PROPOSAL_READY ve FAILED_TIMEOUT sayıları önemli."),
     ("pipeline_gate", "Pipeline gate sonuçları PASS mı?"),
     ("deploy_when_pass", "Tüm gate'ler PASS ise production'a alabilir misin?"),
     ("dashboard_health", "Dashboard health check kısa özet verir misin?"),

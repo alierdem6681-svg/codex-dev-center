@@ -12,6 +12,11 @@ from typing import Any
 
 try:
     from .task_status_constants import (
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -20,6 +25,11 @@ try:
     )
 except ImportError:
     from task_status_constants import (
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -38,6 +48,15 @@ WORKERS_PATH = STATE_DIR / "workers.json"
 SYSTEM_STATE_PATH = STATE_DIR / "system_state.json"
 
 POLL_SECONDS = 3
+
+EXPECTED_WORKER_FILES = [
+    "PLAN.md",
+    "CHANGE_PROPOSAL.md",
+    "TEST_PLAN.md",
+    "RISK_REVIEW.md",
+    "LIVING_DOCS_CHECKLIST.md",
+    "WORKER_SUMMARY.md",
+]
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -64,6 +83,36 @@ def append_log(path: Path, text: str) -> None:
 
 def safe_excerpt(value: Any, limit: int = 800) -> str:
     return redact_sensitive_text(str(value or "")).strip()[:limit] or "-"
+
+def tail_file(path: Path, limit: int = 4000) -> str:
+    try:
+        if path.exists():
+            return path.read_text(encoding="utf-8", errors="replace")[-limit:]
+    except Exception:
+        return ""
+    return ""
+
+def classify_worker_result(
+    returncode: int,
+    created_files: list[str],
+    raw_output: str,
+    fallback_used: bool,
+) -> tuple[str, str]:
+    has_output = bool(str(raw_output or "").strip())
+    has_expected_set = len(created_files) >= 4
+    has_partial_proposal = bool(created_files) or fallback_used
+
+    if has_expected_set:
+        return TASK_STATUS_READY_FOR_VALIDATION, "worker_output_ready_for_validation"
+    if has_partial_proposal:
+        return TASK_STATUS_PROPOSAL_READY, "worker_proposal_ready_for_cto_review"
+    if returncode == 124 and not has_output:
+        return TASK_STATUS_FAILED_TIMEOUT, "worker_timeout_without_output"
+    if returncode == 124:
+        return TASK_STATUS_FAILED_RETRYABLE, "worker_timeout_without_proposal_files"
+    if returncode != 0:
+        return TASK_STATUS_FAILED_RETRYABLE, "worker_failed_without_proposal_files"
+    return TASK_STATUS_FAILED_NO_PROPOSAL, "worker_completed_without_proposal_files"
 
 def write_fallback_proposal_files(workspace: Path, task: dict[str, Any], worker_id: str, reason: str) -> list[str]:
     task_id = safe_excerpt(task.get("id"), 160)
@@ -212,7 +261,14 @@ def claim_task(worker_id: str) -> dict[str, Any] | None:
 
     return claimed
 
-def finish_task(task_id: str, worker_id: str, status: str, result: str, report_path: str | None = None) -> None:
+def finish_task(
+    task_id: str,
+    worker_id: str,
+    status: str,
+    result: str,
+    report_path: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     for task in queue.get("tasks", []):
         if task.get("id") == task_id:
@@ -222,6 +278,8 @@ def finish_task(task_id: str, worker_id: str, status: str, result: str, report_p
             task["updated_at"] = now()
             if report_path:
                 task["report_path"] = report_path
+            if metadata:
+                task.update(metadata)
             break
 
     queue["updated_at"] = now()
@@ -241,7 +299,7 @@ def finish_task(task_id: str, worker_id: str, status: str, result: str, report_p
     if not found_executor:
         update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {status}")
 
-def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str]:
+def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str, str, dict[str, Any]]:
     import subprocess
     from pathlib import Path
 
@@ -306,32 +364,34 @@ Bu workspace içinde şu dosyaları oluştur:
         prompt
     ]
 
-    with out_file.open("wb") as out, err_file.open("wb") as err:
-        proc = subprocess.run(
-            cmd,
-            cwd="/opt/codex-dev-center",
-            stdin=subprocess.DEVNULL,
-            stdout=out,
-            stderr=err,
-            timeout=210
-        )
+    returncode = 1
+    timed_out_by_python = False
+    try:
+        with out_file.open("wb") as out, err_file.open("wb") as err:
+            proc = subprocess.run(
+                cmd,
+                cwd="/opt/codex-dev-center",
+                stdin=subprocess.DEVNULL,
+                stdout=out,
+                stderr=err,
+                timeout=210
+            )
+            returncode = proc.returncode
+    except subprocess.TimeoutExpired:
+        returncode = 124
+        timed_out_by_python = True
 
-    expected = [
-        "PLAN.md",
-        "CHANGE_PROPOSAL.md",
-        "TEST_PLAN.md",
-        "RISK_REVIEW.md",
-        "LIVING_DOCS_CHECKLIST.md",
-        "WORKER_SUMMARY.md",
-    ]
-    created = [name for name in expected if (workspace / name).exists()]
+    created = [name for name in EXPECTED_WORKER_FILES if (workspace / name).exists()]
+    raw_output = tail_file(out_file) + "\n" + tail_file(err_file)
     fallback_used = False
-    if len(created) < 4:
-        fallback_reason = "codex_timeout_or_incomplete_output" if proc.returncode != 0 else "incomplete_worker_output"
+    if len(created) < 4 and (raw_output.strip() or returncode == 0):
+        fallback_reason = "codex_timeout_or_incomplete_output" if returncode != 0 else "incomplete_worker_output"
         created = write_fallback_proposal_files(workspace, task, worker_id, fallback_reason)
         fallback_used = True
 
-    status = "DONE" if len(created) >= 4 else "FAILED"
+    status, result = classify_worker_result(returncode, created, raw_output, fallback_used)
+    validation_status = "PENDING" if status == TASK_STATUS_READY_FOR_VALIDATION else "NOT_READY"
+    pipeline_status = "NOT_RUN"
 
     report = f"""# WORKER CONTROLLED EXECUTION REPORT
 
@@ -343,24 +403,43 @@ Başlık: {title}
 Risk: {risk}
 
 Sonuç: {status}
-Codex return code: {proc.returncode}
+Result: {result}
+Codex return code: {returncode}
+Timed out by python supervisor: {str(timed_out_by_python).lower()}
 Fallback used: {str(fallback_used).lower()}
 Workspace: {workspace}
+Validation status: {validation_status}
+Pipeline status: {pipeline_status}
 
 Oluşan dosyalar:
 {chr(10).join("- " + x for x in created) if created else "- Yok"}
 
 Not:
 Bu adım ana repo dosyalarını değiştirmedi.
+DONE değildir; validation ve pipeline PASS olmadan production tamamlandı sayılmaz.
 Sadece izole workspace içinde proposal/test/risk/living-docs çıktısı üretti.
 
 Log:
 {task_log}
 """
     report_path.write_text(report, encoding="utf-8")
-    append_log(task_log, f"{now()} WORKER={worker_id} TASK={task_id} CONTROLLED_CODEX_DONE status={status} created={len(created)}")
+    append_log(
+        task_log,
+        f"{now()} WORKER={worker_id} TASK={task_id} CONTROLLED_CODEX_DONE status={status} rc={returncode} created={len(created)} fallback={fallback_used}",
+    )
 
-    return status, str(report_path)
+    metadata = {
+        "workspace": str(workspace),
+        "created_files": created,
+        "codex_return_code": returncode,
+        "fallback_used": fallback_used,
+        "validation_status": validation_status,
+        "pipeline_status": pipeline_status,
+        "delivery_level": status,
+        "production_deployed": False,
+        "repo_applied": False,
+    }
+    return status, result, str(report_path), metadata
 
 def run_worker(worker_id: str) -> None:
     log_file = LOG_DIR / f"{worker_id}.service.log"
@@ -380,8 +459,8 @@ def run_worker(worker_id: str) -> None:
             update_worker(worker_id, "RUNNING", task_id, "processing")
             append_log(log_file, f"{now()} {worker_id} claimed {task_id}")
 
-            status, report_path = execute_safe_task(worker_id, task)
-            finish_task(task_id, worker_id, status, "controlled_execution_proposal_completed", report_path)
+            status, result, report_path, metadata = execute_safe_task(worker_id, task)
+            finish_task(task_id, worker_id, status, result, report_path, metadata)
             append_log(log_file, f"{now()} {worker_id} finished {task_id} status={status}")
 
         except KeyboardInterrupt:

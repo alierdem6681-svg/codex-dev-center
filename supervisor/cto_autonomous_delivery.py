@@ -22,8 +22,14 @@ try:
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_QUEUED,
+        TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_VALIDATION_FAILED,
         atomic_write_json,
         append_audit,
         is_worker_eligible_task,
@@ -42,8 +48,14 @@ except ImportError:
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_QUEUED,
+        TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_VALIDATION_FAILED,
         atomic_write_json,
         append_audit,
         is_worker_eligible_task,
@@ -185,7 +197,18 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         return "already_child_task"
     if str(task.get("source", "")).lower() == "telegram" and status in ACTIVE_TASK_STATUSES:
         return "active_telegram_parent_reserved_for_cto"
-    if status not in {TASK_STATUS_FAILED_NO_PROPOSAL, TASK_STATUS_FAILED, TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
+    if status not in {
+        TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_RETRYABLE,
+        TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PIPELINE_FAILED,
+        TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_VALIDATION_FAILED,
+        TASK_STATUS_DONE,
+    }:
         return "status_not_recoverable_for_backlog_pilot"
     risk = normalize_risk(task.get("risk") or task.get("risk_level"))
     if risk not in {"low", "medium"}:
@@ -204,8 +227,14 @@ def select_backlog_candidate(queue: dict[str, Any]) -> dict[str, Any] | None:
     priorities = {
         TASK_STATUS_FAILED_NO_PROPOSAL: 0,
         TASK_STATUS_FAILED: 1,
-        TASK_STATUS_PROPOSAL_DONE: 2,
-        TASK_STATUS_DONE: 3,
+        TASK_STATUS_FAILED_TIMEOUT: 2,
+        TASK_STATUS_FAILED_RETRYABLE: 3,
+        TASK_STATUS_VALIDATION_FAILED: 4,
+        TASK_STATUS_PIPELINE_FAILED: 5,
+        TASK_STATUS_PROPOSAL_READY: 6,
+        TASK_STATUS_PROPOSAL_DONE: 7,
+        TASK_STATUS_READY_FOR_VALIDATION: 8,
+        TASK_STATUS_DONE: 9,
     }
     candidates = [task for task in queue.get("tasks", []) if isinstance(task, dict) and is_backlog_candidate(task)]
     candidates.sort(
@@ -354,7 +383,7 @@ def delivery_status() -> dict[str, Any]:
 def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
     critical = approval_required_payload(task_text(task))
     status = normalize_status(task.get("status"))
-    deployable_statuses = {TASK_STATUS_DONE, TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DEPLOYED}
+    deployable_statuses = {TASK_STATUS_DONE, TASK_STATUS_DEPLOYED}
     delivery_level = str(task.get("delivery_level") or "").upper()
     repo_applied = bool(
         task.get("repo_applied")
