@@ -36,6 +36,21 @@ STATE = APP / "state"
 LOGS = APP / "logs"
 JOBS = STATE / "direct_cto_jobs"
 
+def compact_text(value, limit=1600):
+    text = redact_sensitive_text(value or "")
+    text = re.sub(r"RAW_USER_MESSAGE_START.*?RAW_USER_MESSAGE_END", "[RAW_USER_MESSAGE_REDACTED]", text, flags=re.S)
+    text = re.sub(r"(?is)user\nSen Codex Dev Center.*", "[PROMPT_CONTEXT_REDACTED]", text)
+    text = re.sub(r"(?im)^OpenAI Codex v.*$", "[CODEX_HEADER_REDACTED]", text)
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(marker in stripped.lower() for marker in ["session id:", "workdir:", "provider:", "model:", "sandbox:", "reasoning"]):
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)[-limit:]
+
 def now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -117,7 +132,7 @@ def build_prompt(raw_user_message):
         "Kullanıcı mesajını değiştirme veya yeniden yorumlama; doğrudan iş olarak değerlendir.",
         "Türkçe, kısa, doğal ve yönetici seviyesinde sonuç üret.",
         "Kod, diff, terminal dump, dosya dump, stack trace gönderme.",
-        "Production, IAM, secret, database, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; açık onay gerektiğini belirt.",
+        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, credential rotation, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak belirt.",
         "Düşük/orta riskli işlerde plan, test, risk, dashboard ve living-docs akışını öner.",
         "Eğer görev uzun geliştirme/pipeline işiyse uygulanacak adımları sırala; ana repo dosyalarını bu job içinde değiştirme.",
         "Mevcut çalışma kökü: /opt/codex-dev-center.",
@@ -153,6 +168,7 @@ def run_job(job_id):
         "timeout", "1800",
         "codex", "exec",
         "--sandbox", "read-only",
+        "--skip-git-repo-check",
         "--cd", str(APP),
         "-"
     ]
@@ -180,9 +196,16 @@ def run_job(job_id):
                 mark_task_status(APP, router_task_id, TASK_STATUS_DONE, "async_cto_job_done")
         else:
             with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
-                f.write(now() + " job=" + job_id + " rc=" + str(proc.returncode) + "\n")
-                f.write(raw_err[:2500] + "\n")
-            send_message(chat_id, "CTO bu arka plan işi tamamlayamadı. Teknik çıktı Telegram’a gönderilmedi; loglara kaydedildi.")
+                f.write(json.dumps({
+                    "created_at": now(),
+                    "job": job_id,
+                    "returncode": proc.returncode,
+                    "stderr_summary": compact_text(raw_err),
+                    "stdout_bytes": len(raw_out or ""),
+                    "stderr_bytes": len(raw_err or ""),
+                    "prompt_or_message_content_logged": False,
+                }, ensure_ascii=False, sort_keys=True) + "\n")
+            send_message(chat_id, "Teknik hata oluştu, düzeltiyorum. Kısa özet: CTO arka plan işi tamamlanamadı; teknik çıktı Telegram'a gönderilmedi.")
             job["status"] = TASK_STATUS_FAILED
             job["result"] = "codex_failed"
             if router_task_id and mark_task_status is not None:

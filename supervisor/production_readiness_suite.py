@@ -228,8 +228,27 @@ def dashboard_test(results: dict[str, Any]) -> None:
 
 
 def telegram_test(results: dict[str, Any]) -> None:
-    files = [ROOT / "supervisor/telegram_bridge.py", ROOT / "supervisor/telegram_direct_cto.py"]
-    record(results, "telegram_bridge_direct_cto_test", all(p.exists() for p in files), {"mode": "static_smoke"})
+    files = [
+        ROOT / "supervisor/telegram_bridge.py",
+        ROOT / "supervisor/telegram_direct_cto.py",
+        ROOT / "supervisor/telegram_direct_cto_simulator.py",
+    ]
+    simulation = run_cmd([sys.executable, "supervisor/telegram_direct_cto_simulator.py", "--summary-json"], timeout=90)
+    simulated = False
+    case_count = 0
+    if simulation["ok"]:
+        try:
+            payload = json.loads(simulation["stdout"])
+            simulated = bool(payload.get("ok"))
+            case_count = int(payload.get("case_count") or 0)
+        except Exception:
+            simulated = False
+    record(
+        results,
+        "telegram_bridge_direct_cto_test",
+        all(p.exists() for p in files) and simulated and case_count >= 15,
+        {"mode": "safe_passthrough_simulation", "case_count": case_count, "simulation": simulation},
+    )
 
 
 def scan_patterns(patterns: list[re.Pattern[str]]) -> list[dict[str, Any]]:

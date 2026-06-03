@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import base64
+import hashlib
 import json
 import os
 import re
@@ -11,9 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from critical_operation_policy import critical_operation_findings
     from cto_task_router import submit_task, trigger_lifecycle
     from task_status_constants import redact_sensitive_text
 except ImportError:
+    def critical_operation_findings(value):
+        return []
     submit_task = None
     trigger_lifecycle = None
     def redact_sensitive_text(value):
@@ -24,6 +28,8 @@ APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 LOGS = APP / "logs"
 OFFSET_FILE = STATE / "telegram_direct_cto_offset.txt"
+PASSTHROUGH_AUDIT = LOGS / "direct_cto_passthrough.ndjson"
+FAILURE_LOG = LOGS / "direct_cto_failures.log"
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -86,6 +92,159 @@ def split_message(text, limit):
         parts.append(text)
     return parts
 
+def sha256_text(value):
+    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
+
+def compact_text(value, limit=1400):
+    text = redact_sensitive_text(value or "")
+    text = re.sub(r"RAW_USER_MESSAGE_START.*?RAW_USER_MESSAGE_END", "[RAW_USER_MESSAGE_REDACTED]", text, flags=re.S)
+    text = re.sub(r"(?is)user\nSen Codex Dev Center.*", "[PROMPT_CONTEXT_REDACTED]", text)
+    text = re.sub(r"(?im)^OpenAI Codex v.*$", "[CODEX_HEADER_REDACTED]", text)
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(marker in stripped.lower() for marker in ["session id:", "workdir:", "provider:", "model:", "sandbox:", "reasoning"]):
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)[-limit:]
+
+def audit_passthrough(chat_id, from_user, raw_text, cto_input_text, route):
+    LOGS.mkdir(parents=True, exist_ok=True)
+    record = {
+        "created_at": now(),
+        "chat_id_hash": sha256_text(chat_id)[:16],
+        "from_user_hash": sha256_text(from_user)[:16],
+        "raw_message_sha256": sha256_text(raw_text),
+        "cto_input_sha256": sha256_text(cto_input_text),
+        "raw_length": len(raw_text or ""),
+        "cto_input_length": len(cto_input_text or ""),
+        "unchanged": raw_text == cto_input_text,
+        "redaction_applied": raw_text != cto_input_text,
+        "route": route,
+        "content_logged": False,
+    }
+    with PASSTHROUGH_AUDIT.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    return record
+
+def log_failure(run_id, returncode, raw_err, raw_out=""):
+    LOGS.mkdir(parents=True, exist_ok=True)
+    record = {
+        "created_at": now(),
+        "run_id": run_id,
+        "returncode": returncode,
+        "stderr_summary": compact_text(raw_err),
+        "stdout_bytes": len(raw_out or ""),
+        "stderr_bytes": len(raw_err or ""),
+        "prompt_or_message_content_logged": False,
+    }
+    with FAILURE_LOG.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+def service_status(name):
+    try:
+        p = subprocess.run(["systemctl", "is-active", name], text=True, capture_output=True, timeout=8)
+        return (p.stdout or p.stderr or "unknown").strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+def read_json(path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return default
+    return default
+
+def queue_counts():
+    queue = read_json(STATE / "task_queue.json", {"tasks": []})
+    counts = {}
+    for task in queue.get("tasks", []):
+        status = str(task.get("status", "")).upper() or "UNKNOWN"
+        counts[status] = counts.get(status, 0) + 1
+    return len(queue.get("tasks", [])), counts
+
+def local_natural_reply(text):
+    lowered = (text or "").lower()
+    critical = critical_operation_findings(text)
+    if critical:
+        return (
+            "Bu istek kritik altyapı kapsamına giriyor ve otomatik yapılmayacak.\n"
+            "Durum: APPROVAL_REQUIRED.\n"
+            "Kısa özet: secret, token/private key/env, credential rotation, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
+        )
+
+    if any(x in lowered for x in ["merhaba", "selam", "sistem durumu", "status", "çalışıyor", "calisiyor"]):
+        total, counts = queue_counts()
+        core = {
+            "panel": service_status("codex-panel"),
+            "direct_cto": service_status("codex-direct-cto"),
+            "lifecycle": service_status("codex-lifecycle"),
+            "watchdog": service_status("codex-watchdog"),
+        }
+        return (
+            "Merhaba, CTO aktif.\n"
+            f"Panel: {core['panel']}, Telegram CTO: {core['direct_cto']}, lifecycle: {core['lifecycle']}, watchdog: {core['watchdog']}.\n"
+            f"Kuyrukta toplam {total} kayıt var. Aktif worker işi şu an otomatik tekli modda yönetilecek.\n"
+            "Secret ve teknik logları Telegram'a dökmüyorum; sadece güvenli özet paylaşacağım."
+        )
+
+    if any(x in lowered for x in ["kuyruk", "queue", "proposal_done", "failed_no_proposal", "bekleyen görev", "bekleyen gorev"]):
+        total, counts = queue_counts()
+        return (
+            "Kuyruk özeti:\n"
+            f"- Toplam: {total}\n"
+            f"- PROPOSAL_DONE: {counts.get('PROPOSAL_DONE', 0)}\n"
+            f"- FAILED_NO_PROPOSAL: {counts.get('FAILED_NO_PROPOSAL', 0)}\n"
+            f"- FAILED: {counts.get('FAILED', 0)}\n"
+            f"- QUEUED: {counts.get('QUEUED', 0)}\n"
+            "Tekli modda en düşük riskli uygun işi seçip worker'a verecek şekilde ilerliyorum."
+        )
+
+    if any(x in lowered for x in ["dashboard health", "health kontrol", "health check", "panel sağlık", "panel saglik"]):
+        return (
+            "Dashboard health kısa özeti:\n"
+            f"- codex-panel: {service_status('codex-panel')}\n"
+            f"- codex-lifecycle: {service_status('codex-lifecycle')}\n"
+            f"- codex-watchdog: {service_status('codex-watchdog')}\n"
+            "Ayrıntılı teknik çıktıyı Telegram'a dökmüyorum; gerekiyorsa güvenli rapor olarak işleyebilirim."
+        )
+
+    if any(x in lowered for x in ["pipeline gate", "gate sonuç", "gate sonuc", "readiness"]):
+        readiness = read_json(STATE / "production_readiness_status.json", {})
+        failed = readiness.get("failed", [])
+        status = readiness.get("status", "UNKNOWN")
+        score = readiness.get("score_percent", "-")
+        return (
+            "Pipeline gate özeti:\n"
+            f"- Production readiness: {status}\n"
+            f"- Skor: {score}\n"
+            f"- Fail gate: {', '.join(failed) if failed else 'yok'}\n"
+            "Gate PASS ise normal app deploy için ayrıca onay istemeden production akışı çalışabilir."
+        )
+
+    if any(x in lowered for x in ["tüm gate", "tum gate", "deploy et", "production'a al", "productiona al", "canlıya al", "canliya al"]):
+        readiness = read_json(STATE / "production_readiness_status.json", {})
+        if readiness.get("status") == "PASS":
+            return (
+                "Gate durumu PASS görünüyor. Normal app deploy için ayrıca onay istemem.\n"
+                "Yine de task'ın worker çıktısı ve branch/PR/merge marker'ı yoksa deploy adayı saymam; önce bu zinciri tamamlarım."
+            )
+        return (
+            "Production deploy şu an başlatılmayacak; gate PASS değil veya son gate sonucu eksik.\n"
+            "Önce fail olan adımı düzelttirip pipeline'ı tekrar çalıştıracağım."
+        )
+
+    if any(x in lowered for x in ["teknik log", "traceback", "stack trace", "terminal çıktısı", "terminal ciktisi"]):
+        return (
+            "Teknik çıktı Telegram'a gönderilmeyecek.\n"
+            "Kısa özet: Log/traceback gerekiyorsa ben onu güvenli şekilde inceleyip sana doğal dilde kök neden ve düzeltme özetini vereceğim."
+        )
+
+    return None
+
 def output_guard(raw):
     text = raw or ""
 
@@ -142,7 +301,7 @@ def output_guard(raw):
     if len(cleaned) > 3500:
         cleaned = cleaned[:3400].rstrip() + "\n\n[Yanıt kısaltıldı; teknik ayrıntılar loglara yazıldı.]"
 
-    return cleaned or "CTO teknik çıktı üretti; Telegram'a dökmedim. Daha kısa ve açıklama odaklı yanıt isteyebilirsiniz."
+    return cleaned or "CTO teknik çıktı üretti; Telegram'a dökmedim. Kısa özet: Yanıt güvenli doğal dil özetine dönüştürülecek."
 
 def classify_job_metadata(text):
     lowered = (text or "").lower()
@@ -153,7 +312,7 @@ def classify_job_metadata(text):
         eta = "10-20 dakika"
         first_update = "yaklaşık 2 dakika içinde"
         interval = 600
-        risk = "yüksek olabilir; production aşamasında açık onay gerekecek"
+        risk = "orta/yüksek; normal app deploy gate PASS ise otomatik, kritik altyapı işlemi varsa onay gerekli"
     elif any(x in lowered for x in ["pipeline", "quality gate", "test", "simülasyon", "simulasyon"]):
         name = "Pipeline Eksik Analizi"
         eta = "3-8 dakika"
@@ -348,6 +507,7 @@ def run_codex(raw_user_message):
         "timeout", "150",
         "codex", "exec",
         "--sandbox", "read-only",
+        "--skip-git-repo-check",
         "--cd", str(APP),
         "-"
     ]
@@ -364,8 +524,8 @@ def run_codex(raw_user_message):
             )
     except subprocess.TimeoutExpired:
         return (
-            "Bu yanıt için süre doldu. Teknik çıktıyı Telegram’a göndermedim. "
-            "Daha kısa bir mesajla tekrar yazarsanız daha hızlı yanıtlayacağım."
+            "Teknik hata oluştu, düzeltiyorum.\n"
+            "Kısa özet: CTO yanıtı süre sınırına takıldı. Teknik çıktıyı Telegram'a göndermedim; işi arka plan/görev akışında ele alacağım."
         )
     except Exception:
         return (
@@ -380,19 +540,17 @@ def run_codex(raw_user_message):
         return output_guard(raw_out)
 
     # Hata/timeout durumunda stderr/prompt/session dump asla Telegram'a gönderilmez.
-    with (LOGS / "direct_cto_failures.log").open("a", encoding="utf-8") as f:
-        f.write(now() + " run_id=" + run_id + " rc=" + str(proc.returncode) + "\n")
-        f.write(raw_err[:2000] + "\n")
+    log_failure(run_id, proc.returncode, raw_err, raw_out)
 
     if proc.returncode == 124:
         return (
-            "Bu yanıt için süre doldu. Teknik çıktıyı Telegram’a göndermedim. "
-            "Daha kısa bir mesajla tekrar deneyin veya işi küçük parçalara bölelim."
+            "Teknik hata oluştu, düzeltiyorum.\n"
+            "Kısa özet: CTO yanıtı süre sınırına takıldı. Teknik çıktıyı Telegram'a göndermedim; görevi parçalara ayırıp sürdüreceğim."
         )
 
     return (
-        "CTO bu mesaj için sağlıklı yanıt üretemedi. "
-        "Teknik çıktı gizlendi; isterseniz mesajı daha kısa göndererek tekrar deneyin."
+        "Teknik hata oluştu, düzeltiyorum.\n"
+        "Kısa özet: CTO çalışma komutu başarısız oldu; teknik çıktı gizlendi ve güvenli hata özeti kaydedildi."
     )
 
 def log_inbox(payload):
@@ -426,6 +584,7 @@ def handle_message(token, expected_chat_id, msg):
         return
 
     safe_text = redact_sensitive_text(text)
+    audit_passthrough(chat_id, from_user, text, safe_text, "intake")
 
     # Açık uygulama/başlatma komutlarında CTO Action Mode devreye girer.
     if is_action_command(text):
@@ -466,6 +625,11 @@ def handle_message(token, expected_chat_id, msg):
         return
 
     # Normal kısa mesajda ACK yok. Mesaj doğrudan Codex CTO'ya gider.
+    local_reply = local_natural_reply(safe_text)
+    if local_reply:
+        audit_passthrough(chat_id, from_user, text, safe_text, "local_natural_reply")
+        send_message(token, chat_id, local_reply)
+        return
     reply = run_codex(safe_text)
     send_message(token, chat_id, reply)
 

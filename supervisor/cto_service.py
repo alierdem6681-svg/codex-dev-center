@@ -172,6 +172,7 @@ def codex_readonly_plan(user_text):
         "timeout", "120",
         "codex", "exec",
         "--sandbox", "read-only",
+        "--skip-git-repo-check",
         "--cd", str(APP),
         prompt
     ]

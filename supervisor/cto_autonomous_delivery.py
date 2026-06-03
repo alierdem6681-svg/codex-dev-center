@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -19,11 +20,18 @@ try:
         TASK_STATUS_APPROVAL_REQUIRED,
         TASK_STATUS_DEPLOYED,
         TASK_STATUS_DONE,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_QUEUED,
         atomic_write_json,
+        append_audit,
         is_worker_eligible_task,
         normalize_queue_payload,
+        normalize_risk,
         normalize_status,
+        redact_sensitive_text,
+        utc_now,
     )
 except ImportError:
     from critical_operation_policy import approval_required_payload
@@ -32,11 +40,18 @@ except ImportError:
         TASK_STATUS_APPROVAL_REQUIRED,
         TASK_STATUS_DEPLOYED,
         TASK_STATUS_DONE,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_PROPOSAL_DONE,
+        TASK_STATUS_QUEUED,
         atomic_write_json,
+        append_audit,
         is_worker_eligible_task,
         normalize_queue_payload,
+        normalize_risk,
         normalize_status,
+        redact_sensitive_text,
+        utc_now,
     )
 
 
@@ -141,6 +156,178 @@ def queue_summary(queue: dict[str, Any] | None = None) -> dict[str, Any]:
         "active_task_count": len(active),
         "worker_eligible_active_count": len(worker_active),
         "worker_eligible_active_ids": [task.get("id") for task in worker_active],
+    }
+
+
+def safe_slug(text: Any, limit: int = 56) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "-", str(text or "").strip()).strip("-").upper()
+    return (cleaned[:limit].strip("-") or "BACKLOG")
+
+
+def choose_worker(queue: dict[str, Any]) -> str:
+    workers = ["worker-1", "worker-2", "worker-3", "worker-4"]
+    tasks = queue.get("tasks", [])
+    return workers[len(tasks) % len(workers)]
+
+
+def task_flag(task: dict[str, Any], key: str) -> bool:
+    value = task.get(key)
+    return value is True or str(value).strip().lower() in {"1", "true", "yes"}
+
+
+def backlog_candidate_reason(task: dict[str, Any]) -> str:
+    status = normalize_status(task.get("status"))
+    if task_flag(task, "production_deployed"):
+        return "already_deployed"
+    if task_flag(task, "backlog_continuation_created"):
+        return "continuation_already_created"
+    if task.get("parent_task_id") and str(task.get("source", "")).lower() == "cto":
+        return "already_child_task"
+    if str(task.get("source", "")).lower() == "telegram" and status in ACTIVE_TASK_STATUSES:
+        return "active_telegram_parent_reserved_for_cto"
+    if status not in {TASK_STATUS_FAILED_NO_PROPOSAL, TASK_STATUS_FAILED, TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
+        return "status_not_recoverable_for_backlog_pilot"
+    risk = normalize_risk(task.get("risk") or task.get("risk_level"))
+    if risk not in {"low", "medium"}:
+        return "risk_requires_approval"
+    critical = approval_required_payload(task_text(task))
+    if critical["approval_required"]:
+        return "critical_operation_requires_approval"
+    return ""
+
+
+def is_backlog_candidate(task: dict[str, Any]) -> bool:
+    return backlog_candidate_reason(task) == ""
+
+
+def select_backlog_candidate(queue: dict[str, Any]) -> dict[str, Any] | None:
+    priorities = {
+        TASK_STATUS_FAILED_NO_PROPOSAL: 0,
+        TASK_STATUS_FAILED: 1,
+        TASK_STATUS_PROPOSAL_DONE: 2,
+        TASK_STATUS_DONE: 3,
+    }
+    candidates = [task for task in queue.get("tasks", []) if isinstance(task, dict) and is_backlog_candidate(task)]
+    candidates.sort(
+        key=lambda task: (
+            0 if normalize_risk(task.get("risk") or task.get("risk_level")) == "low" else 1,
+            priorities.get(normalize_status(task.get("status")), 9),
+            str(task.get("created_at") or ""),
+            str(task.get("id") or ""),
+        )
+    )
+    return candidates[0] if candidates else None
+
+
+def create_backlog_continuation_task(queue: dict[str, Any], parent: dict[str, Any]) -> dict[str, Any]:
+    parent_id = str(parent.get("id") or "unknown-parent")
+    title = str(parent.get("title") or parent.get("description") or parent_id)
+    risk = normalize_risk(parent.get("risk") or parent.get("risk_level"))
+    if risk not in {"low", "medium"}:
+        risk = "medium"
+    task_id = f"CTO-BACKLOG-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}-{safe_slug(title)}"
+    parent_status = normalize_status(parent.get("status"))
+    description = "\n".join(
+        [
+            f"Parent task: {parent_id}",
+            f"Parent status: {parent_status}",
+            "CTO backlog continuation pilot.",
+            "Worker görevi: parent rapor/proposal/workspace kayıtlarını güvenli şekilde incele, uygulanabilir küçük bir repo/app iyileştirme önerisi hazırla, test planı ve risk özeti üret.",
+            "Ana repo dosyalarını doğrudan değiştirme; production deploy yapma; secret/env/token/private key/IAM/billing/DNS/firewall/database destructive/credential rotation işlemlerine dokunma.",
+            "Çıktı beklentisi: PLAN.md, CHANGE_PROPOSAL.md, TEST_PLAN.md, RISK_REVIEW.md, LIVING_DOCS_CHECKLIST.md, WORKER_SUMMARY.md.",
+        ]
+    )
+    child = {
+        "id": task_id,
+        "parent_task_id": parent_id,
+        "parent_status": parent_status,
+        "title": "Backlog continuation: " + redact_sensitive_text(title)[:140],
+        "description": description,
+        "raw_message": "",
+        "source": "cto",
+        "priority": "normal",
+        "status": TASK_STATUS_QUEUED,
+        "risk": risk,
+        "risk_level": risk,
+        "assigned_worker": choose_worker(queue),
+        "worker_eligible": True,
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+        "repo_applied": False,
+        "staging_deployed": False,
+        "production_deployed": False,
+        "delivery_level": "BACKLOG_CONTINUATION_QUEUED",
+        "cto_orchestrated": True,
+        "requires_pipeline_before_deploy": True,
+    }
+    parent["backlog_continuation_created"] = True
+    parent["backlog_continuation_task_id"] = task_id
+    parent["backlog_continuation_created_at"] = utc_now()
+    parent["updated_at"] = utc_now()
+    queue.setdefault("tasks", []).append(child)
+    return child
+
+
+def start_next_backlog(execute: bool = False) -> dict[str, Any]:
+    cfg = policy()
+    queue = load_queue()
+    summary = queue_summary(queue)
+    if summary["worker_eligible_active_count"] >= cfg["max_parallel_tasks"]:
+        return {"ok": True, "status": "WAIT_ACTIVE_TASK", "summary": summary}
+
+    candidate = select_backlog_candidate(queue)
+    if not candidate:
+        return {"ok": False, "status": "NO_BACKLOG_CANDIDATE", "summary": summary}
+
+    evaluation = approval_required_payload(task_text(candidate))
+    if evaluation["approval_required"]:
+        if execute:
+            set_task_approval_required(str(candidate.get("id")), evaluation["critical_operation_findings"])
+        return {"ok": False, "status": "APPROVAL_REQUIRED", "candidate_id": candidate.get("id"), "evaluation": evaluation}
+
+    if not execute:
+        return {
+            "ok": True,
+            "status": "DRY_RUN_BACKLOG_CANDIDATE_READY",
+            "candidate_id": candidate.get("id"),
+            "candidate_status": normalize_status(candidate.get("status")),
+            "candidate_risk": normalize_risk(candidate.get("risk") or candidate.get("risk_level")),
+            "summary": summary,
+        }
+
+    child = create_backlog_continuation_task(queue, candidate)
+    normalized, changes = normalize_queue_payload(queue)
+    atomic_write_json(QUEUE, normalized)
+    append_audit(
+        ROOT,
+        "cto_backlog_continuation_created",
+        {
+            "parent_task_id": candidate.get("id"),
+            "child_task_id": child.get("id"),
+            "worker": child.get("assigned_worker"),
+            "risk": child.get("risk"),
+            "normalization_changes": len(changes),
+        },
+    )
+    state = read_json(DELIVERY_STATE, {})
+    state.update(
+        {
+            "last_backlog_parent_task_id": candidate.get("id"),
+            "last_backlog_child_task_id": child.get("id"),
+            "last_backlog_dispatch_at": now(),
+            "max_parallel_tasks": cfg["max_parallel_tasks"],
+        }
+    )
+    atomic_write_json(DELIVERY_STATE, state)
+    dispatched = run([sys.executable, "supervisor/lifecycle_manager.py", "dispatch"], cwd=ROOT, timeout=60)
+    return {
+        "ok": True,
+        "status": "BACKLOG_CONTINUATION_CREATED",
+        "parent_task_id": candidate.get("id"),
+        "child_task": child,
+        "normalization_changes": changes,
+        "dispatch": dispatched,
+        "summary": queue_summary(),
     }
 
 
@@ -427,6 +614,8 @@ def main() -> None:
     evaluate.add_argument("task_id")
     dispatch = sub.add_parser("dispatch-next")
     dispatch.add_argument("--execute", action="store_true")
+    backlog = sub.add_parser("start-next-backlog")
+    backlog.add_argument("--execute", action="store_true")
     merged = sub.add_parser("mark-merged")
     merged.add_argument("task_id")
     merged.add_argument("--commit", default="")
@@ -448,6 +637,8 @@ def main() -> None:
         payload = {"ok": bool(task), "task_id": args.task_id, "evaluation": evaluate_task(task) if task else None}
     elif args.cmd == "dispatch-next":
         payload = dispatch_next(execute=args.execute)
+    elif args.cmd == "start-next-backlog":
+        payload = start_next_backlog(execute=args.execute)
     elif args.cmd == "mark-merged":
         payload = mark_task_merged(args.task_id, args.commit)
     elif args.cmd == "deploy-ready":
