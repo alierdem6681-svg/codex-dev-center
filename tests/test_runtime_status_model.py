@@ -931,6 +931,53 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "DRY_RUN_PR_READY_TO_MERGE")
 
+    def test_dirty_pr_is_marked_conflict_and_skipped_by_finalizer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-MERGE-DIRTY")
+            task["status"] = TASK_STATUS_DONE
+            task["repo_applied"] = False
+            task["branch_merged"] = False
+            task["delivery_level"] = "PR_READY"
+            task["pull_request_number"] = 47
+            original_run = cto_autonomous_delivery.run
+
+            def fake_run(_args, cwd=None, timeout=300):
+                return {
+                    "ok": True,
+                    "returncode": 0,
+                    "stdout": json.dumps(
+                        {
+                            "number": 47,
+                            "url": "https://example.invalid/pr/47",
+                            "state": "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "DIRTY",
+                            "headRefName": "worker/task",
+                            "baseRefName": "main",
+                            "mergeCommit": None,
+                        }
+                    ),
+                    "stderr": "",
+                    "cmd": "gh pr view 47",
+                }
+
+            cto_autonomous_delivery.run = fake_run
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    result = cto_autonomous_delivery.merge_pr_task("TASK-MERGE-DIRTY", execute=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+                    candidate = cto_autonomous_delivery.pr_ready_candidate()
+            finally:
+                cto_autonomous_delivery.run = original_run
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "PR_NOT_MERGEABLE")
+        self.assertEqual(updated["delivery_level"], "PR_CONFLICT")
+        self.assertEqual(updated["deployment_status"], "MERGE_CONFLICT")
+        self.assertEqual(updated["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertTrue(updated["merge_blocked"])
+        self.assertEqual(candidate, "")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")
