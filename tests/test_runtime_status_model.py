@@ -199,6 +199,26 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertTrue(hasattr(direct_cto_async_job, "REPORTS"))
         self.assertTrue(hasattr(direct_cto_async_job, "JOBS"))
 
+    def test_direct_cto_usage_limit_failure_is_retryable(self):
+        failure = direct_cto_async_job.classify_codex_failure(
+            "",
+            "ERROR: You've hit your usage limit. Try again at 10:56 AM.",
+            {"status": "EXITED_NONZERO", "returncode": 1},
+        )
+
+        self.assertEqual(failure["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertEqual(failure["result"], "codex_usage_limit_retryable")
+
+    def test_direct_cto_generic_nonzero_failure_is_retryable(self):
+        failure = direct_cto_async_job.classify_codex_failure(
+            "",
+            "unexpected nonzero exit",
+            {"status": "EXITED_NONZERO", "returncode": 1},
+        )
+
+        self.assertEqual(failure["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertEqual(failure["result"], "codex_failed_retryable")
+
     def test_nonlocal_short_message_routes_to_async_job(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "short_async",
