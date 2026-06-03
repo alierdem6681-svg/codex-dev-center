@@ -580,11 +580,12 @@ def run_delivery_finalizer() -> bool:
                 "supervisor/cto_autonomous_delivery.py",
                 "finalize-latest",
                 "--execute",
+                "--wait",
             ],
             cwd=str(APP),
             text=True,
             capture_output=True,
-            timeout=600,
+            timeout=1200,
         )
         status = "UNKNOWN"
         if p.stdout.strip():

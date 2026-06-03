@@ -1152,6 +1152,113 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertTrue(updated["merge_blocked"])
         self.assertEqual(candidate, "")
 
+    def test_failed_merge_rechecks_and_marks_already_merged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-MERGE-RACE")
+            task["status"] = TASK_STATUS_DONE
+            task["repo_applied"] = False
+            task["branch_merged"] = False
+            task["delivery_level"] = "PR_READY"
+            task["pull_request_number"] = 61
+            original_run = cto_autonomous_delivery.run
+            calls: list[list[str]] = []
+
+            def fake_run(args, cwd=None, timeout=300):
+                calls.append(args)
+                if args[:3] == ["gh", "pr", "merge"]:
+                    return {
+                        "ok": False,
+                        "returncode": 1,
+                        "stdout": "/usr/bin/git: exit status 1",
+                        "stderr": "",
+                        "cmd": "gh pr merge 61 --squash",
+                    }
+                return {
+                    "ok": True,
+                    "returncode": 0,
+                    "stdout": json.dumps(
+                        {
+                            "number": 61,
+                            "url": "https://example.invalid/pr/61",
+                            "state": "MERGED" if any(call[:3] == ["gh", "pr", "merge"] for call in calls) else "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "UNKNOWN",
+                            "headRefName": "worker/task",
+                            "baseRefName": "main",
+                            "mergeCommit": {"oid": "abc123"},
+                        }
+                    ),
+                    "stderr": "",
+                    "cmd": "gh pr view 61",
+                }
+
+            cto_autonomous_delivery.run = fake_run
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    result = cto_autonomous_delivery.merge_pr_task("TASK-MERGE-RACE", execute=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.run = original_run
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "ALREADY_MERGED")
+        self.assertTrue(updated["repo_applied"])
+        self.assertTrue(updated["branch_merged"])
+        self.assertEqual(updated["delivery_level"], "READY_FOR_DEPLOY")
+        self.assertEqual(updated["merged_commit"], "abc123")
+
+    def test_failed_merge_git_exit_status_marks_conflict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-MERGE-GIT-EXIT")
+            task["status"] = TASK_STATUS_DONE
+            task["repo_applied"] = False
+            task["branch_merged"] = False
+            task["delivery_level"] = "PR_READY"
+            task["pull_request_number"] = 62
+            original_run = cto_autonomous_delivery.run
+
+            def fake_run(args, cwd=None, timeout=300):
+                if args[:3] == ["gh", "pr", "merge"]:
+                    return {
+                        "ok": False,
+                        "returncode": 1,
+                        "stdout": "/usr/bin/git: exit status 1",
+                        "stderr": "",
+                        "cmd": "gh pr merge 62 --squash",
+                    }
+                return {
+                    "ok": True,
+                    "returncode": 0,
+                    "stdout": json.dumps(
+                        {
+                            "number": 62,
+                            "url": "https://example.invalid/pr/62",
+                            "state": "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "UNKNOWN",
+                            "headRefName": "worker/task",
+                            "baseRefName": "main",
+                            "mergeCommit": None,
+                        }
+                    ),
+                    "stderr": "",
+                    "cmd": "gh pr view 62",
+                }
+
+            cto_autonomous_delivery.run = fake_run
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    result = cto_autonomous_delivery.merge_pr_task("TASK-MERGE-GIT-EXIT", execute=True)
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.run = original_run
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "PR_NOT_MERGEABLE")
+        self.assertEqual(updated["delivery_level"], "PR_CONFLICT")
+        self.assertEqual(updated["deployment_status"], "MERGE_CONFLICT")
+        self.assertEqual(updated["merge_blocked_reason"], "merge_command_git_exit_status_1")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")
