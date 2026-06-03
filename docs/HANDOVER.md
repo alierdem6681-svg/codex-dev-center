@@ -295,3 +295,28 @@ Yeni davranış:
 - `AGENTS.md.bak` veya `AGENTS.md/child` gibi tekil dosya varyantları repo apply allowlist'ten geçmez.
 - `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
 - Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmadı.
+
+---
+
+## Quality Gate Contract Apply
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-170841 / CTO-DISPATCH-20260603-073025-CTO-ACTION-20260601-160827-02-QUALITY-GATE
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` içine `codex_quality_gate_contract` kapısı eklendi.
+- Production readiness policy `codex_quality_gate_contract` zorunlu gate kaydıyla güncellendi.
+- `tests/test_runtime_status_model.py` kalite kapısı sözleşmesinin PASS ve non-mutating olduğunu doğrular.
+
+Yeni davranış:
+- Readiness suite artık `supervisor/codex_quality_gate.py` içindeki preflight, test suite, diff report ve gate status sözleşmesini statik olarak doğrular.
+- Bu gate `static_non_mutating_contract` modundadır; production deploy, runtime secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmaz.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- `python3 supervisor/production_readiness_suite.py --json` PASS, score 100.0, `codex_quality_gate_contract` PASS.
+
+Not:
+- Commit/PR adımı bu sandbox'ta git worktree metadata dizini read-only olduğu için çalıştırılamadı: `index.lock` oluşturulamadı.

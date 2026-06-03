@@ -170,6 +170,16 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(contracts[group]["contracts"])
             self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
+    def test_codex_quality_gate_contract_is_non_mutating(self):
+        contract = production_readiness_suite.codex_quality_gate_contract()
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "static_non_mutating_contract")
+        self.assertTrue(contract["contracts"])
+        self.assertTrue(all(item["ok"] for item in contract["contracts"]))
+        self.assertFalse(contract["production_deploy_performed"])
+        self.assertFalse(contract["mutating_cloud_operations_performed"])
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"

@@ -20,6 +20,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Geri alma simulation PASS
 - Restart simulation PASS
 - Failure injection simulation PASS
+- Codex quality gate contract PASS
 
 ## Simülasyon Kanıtı
 
@@ -27,6 +28,7 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
+- `codex_quality_gate_contract` preflight, test suite, diff report ve gate status kalite kapısı sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
 
 ## Otomatik Yayına Alma Kuralı

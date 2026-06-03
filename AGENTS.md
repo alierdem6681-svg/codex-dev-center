@@ -118,6 +118,7 @@ Canliya alma sadece su kosullarda calisabilir:
 - On canli kapisi PASS olmali.
 - Geri alma simulasyonu PASS olmali.
 - Secret leakage ve forbidden operation scan PASS olmali.
+- Codex quality gate contract PASS olmali.
 - `CODEX_STAGING_DEPLOY_COMMAND`, `CODEX_PRODUCTION_DEPLOY_COMMAND`, `CODEX_ROLLBACK_COMMAND` tanimli olmali.
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmali.
 - Kritik istisna bulunmamali.

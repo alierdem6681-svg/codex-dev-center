@@ -25,7 +25,8 @@
     "staging_smoke_test",
     "rollback_simulation",
     "restart_simulation",
-    "failure_injection_simulation"
+    "failure_injection_simulation",
+    "codex_quality_gate_contract"
   ],
   "real_deploy_sequence": [
     "git_clean_check",
@@ -42,6 +43,7 @@
     "staging_health_check",
     "staging_smoke_test",
     "rollback_simulation",
+    "codex_quality_gate_contract",
     "github_actions_production_deploy",
     "production_health_check",
     "production_smoke_test",

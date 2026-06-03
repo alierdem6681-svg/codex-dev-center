@@ -468,6 +468,46 @@ def readiness_simulation_contracts() -> dict[str, Any]:
     }
 
 
+def codex_quality_gate_contract() -> dict[str, Any]:
+    contracts = [
+        static_contract(
+            "supervisor/codex_quality_gate.py",
+            [
+                "def preflight(",
+                "def test_suite(",
+                "def diff_report(",
+                "def gate_status(",
+                "quality_gate_preflight.json",
+                "quality_gate_tests.json",
+                "quality_gate_diff.json",
+                "quality_gate_status.json",
+            ],
+        ),
+        static_contract(
+            "state_templates/module_registry.json",
+            [
+                "\"id\": \"codex_quality_gate\"",
+                "\"status\": \"active\"",
+                "\"dashboard_visible\": true",
+                "\"codex_gate_status\"",
+            ],
+        ),
+        static_contract(
+            "state_templates/production_readiness_policy.json",
+            [
+                "\"codex_quality_gate_contract\"",
+            ],
+        ),
+    ]
+    return {
+        "ok": all(item["ok"] for item in contracts),
+        "mode": "static_non_mutating_contract",
+        "contracts": contracts,
+        "production_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
 def chaos_simulations(results: dict[str, Any]) -> None:
     contracts = readiness_simulation_contracts()
     record(results, "restart_simulation", contracts["restart"]["ok"], contracts["restart"])
@@ -477,6 +517,11 @@ def chaos_simulations(results: dict[str, Any]) -> None:
         contracts["failure_injection"]["ok"],
         contracts["failure_injection"],
     )
+
+
+def quality_gate_contracts(results: dict[str, Any]) -> None:
+    contract = codex_quality_gate_contract()
+    record(results, "codex_quality_gate_contract", contract["ok"], contract)
 
 
 def unit_and_integration(results: dict[str, Any]) -> None:
@@ -503,6 +548,7 @@ def run_suite() -> dict[str, Any]:
     security_scans(results)
     staging_and_rollback(results)
     chaos_simulations(results)
+    quality_gate_contracts(results)
 
     failed = [name for name, item in results.items() if not item.get("ok")]
     score = round(100 * (len(results) - len(failed)) / max(1, len(results)), 2)

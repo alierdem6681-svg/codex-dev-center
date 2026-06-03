@@ -55,7 +55,7 @@ Kritik istisnalar otomatik yapılamaz:
 
 ## 7. Autonomous Production Delivery
 
-Codex Dev Center uygulamasının kendi repo/app deploy akışı için GitHub Actions manuel yayına alma kapısı kullanılır. Tüm readiness kapıları, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
+Codex Dev Center uygulamasının kendi repo/app deploy akışı için GitHub Actions manuel yayına alma kapısı kullanılır. Tüm readiness kapıları, Codex quality gate contract, ön canlı kapısı, geri alma simülasyonu, secret scan ve forbidden operation scan PASS olmadan production çalışmaz.
 
 Production için staging, production ve rollback komutları environment veya policy default ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` environment veya policy default olmadan production komutu çalışmaz. `production_deploy_channel=github_actions_manual` olduğunda GitHub Actions dışındaki production deploy denemeleri `github_actions_workflow_required` blocker'ı ile durur.
 

@@ -135,3 +135,9 @@ Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/fire
 Validated proposal apply worker akışı için repo path doğrulaması güçlendirildi. `supervisor/worker_runner.py` artık apply path'lerini normalize eder, tekil allowlist dosyalarında exact match ister ve `AGENTS.md.bak`, `AGENTS.md/child`, traversal veya runtime `state/` hedeflerini bloklar.
 
 Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı.
+
+## 2026-06-03 Quality Gate Contract Apply
+
+Production readiness suite `codex_quality_gate_contract` kapısıyla güçlendirildi. Bu gate `supervisor/codex_quality_gate.py` içindeki preflight, test suite, diff report ve gate status sözleşmelerini statik olarak doğrular.
+
+Davranış `tests/test_runtime_status_model.py` içinde PASS ve non-mutating olarak sabitlendi. Production deploy, runtime secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapılmadı.

@@ -34,7 +34,8 @@
       "enabled": true,
       "requires_approval": false,
       "non_mutating": true,
-      "simulation_contracts_required": true
+      "simulation_contracts_required": true,
+      "quality_gate_contract_required": true
     },
     {
       "id": "staging_deploy",
