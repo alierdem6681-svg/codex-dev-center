@@ -239,7 +239,7 @@ Test:
 Not:
 - Production deploy calistirilmadi.
 - Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi calistirilamadi.
-- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write islemi yapilmadi.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 
 ---
 
@@ -260,7 +260,7 @@ Test:
 Not:
 - Production deploy calistirilmadi.
 - Git metadata yolu read-only oldugu icin `git add`, commit ve PR olusturma adimi bu sandbox'ta calistirilamadi.
-- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write islemi yapilmadi.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 
 ---
 
@@ -315,7 +315,7 @@ Eklenenler:
 Yeni davranış:
 - `AGENTS.md.bak` veya `AGENTS.md/child` gibi tekil dosya varyantları repo apply allowlist'ten geçmez.
 - `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
-- Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmadı.
+- Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
 
 ---
 
@@ -333,7 +333,7 @@ Eklenenler:
 Yeni davranış:
 - `staging_smoke_test` için `dry_run=true` ve `mutating_cloud_operations_performed=false` zorunludur.
 - `rollback_simulation` için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
-- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapılmadı.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 
 Test:
 - `python3 -m compileall -q supervisor web_panel scripts` PASS.

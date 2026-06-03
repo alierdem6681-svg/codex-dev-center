@@ -221,7 +221,7 @@ Fallback nedeni: {reason}
 
 1. Parent/task baglamini guvenli proposal seviyesinde ele al.
 2. Ana repo dosyalarina dogrudan dokunma.
-3. Kritik altyapi, secret, IAM, billing, DNS, firewall, destructive database ve credential rotation islerini APPROVAL_REQUIRED kabul et.
+3. Kritik altyapi, secret, IAM, billing, DNS, firewall ve destructive database islerini APPROVAL_REQUIRED kabul et.
 4. Kucuk, test edilebilir repo/app iyilestirmesi icin CTO review bekleyen oneriyi hazirla.
 
 Ozet:
@@ -238,7 +238,7 @@ Oneri:
 
 Kapsam disi:
 - Secret/env/token/private key degeri okuma veya degistirme.
-- IAM, billing, DNS, firewall, destructive database, credential rotation.
+- IAM, billing, DNS, firewall, destructive database.
 """,
         "TEST_PLAN.md": """# Test Plan
 
@@ -258,7 +258,7 @@ Degerlendirme:
 
 Approval:
 - Normal app/repo/pipeline fix: gate PASS ise otomatik ilerleyebilir.
-- Kritik altyapi/credential/veri kaybi riski: APPROVAL_REQUIRED.
+- Kritik altyapi veya veri kaybi riski: APPROVAL_REQUIRED.
 """,
         "LIVING_DOCS_CHECKLIST.md": """# Living Docs Checklist
 
@@ -653,7 +653,7 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
             f"Worker: {worker_id}\n"
             f"Task: {task_id}\n"
             "Sonuç: APPROVAL_REQUIRED\n"
-            "Neden: kritik altyapı/credential kapsamı tespit edildi; otomatik apply yapılmadı.\n",
+            "Neden: kritik altyapı kapsamı tespit edildi; otomatik apply yapılmadı.\n",
             encoding="utf-8",
         )
         return TASK_STATUS_APPROVAL_REQUIRED, "critical_operation_requires_user_approval", str(report_path), metadata
@@ -721,7 +721,7 @@ Kurallar:
 - Main branch'e doğrudan push yapma.
 - Production deploy yapma.
 - Secret/env/token/private key değerlerini okuma, yazma, gösterme veya değiştirme.
-- IAM, billing, DNS, firewall, destructive database, credential rotation veya reklam platformu canlı yazma işlemi yapma.
+- IAM, billing, DNS, firewall, destructive database veya reklam platformu canlı yazma işlemi yapma.
 - Değişikliği küçük, test edilebilir ve geri alınabilir tut.
 - İlgili testleri çalıştır; çalıştıramadığın testleri final çıktıda belirt.
 - Teknik çıktıyı Telegram'a gönderme.

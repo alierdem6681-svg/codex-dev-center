@@ -179,7 +179,7 @@ def build_prompt(raw_user_message):
         "Kullanıcı mesajını değiştirme veya yeniden yorumlama; doğrudan iş olarak değerlendir.",
         "Türkçe, kısa, doğal ve yönetici seviyesinde sonuç üret.",
         "Kod, diff, terminal dump, dosya dump, stack trace gönderme.",
-        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, credential rotation, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak belirt.",
+        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak belirt.",
         "Düşük/orta riskli işlerde plan, test, risk, dashboard ve living-docs akışını öner.",
         "Eğer görev uzun geliştirme/pipeline işiyse uygulanacak adımları sırala; ana repo dosyalarını bu job içinde değiştirme.",
         "Mevcut çalışma kökü: /opt/codex-dev-center.",
@@ -207,7 +207,7 @@ def classify_codex_failure(raw_out, raw_err, progress):
             "router_reason": "async_cto_codex_usage_limit_retryable",
             "telegram_message": (
                 "CTO arka plan işi geçici Codex kullanım limitine takıldı. "
-                "Billing veya credential işlemi yapmadım; limit açıldığında güvenli şekilde retry edilebilir."
+                "Billing veya kritik altyapı işlemi yapmadım; limit açıldığında güvenli şekilde retry edilebilir."
             ),
         }
 

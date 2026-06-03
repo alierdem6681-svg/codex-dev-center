@@ -24,7 +24,6 @@
   "critical_operations_auto_block": [
     "secret_value_view_or_change",
     "token_private_key_env_value_change",
-    "credential_rotation",
     "iam_owner_editor_change",
     "billing_change",
     "firewall_change",

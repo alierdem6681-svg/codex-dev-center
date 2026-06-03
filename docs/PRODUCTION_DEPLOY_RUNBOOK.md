@@ -102,7 +102,7 @@ Uzak sunucuda ilk kullanıcı kurulumu güvenlik gereği varsayılan olarak kapa
 Aşağıdaki işlemler otomatik yapılmaz:
 
 - Secret değerini görüntüleme veya değiştirme
-- Token, private key, env değeri veya credential rotation
+- Token, private key veya env değeri
 - IAM owner/editor yetki değişikliği
 - Billing değişikliği
 - Database veri silme

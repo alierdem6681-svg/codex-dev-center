@@ -140,7 +140,7 @@ def generic_reply(task):
         "Şu an CTO v1 aktif: mesaj alıyor, durum okuyabiliyor ve cevap verebiliyor.\n"
         "Sonraki adımda gerçek Codex CLI entegrasyonu bağlanacak.\n\n"
         "Normal uygulama deploy'u tüm gate'ler PASS ise ayrıca onay istemeden yapılabilir. "
-        "Secret, IAM, billing, DNS/firewall, destructive database veya credential işlemleri onaysız yapılmayacak."
+        "Secret/token/private key/env, IAM, billing, DNS/firewall veya destructive database işlemleri onaysız yapılmayacak."
     )
 
 def codex_readonly_plan(user_text):
@@ -266,7 +266,7 @@ def route_task(task):
     high_risk_phrases = [
         "iam yetkisi ver", "owner yetkisi ver",
         "editor yetkisi ver", "secret oku", "secret göster",
-        "token değiştir", "token degistir", "private key", "credential rotation",
+        "token değiştir", "token degistir", "private key",
         "veritabanı sil", "database sil", "migration çalıştır",
         "dns değiştir", "firewall aç", "google ads api mutate",
         "billing değiştir", "ödeme değiştir"
@@ -325,7 +325,7 @@ def route_task(task):
         return (
             "Production deploy kuralı kaydedildi.\n"
             "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
-            "Secret/IAM/billing/DNS/firewall/destructive database/credential işlemleri APPROVAL_REQUIRED kalacak."
+            "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işlemleri APPROVAL_REQUIRED kalacak."
         )
 
     if any(p in lowered for p in high_risk_phrases):
@@ -349,7 +349,7 @@ def route_task(task):
                 "Production deploy kuralı kaydedildi.\n"
                 "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
                 "Öncesinde test, diff, quality gate, staging kontrolü ve rollback planı zorunlu olacak.\n"
-                "Secret/IAM/billing/DNS/firewall/destructive database/credential işlemleri APPROVAL_REQUIRED kalacak.\n"
+                "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işlemleri APPROVAL_REQUIRED kalacak.\n"
                 "Canlıya alma sonrası sonuç, health durumu ve rollback bilgisi Telegram’dan bildirilecek."
             )
 

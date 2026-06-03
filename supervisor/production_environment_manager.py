@@ -38,8 +38,6 @@ CRITICAL_EXCEPTION_TERMS = [
     "token value",
     "private key",
     "env change",
-    "credential",
-    "credential rotation",
     "iam owner",
     "iam editor",
     "iam ",

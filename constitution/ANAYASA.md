@@ -61,7 +61,7 @@ Production için staging, production ve rollback komutları environment veya pol
 
 Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templates/deploy_policy.json` içinde tanımlıdır. Bu kapsam Google Ads, IAM, secret, billing, database, DNS/firewall veya müşteri verisi mutate işlemlerini kapsamaz.
 
-Dashboard controlled execution proposal görünürlüğü salt okunurdur. Proposal durumu göstermek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu canlı yazma yetkisi anlamına gelmez.
+Dashboard controlled execution proposal görünürlüğü salt okunurdur. Proposal durumu göstermek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi anlamına gelmez.
 
 Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy panel `/api/status` payload'larında GitHub Actions ve pipeline marker durumunu göstermek production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 

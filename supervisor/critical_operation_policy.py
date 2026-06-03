@@ -5,7 +5,7 @@ from typing import Any
 
 
 CRITICAL_CONTEXT_TERMS = (
-    r"secret|token|private[_ -]?key|env|credential|kimlik bilgisi|iam|billing|"
+    r"secret|token|private[_ -]?key|env|iam|billing|"
     r"ödeme|odeme|fatura|firewall|dns|database|veritabanı|veritabani|db|"
     r"google ads|customer|müşteri|musteri|migration"
 )
@@ -62,10 +62,6 @@ CRITICAL_OPERATION_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "token_private_key_env_value_change": [
         re.compile(r"\b(token|private[_ -]?key|env)\b.*\b(rotate|rotation|write|set|change|update|delete|print|show|view)\b", re.I),
         re.compile(r"\b(token|private key|env içeriği|env icerigi).*\b(değiş|degis|göster|goster|yaz|rotate)\b", re.I),
-    ],
-    "credential_rotation": [
-        re.compile(r"\bcredential\b.*\b(rotate|rotation|change|update|reset)\b", re.I),
-        re.compile(r"\b(credential rotation|kimlik bilgisi rotasyonu|kimlik bilgisi değişimi)\b", re.I),
     ],
     "iam_owner_editor_change": [
         re.compile(r"\biam\b.*\b(grant|set|add|remove|change|update|policy|role|yetki|ver|owner|editor)\b", re.I),

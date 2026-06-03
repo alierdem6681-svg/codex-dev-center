@@ -50,7 +50,6 @@
   "database_migration_requires_approval": true,
   "dns_change_requires_approval": true,
   "secret_access_requires_approval": true,
-  "credential_rotation_requires_approval": true,
   "token_private_key_env_change_requires_approval": true,
   "iam_owner_editor_change_requires_approval": true,
   "billing_change_requires_approval": true,

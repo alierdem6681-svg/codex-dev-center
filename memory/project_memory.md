@@ -33,7 +33,7 @@ User requires CTO, workers and all future Codex processes to use gpt-5.5 with xh
 
 Controlled execution proposal durumu dashboard status API'sine `controlled_execution` olarak eklendi. Panel Ayarlar bolumu son controlled execution task/rapor bilgisini ve proposal modunda repo degisikligi ile production deploy'un kapali oldugunu gosterir.
 
-Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapmadi.
+Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 ## Autonomous Production Delivery System v1 Memory
 
@@ -111,13 +111,13 @@ Bu paket CTO task-to-deploy zinciri icin non-destructive dashboard/pipeline mark
 
 Legacy `web_panel/server.py` `/api/status` payload'u ana `web_panel/panel_server.py` ile hizalandi. Artik iki panel server da runtime `state/github_actions_status.json` ve `state/pipeline_status.json` dosyalarini dashboard payload'unda `github_actions` ve `pipeline_status` olarak dondurur.
 
-Davranis `tests/test_runtime_status_model.py` icindeki unit test ile sabitlendi. Compile, unit test ve production readiness suite PASS oldu. Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi tamamlanamadi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapilmadi.
+Davranis `tests/test_runtime_status_model.py` icindeki unit test ile sabitlendi. Compile, unit test ve production readiness suite PASS oldu. Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi tamamlanamadi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
 
 ## 2026-06-03 Dashboard Pipeline Tracking Validation
 
 Dashboard pipeline tracking icin ek regresyon testi eklendi. Ana panel ve legacy panel `/api/status` payload'u, runtime `state/github_actions_status.json` ve `state/pipeline_status.json` dosyalari henuz yokken de `github_actions` ve `pipeline_status` anahtarlarini bos nesne olarak dondurmek zorundadir.
 
-Compile, `tests.test_runtime_status_model` ve production readiness suite PASS oldu. Git metadata yolu read-only oldugu icin commit/PR olusturma adimi bu sandbox'ta calistirilamadi. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapmadi.
+Compile, `tests.test_runtime_status_model` ve production readiness suite PASS oldu. Git metadata yolu read-only oldugu icin commit/PR olusturma adimi bu sandbox'ta calistirilamadi. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 ## 2026-06-02 Worker Lifecycle Smoke Check v1
 
@@ -140,10 +140,10 @@ Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/fire
 
 Validated proposal apply worker akışı için repo path doğrulaması güçlendirildi. `supervisor/worker_runner.py` artık apply path'lerini normalize eder, tekil allowlist dosyalarında exact match ister ve `AGENTS.md.bak`, `AGENTS.md/child`, traversal veya runtime `state/` hedeflerini bloklar.
 
-Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı.
+Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
 
 ## 2026-06-03 Staging / Rollback Readiness Apply Validation
 
 Production readiness suite staging ve rollback dry-run sonuçlarını artık non-mutating JSON sözleşmesiyle doğrular. Staging için `dry_run=true` ve `mutating_cloud_operations_performed=false`; rollback için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
 
-Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma senaryosuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı.
+Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma senaryosuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.

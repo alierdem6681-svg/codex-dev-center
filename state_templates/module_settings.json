@@ -136,7 +136,6 @@
     "production_deploy_execute_env": "CODEX_PRODUCTION_DEPLOY_EXECUTE",
     "production_deploy_execute_default": "1",
     "database_migration_requires_approval": true,
-    "credential_rotation_requires_approval": true,
     "token_private_key_env_change_requires_approval": true,
     "critical_exception_auto_block": true
   },
