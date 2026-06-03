@@ -30,6 +30,7 @@ from supervisor import (  # noqa: E402
 )
 from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_APPROVAL_REQUIRED,
+    TASK_STATUS_DEPLOYED,
     TASK_STATUS_DONE,
     TASK_STATUS_FAILED_RETRYABLE,
     TASK_STATUS_FAILED_TIMEOUT,
@@ -72,11 +73,27 @@ class WorkerStatusModelTest(unittest.TestCase):
 
     def test_critical_policy_keeps_real_critical_changes_blocked(self):
         findings = critical_operation_policy.critical_operation_findings(
-            "production token rotate and credential rotation"
+            "\n".join(
+                [
+                    "production token rotate and credential rotation",
+                    "iam grant owner role",
+                    "billing update payment settings",
+                    "dns add record",
+                    "firewall open production port",
+                    "drop table customer_events",
+                    "google ads mutate live campaign",
+                ]
+            )
         )
 
         self.assertIn("token_private_key_env_value_change", findings)
         self.assertIn("credential_rotation", findings)
+        self.assertIn("iam_owner_editor_change", findings)
+        self.assertIn("billing_change", findings)
+        self.assertIn("dns_change", findings)
+        self.assertIn("firewall_change", findings)
+        self.assertIn("database_destructive_operation", findings)
+        self.assertIn("google_ads_live_mutate", findings)
 
     def test_timeout_without_output_is_not_done(self):
         status, reason = worker_runner.classify_worker_result(124, [], "", False)
@@ -653,11 +670,64 @@ class DashboardDirectCtoJobsSummaryTest(unittest.TestCase):
 
 
 class DeployGateStatusModelTest(unittest.TestCase):
+    def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
+        return {
+            "id": task_id,
+            "status": TASK_STATUS_DONE,
+            "repo_applied": True,
+            "branch_merged": True,
+            "validation_status": "PASS",
+            "pipeline_status": "PASS",
+            "risk": "low",
+            "title": "credential rotation scope note",
+            "description": "Kapsam dışı:\n- credential rotation yapılmadı.\nDo not change token/private key/env values.",
+        }
+
+    @contextlib.contextmanager
+    def patched_delivery_runtime(self, tmp: str, tasks: list[dict]):
+        runtime = Path(tmp)
+        state = runtime / "state"
+        reports = runtime / "reports"
+        state.mkdir(parents=True)
+        reports.mkdir(parents=True)
+        queue = state / "task_queue.json"
+        queue.write_text(json.dumps({"tasks": tasks}), encoding="utf-8")
+        original_queue = cto_autonomous_delivery.QUEUE
+        original_state = cto_autonomous_delivery.STATE
+        original_reports = cto_autonomous_delivery.REPORTS
+        original_policy = cto_autonomous_delivery.policy
+        original_readiness = cto_autonomous_delivery.run_readiness
+        cto_autonomous_delivery.QUEUE = queue
+        cto_autonomous_delivery.STATE = state
+        cto_autonomous_delivery.REPORTS = reports
+        cto_autonomous_delivery.policy = lambda: {
+            "production_deploy_requires_user_approval_for_normal_app_changes": False,
+            "production_deploy_allowed_when_all_gates_pass": True,
+            "max_parallel_tasks": 1,
+            "stable_successful_low_risk_deploy_threshold": 3,
+        }
+        cto_autonomous_delivery.run_readiness = lambda: {
+            "ok": True,
+            "status": "PASS",
+            "score_percent": 100,
+            "failed": [],
+        }
+        try:
+            yield queue
+        finally:
+            cto_autonomous_delivery.QUEUE = original_queue
+            cto_autonomous_delivery.STATE = original_state
+            cto_autonomous_delivery.REPORTS = original_reports
+            cto_autonomous_delivery.policy = original_policy
+            cto_autonomous_delivery.run_readiness = original_readiness
+
     def test_proposal_done_is_not_deployable(self):
         task = {
             "id": "TASK-1",
             "status": TASK_STATUS_PROPOSAL_DONE,
             "repo_applied": True,
+            "validation_status": "PASS",
+            "pipeline_status": "PASS",
             "risk": "low",
             "title": "normal app work",
         }
@@ -667,17 +737,130 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertFalse(result["ready_for_deploy_gate"])
 
     def test_done_with_repo_applied_is_deployable(self):
-        task = {
-            "id": "TASK-2",
-            "status": TASK_STATUS_DONE,
-            "repo_applied": True,
-            "risk": "low",
-            "title": "normal app work",
-        }
+        task = self.deployable_task("TASK-2")
 
         result = cto_autonomous_delivery.evaluate_task(task)
 
         self.assertTrue(result["ready_for_deploy_gate"])
+
+    def test_safe_credential_rotation_context_does_not_block_deploy_gate(self):
+        task = self.deployable_task("TASK-CRED-SAFE")
+
+        result = cto_autonomous_delivery.evaluate_task(task)
+
+        self.assertTrue(result["ready_for_deploy_gate"])
+        self.assertFalse(result["critical"]["approval_required"])
+        self.assertEqual(result["critical"]["source"], "structured_task_state")
+
+    def test_done_repo_applied_requires_validation_and_pipeline_pass(self):
+        task = self.deployable_task("TASK-GATES")
+        task["pipeline_status"] = "FAIL"
+
+        result = cto_autonomous_delivery.evaluate_task(task)
+
+        self.assertFalse(result["ready_for_deploy_gate"])
+
+    def test_active_approval_required_blocks_deploy_gate(self):
+        task = self.deployable_task("TASK-ACTIVE-APPROVAL")
+        task["approval_required"] = True
+        task["critical_operation_findings"] = ["credential_rotation"]
+
+        result = cto_autonomous_delivery.evaluate_task(task)
+
+        self.assertFalse(result["ready_for_deploy_gate"])
+        self.assertTrue(result["critical"]["approval_required"])
+
+    def test_proposal_ready_and_ready_for_validation_are_not_deployable(self):
+        for status in [TASK_STATUS_PROPOSAL_READY, TASK_STATUS_READY_FOR_VALIDATION]:
+            task = self.deployable_task(f"TASK-{status}")
+            task["status"] = status
+
+            result = cto_autonomous_delivery.evaluate_task(task)
+
+            self.assertFalse(result["ready_for_deploy_gate"])
+
+    def test_deploy_task_does_not_return_approval_required_for_safe_credential_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-DEPLOY-SAFE")
+            with self.patched_delivery_runtime(tmp, [task]):
+                result = cto_autonomous_delivery.deploy_task("TASK-DEPLOY-SAFE", execute=False, smoke=True)
+
+        self.assertEqual(result["status"], "DRY_RUN_GATES_PASS_DEPLOY_ALLOWED")
+        self.assertFalse(result["evaluation"]["critical"]["approval_required"])
+
+    def test_deploy_task_blocks_active_approval_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-DEPLOY-ACTIVE-APPROVAL")
+            task["approval_required"] = True
+            with self.patched_delivery_runtime(tmp, [task]):
+                result = cto_autonomous_delivery.deploy_task("TASK-DEPLOY-ACTIVE-APPROVAL", execute=False, smoke=True)
+
+        self.assertEqual(result["status"], "APPROVAL_REQUIRED")
+
+    def test_pr_ready_candidate_uses_structured_gate_not_raw_task_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-PR-SAFE")
+            task["status"] = TASK_STATUS_DONE
+            task["repo_applied"] = False
+            task["branch_merged"] = False
+            task["delivery_level"] = "PR_READY"
+            task["pull_request_number"] = 123
+            with self.patched_delivery_runtime(tmp, [task]):
+                candidate = cto_autonomous_delivery.pr_ready_candidate()
+
+        self.assertEqual(candidate, "TASK-PR-SAFE")
+
+    def test_merge_pr_task_uses_structured_gate_not_raw_task_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-MERGE-SAFE")
+            task["status"] = TASK_STATUS_DONE
+            task["repo_applied"] = False
+            task["branch_merged"] = False
+            task["delivery_level"] = "PR_READY"
+            task["pull_request_number"] = 123
+            original_run = cto_autonomous_delivery.run
+
+            def fake_run(_args, cwd=None, timeout=300):
+                return {
+                    "ok": True,
+                    "returncode": 0,
+                    "stdout": json.dumps(
+                        {
+                            "number": 123,
+                            "url": "https://example.invalid/pr/123",
+                            "state": "OPEN",
+                            "isDraft": False,
+                            "mergeStateStatus": "CLEAN",
+                            "headRefName": "worker/task",
+                            "baseRefName": "main",
+                            "mergeCommit": None,
+                        }
+                    ),
+                    "stderr": "",
+                    "cmd": "gh pr view 123",
+                }
+
+            cto_autonomous_delivery.run = fake_run
+            try:
+                with self.patched_delivery_runtime(tmp, [task]):
+                    result = cto_autonomous_delivery.merge_pr_task("TASK-MERGE-SAFE", execute=False)
+            finally:
+                cto_autonomous_delivery.run = original_run
+
+        self.assertEqual(result["status"], "DRY_RUN_PR_READY_TO_MERGE")
+
+    def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-NO-SMOKE")
+            with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                result = cto_autonomous_delivery.deploy_task("TASK-NO-SMOKE", execute=True, smoke=False)
+                queue = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "SMOKE_REQUIRED_FOR_DEPLOYED")
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertNotEqual(queue["tasks"][0]["status"], TASK_STATUS_DEPLOYED)
+        self.assertFalse(queue["tasks"][0].get("production_deployed", False))
+        self.assertEqual(queue["tasks"][0]["deployment_status"], "DEPLOY_RETRY_REQUIRED")
 
     def test_choose_worker_prefers_least_active_worker(self):
         queue = {
