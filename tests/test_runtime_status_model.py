@@ -19,6 +19,7 @@ from supervisor import (  # noqa: E402
     cto_autonomous_delivery,
     direct_cto_job_recovery,
     lifecycle_manager,
+    production_readiness_suite,
     progress_aware_runner,
     direct_cto_async_job,
     direct_cto_progress_watcher,
@@ -142,6 +143,18 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("logs/apply-worker.log"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
+
+    def test_production_readiness_simulation_contracts_are_non_mutating(self):
+        contracts = production_readiness_suite.readiness_simulation_contracts()
+
+        self.assertTrue(contracts["restart"]["ok"])
+        self.assertTrue(contracts["failure_injection"]["ok"])
+        self.assertFalse(contracts["production_deploy_performed"])
+        self.assertFalse(contracts["mutating_cloud_operations_performed"])
+        for group in ("restart", "failure_injection"):
+            self.assertEqual(contracts[group]["mode"], "static_non_mutating_contract")
+            self.assertTrue(contracts[group]["contracts"])
+            self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -915,6 +928,15 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
 
 class BacklogDispatcherModelTest(unittest.TestCase):
+    def setUp(self):
+        self._logs_tmp = tempfile.TemporaryDirectory()
+        self._original_lifecycle_logs = lifecycle_manager.LOGS
+        lifecycle_manager.LOGS = Path(self._logs_tmp.name) / "logs"
+
+    def tearDown(self):
+        lifecycle_manager.LOGS = self._original_lifecycle_logs
+        self._logs_tmp.cleanup()
+
     def test_completed_child_prevents_duplicate_dispatch(self):
         tasks = [
             {"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "backlog_dispatcher_child": "CHILD"},

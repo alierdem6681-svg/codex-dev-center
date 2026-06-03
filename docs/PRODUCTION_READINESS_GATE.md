@@ -21,6 +21,14 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Restart simulation PASS
 - Failure injection simulation PASS
 
+## Simülasyon Kanıtı
+
+Restart ve failure injection kapıları canlı servis, cloud veya production deploy çalıştırmadan doğrulanır.
+
+- `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
+- `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
+- Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
+
 ## Otomatik Yayına Alma Kuralı
 
 `production_requires_explicit_approval=false` normal Codex Dev Center app deploy'u için hedef kuraldır. Bu, kontrolsüz yayına alma anlamına gelmez.
