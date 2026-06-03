@@ -140,27 +140,28 @@ jobs:
           set -euo pipefail
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
           backup="$BACKUP_DIR/pre_deploy_$stamp.tar.gz"
+          runtime_name="$(basename "$RUNTIME_DIR")"
           sudo tar \
-            --exclude="$RUNTIME_DIR/.git" \
-            --exclude="$RUNTIME_DIR/.github" \
-            --exclude="$RUNTIME_DIR/.venv" \
-            --exclude="$RUNTIME_DIR/venv" \
-            --exclude="$RUNTIME_DIR/node_modules" \
-            --exclude="$RUNTIME_DIR/state" \
-            --exclude="$RUNTIME_DIR/logs" \
-            --exclude="$RUNTIME_DIR/workspaces" \
-            --exclude="$RUNTIME_DIR/backups" \
-            --exclude="$RUNTIME_DIR/tmp" \
-            --exclude="$RUNTIME_DIR/secrets" \
-            --exclude="$RUNTIME_DIR/.env" \
-            --exclude="$RUNTIME_DIR/.env.*" \
-            --exclude="$RUNTIME_DIR/*.log" \
-            --exclude="$RUNTIME_DIR/*.ndjson" \
-            --exclude="$RUNTIME_DIR/*.pem" \
-            --exclude="$RUNTIME_DIR/*.key" \
-            --exclude="$RUNTIME_DIR/__pycache__" \
+            --exclude="$runtime_name/.git" \
+            --exclude="$runtime_name/.github" \
+            --exclude="$runtime_name/.venv" \
+            --exclude="$runtime_name/venv" \
+            --exclude="$runtime_name/node_modules" \
+            --exclude="$runtime_name/state" \
+            --exclude="$runtime_name/logs" \
+            --exclude="$runtime_name/workspaces" \
+            --exclude="$runtime_name/backups" \
+            --exclude="$runtime_name/tmp" \
+            --exclude="$runtime_name/secrets" \
+            --exclude="$runtime_name/.env" \
+            --exclude="$runtime_name/.env.*" \
+            --exclude="$runtime_name/*.log" \
+            --exclude="$runtime_name/*.ndjson" \
+            --exclude="$runtime_name/*.pem" \
+            --exclude="$runtime_name/*.key" \
+            --exclude="$runtime_name/__pycache__" \
             -czf "$backup" \
-            -C "$(dirname "$RUNTIME_DIR")" "$(basename "$RUNTIME_DIR")"
+            -C "$(dirname "$RUNTIME_DIR")" "$runtime_name"
           test -s "$backup"
           echo "backup=$backup" >> "$GITHUB_STEP_SUMMARY"
           echo "LAST_BACKUP_PATH=$backup" >> "$GITHUB_ENV"
