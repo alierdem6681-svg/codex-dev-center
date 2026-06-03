@@ -168,12 +168,18 @@ def useful_lines_for_scan(task: dict[str, Any], workspace: Path | None, limit_pe
 
 def actionable_critical_findings(lines: list[str]) -> list[str]:
     findings: set[str] = set()
+    safe_context_remaining = 0
     for line in lines:
         text = str(line or "").strip()
         if not text:
+            safe_context_remaining = max(0, safe_context_remaining - 1)
             continue
         lowered = text.lower()
         if any(marker in lowered for marker in SAFE_POLICY_MARKERS):
+            safe_context_remaining = 8
+            continue
+        if safe_context_remaining > 0:
+            safe_context_remaining -= 1
             continue
         findings.update(critical_operation_findings(text))
     return sorted(findings)
@@ -278,6 +284,23 @@ def candidate_statuses(include_proposal_done: bool) -> set[str]:
     return statuses
 
 
+def is_validation_candidate(
+    task: dict[str, Any],
+    statuses: set[str],
+    *,
+    recheck_engine_approval: bool,
+) -> bool:
+    status = normalize_status(task.get("status"))
+    if status in statuses:
+        return True
+    if not recheck_engine_approval or status != TASK_STATUS_APPROVAL_REQUIRED:
+        return False
+    return (
+        task.get("result") == "critical_operation_requires_user_approval"
+        and task.get("validation_status") == "APPROVAL_REQUIRED"
+    )
+
+
 def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any]) -> dict[str, Any]:
     workspace = find_workspace(runtime, task)
     files = created_files(workspace)
@@ -342,6 +365,17 @@ def apply_validation_result(task: dict[str, Any], result: dict[str, Any]) -> boo
     if not target_status:
         return False
 
+    before_findings = sorted(task.get("critical_operation_findings") or [])
+    after_findings = sorted(result.get("critical_operation_findings") or [])
+    if (
+        normalize_status(task.get("status")) == target_status
+        and task.get("result") == result.get("result")
+        and task.get("validation_status") == result.get("validation_status")
+        and task.get("pipeline_status") == result.get("pipeline_status")
+        and before_findings == after_findings
+    ):
+        return False
+
     task["status"] = target_status
     task["result"] = result.get("result")
     task["delivery_level"] = target_status
@@ -402,6 +436,7 @@ def validate_ready_tasks(
     limit: int = DEFAULT_LIMIT,
     run_pipeline_gate: bool = False,
     include_proposal_done: bool = False,
+    recheck_engine_approval: bool = True,
     pipeline_max_age_seconds: int | None = None,
     write: bool = True,
 ) -> dict[str, Any]:
@@ -418,7 +453,7 @@ def validate_ready_tasks(
     for task in queue.get("tasks", []):
         if checked >= max(0, limit):
             break
-        if normalize_status(task.get("status")) not in statuses:
+        if not is_validation_candidate(task, statuses, recheck_engine_approval=recheck_engine_approval):
             continue
         checked += 1
         result = evaluate_task(task, runtime, pipeline)
@@ -458,6 +493,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
     parser.add_argument("--run-pipeline", action="store_true")
     parser.add_argument("--include-proposal-done", action="store_true")
+    parser.add_argument("--no-recheck-engine-approval", action="store_true")
     parser.add_argument("--pipeline-max-age-seconds", type=int, default=0)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -468,6 +504,7 @@ def main() -> None:
         limit=args.limit,
         run_pipeline_gate=args.run_pipeline,
         include_proposal_done=args.include_proposal_done,
+        recheck_engine_approval=not args.no_recheck_engine_approval,
         pipeline_max_age_seconds=max_age,
         write=True,
     )

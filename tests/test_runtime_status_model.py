@@ -264,7 +264,15 @@ class WorkerLifecycleRepairTest(unittest.TestCase):
 
 
 class TaskValidationEngineTest(unittest.TestCase):
-    def write_ready_runtime(self, tmp: str, pipeline_status: str = "PASS", title: str = "normal worker task") -> Path:
+    def write_ready_runtime(
+        self,
+        tmp: str,
+        pipeline_status: str = "PASS",
+        title: str = "normal worker task",
+        task_status: str = TASK_STATUS_READY_FOR_VALIDATION,
+        result: str | None = None,
+        validation_status: str = "PENDING",
+    ) -> Path:
         runtime = Path(tmp)
         state = runtime / "state"
         workspace = runtime / "workspaces" / "worker_worker-1_TASK-VAL_20260603_000000"
@@ -272,7 +280,12 @@ class TaskValidationEngineTest(unittest.TestCase):
         workspace.mkdir(parents=True)
         for name in task_validation_engine.EXPECTED_WORKER_FILES[:4]:
             (workspace / name).write_text(
-                "# Test\n\nDo not change token/private key/env values.\nValid worker output.\n",
+                "# Test\n\n"
+                "Kapsam disi:\n"
+                "- database destructive operation\n"
+                "- credential rotation\n\n"
+                "Do not change token/private key/env values.\n"
+                "Valid worker output.\n",
                 encoding="utf-8",
             )
         (state / "production_readiness_status.json").write_text(
@@ -287,7 +300,9 @@ class TaskValidationEngineTest(unittest.TestCase):
                             "id": "TASK-VAL",
                             "title": title,
                             "description": "Validate safe worker output.",
-                            "status": TASK_STATUS_READY_FOR_VALIDATION,
+                            "status": task_status,
+                            "result": result,
+                            "validation_status": validation_status,
                             "source": "cto",
                             "risk": "low",
                             "assigned_worker": "worker-1",
@@ -334,6 +349,22 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(result["changed"], 1)
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_APPROVAL_REQUIRED)
         self.assertTrue(queue["tasks"][0]["critical_operation_findings"])
+
+    def test_engine_approval_can_be_rechecked_when_findings_were_policy_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(
+                tmp,
+                pipeline_status="PASS",
+                task_status=TASK_STATUS_APPROVAL_REQUIRED,
+                result="critical_operation_requires_user_approval",
+                validation_status="APPROVAL_REQUIRED",
+            )
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
 
 
 if __name__ == "__main__":
