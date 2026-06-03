@@ -7,8 +7,10 @@ from pathlib import Path
 
 try:
     from .task_status_constants import is_worker_eligible_task
+    from .direct_cto_job_recovery import reconcile_stale_jobs
 except ImportError:
     from task_status_constants import is_worker_eligible_task
+    from direct_cto_job_recovery import reconcile_stale_jobs
 
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -89,7 +91,7 @@ def health_once():
         "actions": []
     }
 
-    core_services = ["codex-panel", "codex-lifecycle", "codex-watchdog"]
+    core_services = ["codex-panel", "codex-direct-cto", "codex-lifecycle", "codex-watchdog"]
     worker_services = ["codex-worker-1", "codex-worker-2", "codex-worker-3", "codex-worker-4"]
 
     for svc in core_services:
@@ -115,6 +117,11 @@ def health_once():
 
     drift_check()
     result["actions"].append("drift_check")
+
+    direct_cto_recovery = reconcile_stale_jobs(APP)
+    result["direct_cto_recovery"] = direct_cto_recovery
+    if direct_cto_recovery.get("changed"):
+        result["actions"].append("direct_cto_stale_job_recovery")
 
     write_json(STATE / "service_health.json", result)
 

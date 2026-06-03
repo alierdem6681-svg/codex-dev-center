@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "web_panel"))
 from supervisor import (  # noqa: E402
     critical_operation_policy,
     cto_autonomous_delivery,
+    direct_cto_job_recovery,
     lifecycle_manager,
     progress_aware_runner,
     direct_cto_async_job,
@@ -337,6 +338,50 @@ class DirectCtoProgressWatcherTest(unittest.TestCase):
                 direct_cto_progress_watcher.JOBS = original_jobs
 
         self.assertFalse(stopped)
+
+
+class DirectCtoJobRecoveryTest(unittest.TestCase):
+    def write_job(self, root, job_id, status="RUNNING", pid=999999999):
+        jobs_dir = Path(root) / "state" / "direct_cto_jobs"
+        jobs_dir.mkdir(parents=True)
+        old = "2026-06-03T00:00:00+00:00"
+        (jobs_dir / f"{job_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": job_id,
+                    "status": status,
+                    "chat_id": "123",
+                    "created_at": old,
+                    "started_at": old,
+                    "updated_at": old,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (jobs_dir / f"{job_id}.progress.json").write_text(
+            json.dumps({"status": "RUNNING", "pid": pid, "updated_at": old}),
+            encoding="utf-8",
+        )
+        return jobs_dir / f"{job_id}.json"
+
+    def test_stale_running_direct_cto_job_without_process_is_retryable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job_path = self.write_job(tmp, "JOB-STALE", pid=999999999)
+            result = direct_cto_job_recovery.reconcile_stale_jobs(tmp, stale_seconds=1, notify=False)
+            job = json.loads(job_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(job["status"], TASK_STATUS_FAILED_RETRYABLE)
+        self.assertEqual(job["result"], "direct_cto_process_lost_retryable")
+
+    def test_running_direct_cto_job_with_live_process_is_left_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job_path = self.write_job(tmp, "JOB-LIVE", pid=os.getpid())
+            result = direct_cto_job_recovery.reconcile_stale_jobs(tmp, stale_seconds=1, notify=False)
+            job = json.loads(job_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 0)
+        self.assertEqual(job["status"], "RUNNING")
 
 
 class DashboardDirectCtoJobsSummaryTest(unittest.TestCase):
