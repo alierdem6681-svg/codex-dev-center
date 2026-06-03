@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
@@ -16,6 +17,7 @@ try:
         normalize_status,
     )
 except ImportError:
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
@@ -116,96 +118,97 @@ def main():
     REPORTS.mkdir(parents=True, exist_ok=True)
 
     qpath = STATE / "task_queue.json"
-    q = read_json(qpath, {"tasks": []})
-    q, _changes = normalize_queue_payload(q)
-    tasks = q.get("tasks", [])
-    action_tasks = [t for t in tasks if str(t.get("id", "")).startswith("CTO-ACTION-")]
-
-    if not action_tasks:
-        print("WATCHER=NO_ACTION_TASKS")
-        return 0
-
-    keys = [run_key(t.get("id")) for t in action_tasks if run_key(t.get("id"))]
-    latest_key = sorted(keys)[-1] if keys else None
-    current = [t for t in action_tasks if run_key(t.get("id")) == latest_key] if latest_key else action_tasks[-10:]
-    current_ids = {t.get("id") for t in current}
-
     ready_for_validation = 0
     failed_no_proposal = 0
     running = 0
     details = []
+    with state_file_lock(qpath):
+        q = read_json(qpath, {"tasks": []})
+        q, _changes = normalize_queue_payload(q)
+        tasks = q.get("tasks", [])
+        action_tasks = [t for t in tasks if str(t.get("id", "")).startswith("CTO-ACTION-")]
 
-    for t in current:
-        tid = t.get("id")
-        worker = t.get("assigned_worker")
-        ws = t.get("workspace") or ""
-        if not ws:
-            found = find_workspace(tid, worker)
-            ws = str(found) if found else ""
+        if not action_tasks:
+            print("WATCHER=NO_ACTION_TASKS")
+            return 0
 
-        created = 0
-        if ws and Path(ws).exists():
-            created = sum(1 for x in EXPECTED if (Path(ws) / x).exists())
+        keys = [run_key(t.get("id")) for t in action_tasks if run_key(t.get("id"))]
+        latest_key = sorted(keys)[-1] if keys else None
+        current = [t for t in action_tasks if run_key(t.get("id")) == latest_key] if latest_key else action_tasks[-10:]
+        current_ids = {t.get("id") for t in current}
 
-        status = normalize_status(t.get("status"))
+        for t in current:
+            tid = t.get("id")
+            worker = t.get("assigned_worker")
+            ws = t.get("workspace") or ""
+            if not ws:
+                found = find_workspace(tid, worker)
+                ws = str(found) if found else ""
 
-        if created >= 4:
-            t["status"] = TASK_STATUS_READY_FOR_VALIDATION
-            t["result"] = "worker_output_ready_for_validation_not_done"
-            t["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
-            t["validation_status"] = "PENDING"
-            t["pipeline_status"] = "NOT_RUN"
-            t["repo_applied"] = False
-            t["staging_deployed"] = False
-            t["production_deployed"] = False
-            t["workspace"] = ws
-            t["updated_at"] = now()
-            ready_for_validation += 1
+            created = 0
+            if ws and Path(ws).exists():
+                created = sum(1 for x in EXPECTED if (Path(ws) / x).exists())
 
-            report_path = REPORTS / f"{tid}_{worker}_READY_FOR_VALIDATION_REPORT.md"
-            report_path.write_text(
-                "ACTION TASK READY FOR VALIDATION REPORT\n\n"
-                f"Task: {tid}\n"
-                f"Worker: {worker}\n"
-                f"Workspace: {ws}\n"
-                f"Created files: {created}/6\n"
-                "Validation status: PENDING\n"
-                "Pipeline status: NOT_RUN\n"
-                "Repo applied: false\n"
-                "Staging deployed: false\n"
-                "Production deployed: false\n",
-                encoding="utf-8"
-            )
-            t["report_path"] = str(report_path)
-            details.append(f"{tid}: READY_FOR_VALIDATION ({created}/6)")
-        elif status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
-            running += 1
-            details.append(f"{tid}: {status} ({created}/6)")
-        else:
-            t["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
-            t["result"] = "failed_no_proposal_output"
-            t["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
-            t["repo_applied"] = False
-            t["staging_deployed"] = False
-            t["production_deployed"] = False
-            t["updated_at"] = now()
-            failed_no_proposal += 1
-            details.append(f"{tid}: FAILED_NO_PROPOSAL ({created}/6)")
+            status = normalize_status(t.get("status"))
 
-    q["updated_at"] = now()
-    write_json(qpath, q)
+            if created >= 4:
+                t["status"] = TASK_STATUS_READY_FOR_VALIDATION
+                t["result"] = "worker_output_ready_for_validation_not_done"
+                t["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
+                t["validation_status"] = "PENDING"
+                t["pipeline_status"] = "NOT_RUN"
+                t["repo_applied"] = False
+                t["staging_deployed"] = False
+                t["production_deployed"] = False
+                t["workspace"] = ws
+                t["updated_at"] = now()
+                ready_for_validation += 1
+
+                report_path = REPORTS / f"{tid}_{worker}_READY_FOR_VALIDATION_REPORT.md"
+                report_path.write_text(
+                    "ACTION TASK READY FOR VALIDATION REPORT\n\n"
+                    f"Task: {tid}\n"
+                    f"Worker: {worker}\n"
+                    f"Workspace: {ws}\n"
+                    f"Created files: {created}/6\n"
+                    "Validation status: PENDING\n"
+                    "Pipeline status: NOT_RUN\n"
+                    "Repo applied: false\n"
+                    "Staging deployed: false\n"
+                    "Production deployed: false\n",
+                    encoding="utf-8"
+                )
+                t["report_path"] = str(report_path)
+                details.append(f"{tid}: READY_FOR_VALIDATION ({created}/6)")
+            elif status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
+                running += 1
+                details.append(f"{tid}: {status} ({created}/6)")
+            else:
+                t["status"] = TASK_STATUS_FAILED_NO_PROPOSAL
+                t["result"] = "failed_no_proposal_output"
+                t["delivery_level"] = TASK_STATUS_FAILED_NO_PROPOSAL
+                t["repo_applied"] = False
+                t["staging_deployed"] = False
+                t["production_deployed"] = False
+                t["updated_at"] = now()
+                failed_no_proposal += 1
+                details.append(f"{tid}: FAILED_NO_PROPOSAL ({created}/6)")
+
+        q["updated_at"] = now()
+        write_json(qpath, q)
 
     # Worker state temizliği: running iş yoksa idle göster.
     wpath = STATE / "workers.json"
-    workers = read_json(wpath, {"workers": []})
-    if running == 0:
-        for w in workers.get("workers", []):
-            if w.get("current_task") in current_ids:
-                w["status"] = "IDLE"
-                w["current_task"] = None
-                w["note"] = "action_watcher_reconciled"
-                w["last_seen"] = now()
-        write_json(wpath, workers)
+    with state_file_lock(wpath):
+        workers = read_json(wpath, {"workers": []})
+        if running == 0:
+            for w in workers.get("workers", []):
+                if w.get("current_task") in current_ids:
+                    w["status"] = "IDLE"
+                    w["current_task"] = None
+                    w["note"] = "action_watcher_reconciled"
+                    w["last_seen"] = now()
+            write_json(wpath, workers)
 
     spath = STATE / "system_state.json"
     state = read_json(spath, {})
