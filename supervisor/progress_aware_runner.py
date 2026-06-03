@@ -99,6 +99,42 @@ def output_has_meaningful_marker(text: str) -> bool:
     return any(marker.lower() in lowered for marker in MEANINGFUL_OUTPUT_MARKERS)
 
 
+def snapshot_git_roots(roots: list[Path] | None) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    for root in roots or []:
+        if not (root / ".git").exists():
+            continue
+        try:
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=str(root),
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+            diff = subprocess.run(
+                ["git", "diff", "--stat"],
+                cwd=str(root),
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+            snapshot[str(root)] = (status.stdout or "") + "\n" + (diff.stdout or "")
+        except Exception:
+            continue
+    return snapshot
+
+
+def changed_git_roots(before: dict[str, str], after: dict[str, str]) -> list[str]:
+    changed = []
+    for root, value in after.items():
+        if before.get(root) != value:
+            changed.append(root)
+    return sorted(changed)
+
+
 def terminate_process(proc: subprocess.Popen[Any], grace_seconds: int = 8) -> None:
     if proc.poll() is not None:
         return
@@ -142,6 +178,7 @@ def run_progress_aware(
     stdout_path: Path,
     stderr_path: Path,
     progress_paths: list[Path] | None = None,
+    git_roots: list[Path] | None = None,
     progress_state_path: Path | None = None,
     stall_seconds: int = 900,
     grace_seconds: int = 180,
@@ -162,6 +199,7 @@ def run_progress_aware(
     if progress_state_path:
         ignored_names.add(progress_state_path.name)
     path_snapshot = snapshot_paths(progress_paths, ignored_names)
+    git_snapshot = snapshot_git_roots(git_roots)
     meaningful_events: list[dict[str, Any]] = []
     output_activity_count = 0
 
@@ -189,19 +227,23 @@ def run_progress_aware(
 
                 after_snapshot = snapshot_paths(progress_paths, ignored_names)
                 changed = changed_paths(path_snapshot, after_snapshot)
+                after_git_snapshot = snapshot_git_roots(git_roots)
+                git_changed = changed_git_roots(git_snapshot, after_git_snapshot)
                 tail = tail_text(stdout_path) + "\n" + tail_text(stderr_path)
                 meaningful_output = output_changed and output_has_meaningful_marker(tail)
-                meaningful = bool(changed) or meaningful_output
+                meaningful = bool(changed) or bool(git_changed) or meaningful_output
                 if meaningful:
                     last_meaningful = now_ts
                     event = {
                         "at": utc_now(),
                         "changed_paths": changed[:20],
+                        "git_changed_roots": git_changed[:8],
                         "meaningful_output": meaningful_output,
                     }
                     meaningful_events.append(event)
                     meaningful_events = meaningful_events[-20:]
                     path_snapshot = after_snapshot
+                    git_snapshot = after_git_snapshot
 
                 payload = {
                     "status": "RUNNING" if returncode is None else "EXITED",
