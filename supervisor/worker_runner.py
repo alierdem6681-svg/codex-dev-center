@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import shutil
+import sys
 import time
 import traceback
 from datetime import datetime, timezone
@@ -11,30 +14,40 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .critical_operation_policy import approval_required_payload
     from .progress_aware_runner import run_progress_aware
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
+        TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_DONE,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
+        TASK_STATUS_VALIDATION_FAILED,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_status,
         redact_sensitive_text,
     )
 except ImportError:
+    from critical_operation_policy import approval_required_payload
     from progress_aware_runner import run_progress_aware
     from state_file_lock import state_file_lock
     from task_status_constants import (
+        TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_DONE,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
+        TASK_STATUS_VALIDATION_FAILED,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_status,
@@ -50,11 +63,13 @@ WORKERS_DIR = APP_DIR / "workers"
 QUEUE_PATH = STATE_DIR / "task_queue.json"
 WORKERS_PATH = STATE_DIR / "workers.json"
 SYSTEM_STATE_PATH = STATE_DIR / "system_state.json"
+SOURCE_ROOT = Path(os.environ.get("CODEX_DEV_CENTER_SOURCE", "/home/alierdem6681/codex-dev-center-github-export")).resolve()
 
 POLL_SECONDS = 3
 WORKER_STALL_SECONDS = int(os.environ.get("CODEX_WORKER_STALL_SECONDS", "420"))
 WORKER_GRACE_SECONDS = int(os.environ.get("CODEX_WORKER_GRACE_SECONDS", "180"))
 WORKER_MAX_WALL_SECONDS = int(os.environ.get("CODEX_WORKER_MAX_WALL_SECONDS", "14400"))
+REPO_APPLY_MAX_WALL_SECONDS = int(os.environ.get("CODEX_REPO_APPLY_MAX_WALL_SECONDS", "7200"))
 
 EXPECTED_WORKER_FILES = [
     "PLAN.md",
@@ -63,6 +78,52 @@ EXPECTED_WORKER_FILES = [
     "RISK_REVIEW.md",
     "LIVING_DOCS_CHECKLIST.md",
     "WORKER_SUMMARY.md",
+]
+
+SAFE_REPO_APPLY_PREFIXES = (
+    ".github/workflows/",
+    "AGENTS.md",
+    "constitution/",
+    "docs/",
+    "memory/",
+    "modules/",
+    "prompts/",
+    "scripts/",
+    "state_templates/",
+    "supervisor/",
+    "tests/",
+    "web_panel/",
+    "workers/",
+)
+
+BLOCKED_REPO_APPLY_PARTS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "state",
+    "logs",
+    "workspaces",
+    "backups",
+    "tmp",
+    "secrets",
+    "__pycache__",
+}
+
+BLOCKED_REPO_APPLY_NAMES = {
+    ".env",
+    ".env.local",
+    ".env.production",
+    ".env.prod",
+}
+
+TEXT_SUFFIXES_FOR_SCAN = {".py", ".md", ".json", ".sh", ".html", ".css", ".js", ".txt", ".yml", ".yaml", ".service"}
+
+SECRET_PATTERNS = [
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{20,}\b"),
+    re.compile(r"\bya29\.[0-9A-Za-z_-]{20,}\b"),
 ]
 
 def now() -> str:
@@ -370,9 +431,439 @@ def update_task_progress(task_id: str, worker_id: str, progress: dict[str, Any])
     if changed:
         update_worker(worker_id, "RUNNING", task_id, "progress_watchdog_running")
 
+
+def task_text(task: dict[str, Any]) -> str:
+    return "\n".join(str(task.get(key, "")) for key in ["title", "description", "raw_message"])
+
+
+def task_allows_repo_apply(task: dict[str, Any]) -> bool:
+    mode = str(task.get("execution_mode") or task.get("dispatcher_mode") or "").strip().lower()
+    return bool(task.get("repo_apply_allowed") is True or mode in {"repo_apply", "apply", "implementation"})
+
+
+def run_cmd(
+    args: list[str],
+    *,
+    cwd: Path,
+    timeout: int = 300,
+    env: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=str(cwd),
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": redact_sensitive_text(proc.stdout)[-4000:],
+            "stderr": redact_sensitive_text(proc.stderr)[-4000:],
+            "cmd": " ".join(args),
+        }
+    except Exception as exc:
+        return {"ok": False, "returncode": 1, "stdout": "", "stderr": redact_sensitive_text(str(exc))[:1000], "cmd": " ".join(args)}
+
+
+def safe_branch_fragment(value: Any, limit: int = 64) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "task").strip()).strip("-._").lower()
+    return (cleaned[:limit].strip("-._") or "task")
+
+
+def is_safe_repo_apply_path(path: str) -> bool:
+    rel = path.replace("\\", "/").lstrip("/")
+    if not rel or rel.startswith("../") or "/../" in rel:
+        return False
+    parts = set(rel.split("/"))
+    if parts & BLOCKED_REPO_APPLY_PARTS:
+        return False
+    if Path(rel).name in BLOCKED_REPO_APPLY_NAMES:
+        return False
+    return any(rel == prefix.rstrip("/") or rel.startswith(prefix) for prefix in SAFE_REPO_APPLY_PREFIXES)
+
+
+def changed_repo_files(worktree: Path) -> list[str]:
+    status = run_cmd(["git", "status", "--porcelain"], cwd=worktree, timeout=60)
+    files: list[str] = []
+    for raw in status.get("stdout", "").splitlines():
+        line = raw.rstrip()
+        if not line:
+            continue
+        rel = line[3:] if len(line) > 3 else line
+        if " -> " in rel:
+            rel = rel.split(" -> ", 1)[1]
+        rel = rel.strip().strip('"')
+        if rel:
+            files.append(rel)
+    return sorted(dict.fromkeys(files))
+
+
+def secret_scan_changed_files(worktree: Path, files: list[str]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for rel in files:
+        path = worktree / rel
+        if not path.exists() or not path.is_file():
+            continue
+        if path.suffix.lower() not in TEXT_SUFFIXES_FOR_SCAN:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for idx, pattern in enumerate(SECRET_PATTERNS):
+                if pattern.search(line):
+                    findings.append({"file": rel, "line": lineno, "pattern_id": idx})
+    return findings
+
+
+def proposal_evidence_excerpt(task: dict[str, Any], limit: int = 2500) -> str:
+    chunks: list[str] = []
+    for key in ("proposal_workspace", "proposal_report_path", "workspace", "report_path"):
+        raw = task.get(key)
+        if not raw:
+            continue
+        path = Path(str(raw))
+        if path.is_file():
+            try:
+                chunks.append(f"## {path.name}\n" + path.read_text(encoding="utf-8", errors="replace")[:limit])
+            except Exception:
+                continue
+        elif path.is_dir():
+            for name in EXPECTED_WORKER_FILES:
+                candidate = path / name
+                if not candidate.exists():
+                    continue
+                try:
+                    chunks.append(f"## {name}\n" + candidate.read_text(encoding="utf-8", errors="replace")[:limit])
+                except Exception:
+                    continue
+    return redact_sensitive_text("\n\n".join(chunks))[:limit]
+
+
+def repo_apply_pipeline(worktree: Path) -> list[dict[str, Any]]:
+    env = os.environ.copy()
+    env["CODEX_DEV_CENTER_HOME"] = str(worktree)
+    env["CODEX_DEV_CENTER_SOURCE"] = str(worktree)
+    checks: list[tuple[str, list[str], int]] = [
+        ("python_compile", [sys.executable, "-m", "compileall", "-q", "supervisor", "web_panel", "scripts"], 180),
+    ]
+    if (worktree / "tests" / "test_runtime_status_model.py").exists():
+        checks.append(("unit_runtime_status_model", [sys.executable, "-m", "unittest", "tests.test_runtime_status_model"], 300))
+    if (worktree / "supervisor" / "production_readiness_suite.py").exists():
+        checks.append(("production_readiness", [sys.executable, "supervisor/production_readiness_suite.py", "--json"], 600))
+
+    results: list[dict[str, Any]] = []
+    for name, cmd, timeout in checks:
+        result = run_cmd(cmd, cwd=worktree, timeout=timeout, env=env)
+        result["name"] = name
+        results.append(result)
+        if not result["ok"]:
+            break
+    return results
+
+
+def pipeline_passed(results: list[dict[str, Any]]) -> bool:
+    return bool(results) and all(item.get("ok") for item in results)
+
+
+def create_pull_request(worktree: Path, branch: str, title: str, body: str) -> dict[str, Any]:
+    if not shutil.which("gh"):
+        return {"ok": False, "reason": "gh_not_found"}
+    created = run_cmd(
+        ["gh", "pr", "create", "--base", "main", "--head", branch, "--title", title, "--body", body],
+        cwd=worktree,
+        timeout=120,
+    )
+    if not created["ok"]:
+        return {"ok": False, "create": created}
+    viewed = run_cmd(["gh", "pr", "view", branch, "--json", "number,url,headRefName,state"], cwd=worktree, timeout=60)
+    payload: dict[str, Any] = {"ok": True, "create": created, "url": created.get("stdout", "").strip()}
+    if viewed["ok"]:
+        try:
+            info = json.loads(viewed.get("stdout") or "{}")
+            payload.update(info)
+        except Exception:
+            payload["view"] = viewed
+    return payload
+
+
+def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, str, str, dict[str, Any]]:
+    task_id = str(task.get("id") or "unknown-task")
+    title = safe_excerpt(task.get("title") or "Worker repo apply", 180)
+    desc = safe_excerpt(task.get("description") or task.get("raw_message") or title, 1800)
+    risk = safe_excerpt(task.get("risk") or task.get("risk_level") or "medium", 60)
+    safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in task_id)[:100]
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    worktree = APP_DIR / "workspaces" / f"repo_apply_{worker_id}_{safe_id}_{run_id}"
+    control_dir = APP_DIR / "workspaces" / f"repo_apply_control_{worker_id}_{safe_id}_{run_id}"
+    task_log = LOG_DIR / f"{task_id}_{worker_id}.log"
+    report_path = REPORT_DIR / f"{task_id}_{worker_id}_REPORT.md"
+    branch = f"worker/{safe_branch_fragment(task_id)}-{run_id}"
+
+    critical = approval_required_payload(task_text(task))
+    if critical["approval_required"]:
+        metadata = {
+            "approval_required": True,
+            "critical_operation_findings": critical["critical_operation_findings"],
+            "worker_eligible": False,
+            "production_deployed": False,
+            "repo_applied": False,
+            "delivery_level": TASK_STATUS_APPROVAL_REQUIRED,
+            "validation_status": "APPROVAL_REQUIRED",
+            "pipeline_status": "NOT_RUN",
+        }
+        report_path.write_text(
+            "# WORKER REPO APPLY REPORT\n\n"
+            f"Tarih: {now()}\n"
+            f"Worker: {worker_id}\n"
+            f"Task: {task_id}\n"
+            "Sonuç: APPROVAL_REQUIRED\n"
+            "Neden: kritik altyapı/credential kapsamı tespit edildi; otomatik apply yapılmadı.\n",
+            encoding="utf-8",
+        )
+        return TASK_STATUS_APPROVAL_REQUIRED, "critical_operation_requires_user_approval", str(report_path), metadata
+
+    if not (SOURCE_ROOT / ".git").exists():
+        metadata = {
+            "production_deployed": False,
+            "repo_applied": False,
+            "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
+            "validation_status": "NOT_READY",
+            "pipeline_status": "NOT_RUN",
+        }
+        report_path.write_text(
+            "# WORKER REPO APPLY REPORT\n\n"
+            f"Tarih: {now()}\nWorker: {worker_id}\nTask: {task_id}\nSonuç: FAILED_RETRYABLE\n"
+            f"Neden: source git repo bulunamadı: {SOURCE_ROOT}\n",
+            encoding="utf-8",
+        )
+        return TASK_STATUS_FAILED_RETRYABLE, "source_git_repo_not_found", str(report_path), metadata
+
+    append_log(task_log, f"{now()} WORKER={worker_id} TASK={task_id} REPO_APPLY_START branch={branch} worktree={worktree}")
+    fetch = run_cmd(["git", "fetch", "origin", "main", "--prune"], cwd=SOURCE_ROOT, timeout=180)
+    base_ref = "origin/main" if fetch["ok"] else "HEAD"
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    add_worktree = run_cmd(["git", "worktree", "add", "-b", branch, str(worktree), base_ref], cwd=SOURCE_ROOT, timeout=180)
+    if not add_worktree["ok"]:
+        metadata = {
+            "git_fetch": fetch,
+            "git_worktree": add_worktree,
+            "production_deployed": False,
+            "repo_applied": False,
+            "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
+            "validation_status": "NOT_READY",
+            "pipeline_status": "NOT_RUN",
+        }
+        report_path.write_text(
+            "# WORKER REPO APPLY REPORT\n\n"
+            f"Tarih: {now()}\nWorker: {worker_id}\nTask: {task_id}\nSonuç: FAILED_RETRYABLE\n"
+            "Neden: git worktree oluşturulamadı.\n",
+            encoding="utf-8",
+        )
+        return TASK_STATUS_FAILED_RETRYABLE, "git_worktree_create_failed", str(report_path), metadata
+
+    evidence = proposal_evidence_excerpt(task)
+    prompt = f"""
+Sen Codex Dev Center apply worker'ısın.
+
+Worker:
+{worker_id}
+
+Görev:
+{title}
+
+Açıklama:
+{desc}
+
+Risk:
+{risk}
+
+Bu çalışma ayrı bir git worktree ve branch üzerindedir:
+{branch}
+
+Kurallar:
+- Bu worktree içindeki repo dosyalarını değiştirebilirsin.
+- Main branch'e doğrudan push yapma.
+- Production deploy yapma.
+- Secret/env/token/private key değerlerini okuma, yazma, gösterme veya değiştirme.
+- IAM, billing, DNS, firewall, destructive database, credential rotation veya reklam platformu canlı yazma işlemi yapma.
+- Değişikliği küçük, test edilebilir ve geri alınabilir tut.
+- İlgili testleri çalıştır; çalıştıramadığın testleri final çıktıda belirt.
+- Teknik çıktıyı Telegram'a gönderme.
+
+Önceki proposal/kanıt özeti:
+{evidence or "-"}
+
+Beklenen çıktı:
+- Repo içinde gerekli en küçük kod/doküman/test değişikliğini uygula.
+- Final yanıtta değişen dosyaları, testleri ve riski kısa Türkçe özetle.
+""".strip()
+
+    control_dir.mkdir(parents=True, exist_ok=True)
+    prompt_file = control_dir / "WORKER_APPLY_PROMPT.txt"
+    out_file = control_dir / "codex.apply.out"
+    err_file = control_dir / "codex.apply.err"
+    prompt_file.write_text(prompt, encoding="utf-8")
+
+    progress_state = control_dir / "progress_watchdog.json"
+    cmd = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", str(worktree), prompt]
+    progress_result = run_progress_aware(
+        cmd,
+        cwd=worktree,
+        stdout_path=out_file,
+        stderr_path=err_file,
+        progress_paths=[worktree, control_dir],
+        git_roots=[worktree],
+        progress_state_path=progress_state,
+        stall_seconds=WORKER_STALL_SECONDS,
+        grace_seconds=WORKER_GRACE_SECONDS,
+        max_wall_seconds=REPO_APPLY_MAX_WALL_SECONDS,
+        on_progress=lambda payload: update_task_progress(task_id, worker_id, payload),
+    )
+    returncode = int(progress_result.get("returncode") if progress_result.get("returncode") is not None else 1)
+    changed_files = changed_repo_files(worktree)
+    unsafe_files = [rel for rel in changed_files if not is_safe_repo_apply_path(rel)]
+    secret_findings = secret_scan_changed_files(worktree, changed_files)
+
+    status = TASK_STATUS_DONE
+    result = "repo_apply_pr_ready_pipeline_passed"
+    validation_status = "PASS"
+    pipeline_status = "PASS"
+    pipeline_results: list[dict[str, Any]] = []
+    pr_payload: dict[str, Any] = {}
+    commit_result: dict[str, Any] = {}
+    push_result: dict[str, Any] = {}
+
+    if returncode != 0 and not changed_files:
+        status = TASK_STATUS_FAILED_RETRYABLE
+        result = "repo_apply_worker_failed_without_changes"
+        validation_status = "NOT_READY"
+        pipeline_status = "NOT_RUN"
+    elif not changed_files:
+        status = TASK_STATUS_FAILED_NO_PROPOSAL
+        result = "repo_apply_worker_completed_without_changes"
+        validation_status = "NOT_READY"
+        pipeline_status = "NOT_RUN"
+    elif unsafe_files:
+        status = TASK_STATUS_VALIDATION_FAILED
+        result = "repo_apply_changed_unsafe_paths"
+        validation_status = "FAIL"
+        pipeline_status = "NOT_RUN"
+    elif secret_findings:
+        status = TASK_STATUS_APPROVAL_REQUIRED
+        result = "repo_apply_secret_scan_requires_approval"
+        validation_status = "APPROVAL_REQUIRED"
+        pipeline_status = "NOT_RUN"
+    else:
+        pipeline_results = repo_apply_pipeline(worktree)
+        if not pipeline_passed(pipeline_results):
+            status = TASK_STATUS_PIPELINE_FAILED
+            result = "repo_apply_pipeline_failed"
+            validation_status = "PASS"
+            pipeline_status = "FAIL"
+        else:
+            add_result = run_cmd(["git", "add", "-A", "--", *changed_files], cwd=worktree, timeout=120)
+            commit_result = run_cmd(["git", "commit", "-m", f"Worker apply {task_id}"], cwd=worktree, timeout=180)
+            push_result = run_cmd(["git", "push", "-u", "origin", branch], cwd=worktree, timeout=300)
+            if not (add_result["ok"] and commit_result["ok"] and push_result["ok"]):
+                status = TASK_STATUS_FAILED_RETRYABLE
+                result = "repo_apply_commit_or_push_failed"
+                validation_status = "PASS"
+                pipeline_status = "PASS"
+            else:
+                body = "\n".join(
+                    [
+                        f"Task: {task_id}",
+                        f"Worker: {worker_id}",
+                        "",
+                        "Gates:",
+                        "- local validation: PASS",
+                        "- production readiness: PASS",
+                        "",
+                        "Critical operations remain blocked by policy.",
+                    ]
+                )
+                pr_payload = create_pull_request(worktree, branch, f"Worker apply: {title[:80]}", body)
+                if not pr_payload.get("ok"):
+                    status = TASK_STATUS_FAILED_RETRYABLE
+                    result = "repo_apply_pr_create_failed"
+                    validation_status = "PASS"
+                    pipeline_status = "PASS"
+
+    delivery_level = "PR_READY" if status == TASK_STATUS_DONE and pr_payload.get("ok") else status
+    report = [
+        "# WORKER REPO APPLY REPORT",
+        "",
+        f"Tarih: {now()}",
+        f"Worker: {worker_id}",
+        f"Task: {task_id}",
+        f"Branch: {branch}",
+        f"Worktree: {worktree}",
+        f"Sonuç: {status}",
+        f"Result: {result}",
+        f"Codex return code: {returncode}",
+        f"Validation status: {validation_status}",
+        f"Pipeline status: {pipeline_status}",
+        "",
+        "## Changed Files",
+    ]
+    report.extend([f"- {rel}" for rel in changed_files] or ["- Yok"])
+    if unsafe_files:
+        report += ["", "## Unsafe Path Findings"]
+        report.extend([f"- {rel}" for rel in unsafe_files])
+    if secret_findings:
+        report += ["", "## Secret Scan Findings", f"- Count: {len(secret_findings)}"]
+    if pipeline_results:
+        report += ["", "## Gates"]
+        report.extend([f"- {item.get('name')}: {'PASS' if item.get('ok') else 'FAIL'}" for item in pipeline_results])
+    if pr_payload.get("url"):
+        report += ["", f"Pull Request: {pr_payload.get('url')}"]
+    report_path.write_text("\n".join(report) + "\n", encoding="utf-8")
+
+    metadata = {
+        "workspace": str(worktree),
+        "repo_worktree": str(worktree),
+        "branch": branch,
+        "changed_files": changed_files,
+        "unsafe_files": unsafe_files,
+        "secret_scan_findings": secret_findings,
+        "codex_return_code": returncode,
+        "progress_watchdog": progress_result,
+        "validation_status": validation_status,
+        "pipeline_status": pipeline_status,
+        "pipeline_results": [{"name": item.get("name"), "ok": item.get("ok"), "returncode": item.get("returncode")} for item in pipeline_results],
+        "delivery_level": delivery_level,
+        "production_deployed": False,
+        "repo_applied": False,
+        "branch_merged": False,
+        "pull_request_url": pr_payload.get("url", ""),
+        "pull_request_number": pr_payload.get("number", ""),
+        "pull_request_state": pr_payload.get("state", ""),
+        "commit_stdout": commit_result.get("stdout", "")[-1000:] if commit_result else "",
+        "push_ok": bool(push_result.get("ok")) if push_result else False,
+        "repo_apply_allowed": True,
+    }
+    if status == TASK_STATUS_APPROVAL_REQUIRED:
+        metadata["approval_required"] = True
+        metadata["worker_eligible"] = False
+    append_log(
+        task_log,
+        f"{now()} WORKER={worker_id} TASK={task_id} REPO_APPLY_DONE status={status} result={result} changed={len(changed_files)} branch={branch}",
+    )
+    return status, result, str(report_path), metadata
+
+
 def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str, str, dict[str, Any]]:
     import subprocess
     from pathlib import Path
+
+    if task_allows_repo_apply(task):
+        return execute_repo_apply_task(worker_id, task)
 
     task_id = task.get("id", "unknown-task")
     title = task.get("title", "Yeni görev")

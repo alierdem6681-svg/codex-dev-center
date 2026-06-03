@@ -440,6 +440,14 @@ def git_head() -> str:
     return result.get("stdout", "").strip()
 
 
+def main_head() -> str:
+    root = command_root()
+    run(["git", "fetch", "origin", "main", "--prune"], cwd=root, timeout=120)
+    result = run(["git", "rev-parse", "origin/main"], cwd=root, timeout=30)
+    head = result.get("stdout", "").strip()
+    return head or git_head()
+
+
 def latest_run(workflow: str, head_sha: str = "") -> dict[str, Any]:
     args = [
         "gh",
@@ -485,7 +493,7 @@ def wait_run(run_id: str, timeout_seconds: int = 900) -> dict[str, Any]:
 
 
 def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
-    head = git_head()
+    head = main_head()
     if workflow == DEPLOY_WORKFLOW:
         args = ["gh", "workflow", "run", workflow, "--ref", "main", "-f", f"confirm={CONFIRM_PHRASE}", "-f", "ref=main"]
     else:
@@ -624,6 +632,134 @@ def latest_deploy_candidate() -> str:
     return ""
 
 
+def pr_ready_candidate() -> str:
+    queue = load_queue()
+    for task in reversed(queue.get("tasks", [])):
+        critical = approval_required_payload(task_text(task))
+        if critical["approval_required"]:
+            continue
+        if bool(task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged")):
+            continue
+        if str(task.get("delivery_level") or "").upper() != "PR_READY":
+            continue
+        if not task.get("pull_request_number"):
+            continue
+        if str(task.get("validation_status") or "").upper() != "PASS":
+            continue
+        if str(task.get("pipeline_status") or "").upper() != "PASS":
+            continue
+        return str(task.get("id"))
+    return ""
+
+
+def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "status": "TASK_NOT_FOUND", "task_id": task_id}
+    critical = approval_required_payload(task_text(task))
+    if critical["approval_required"]:
+        marked = set_task_approval_required(task_id, critical["critical_operation_findings"]) if execute else {}
+        return {"ok": False, "status": "APPROVAL_REQUIRED", "critical": critical, "marked": marked}
+    if str(task.get("delivery_level") or "").upper() != "PR_READY":
+        return {"ok": False, "status": "TASK_NOT_PR_READY", "task_id": task_id}
+    if str(task.get("validation_status") or "").upper() != "PASS" or str(task.get("pipeline_status") or "").upper() != "PASS":
+        return {"ok": False, "status": "GATES_NOT_PASS", "task_id": task_id}
+
+    number = str(task.get("pull_request_number") or "").strip()
+    if not number:
+        return {"ok": False, "status": "PR_NUMBER_MISSING", "task_id": task_id}
+
+    view = run(
+        ["gh", "pr", "view", number, "--json", "number,url,state,isDraft,mergeStateStatus,headRefName,baseRefName,mergeCommit"],
+        cwd=command_root(),
+        timeout=60,
+    )
+    if not view["ok"]:
+        return {"ok": False, "status": "PR_VIEW_FAILED", "task_id": task_id, "view": view}
+    try:
+        pr = json.loads(view["stdout"] or "{}")
+    except Exception as exc:
+        return {"ok": False, "status": "PR_VIEW_PARSE_FAILED", "task_id": task_id, "error": str(exc)}
+
+    if pr.get("isDraft"):
+        return {"ok": False, "status": "PR_IS_DRAFT", "task_id": task_id, "pr": pr}
+    if pr.get("baseRefName") and pr.get("baseRefName") != "main":
+        return {"ok": False, "status": "PR_BASE_NOT_MAIN", "task_id": task_id, "pr": pr}
+
+    if pr.get("state") == "MERGED":
+        merge_commit = ((pr.get("mergeCommit") or {}).get("oid") or "").strip()
+        marked = mark_task_merged(task_id, merge_commit) if execute else {}
+        return {"ok": True, "status": "ALREADY_MERGED", "task_id": task_id, "pr": pr, "marked": marked}
+    if pr.get("state") != "OPEN":
+        return {"ok": False, "status": "PR_NOT_OPEN", "task_id": task_id, "pr": pr}
+    if not execute:
+        return {"ok": True, "status": "DRY_RUN_PR_READY_TO_MERGE", "task_id": task_id, "pr": pr}
+
+    merged = run(
+        [
+            "gh",
+            "pr",
+            "merge",
+            number,
+            "--squash",
+            "--delete-branch",
+            "--subject",
+            f"Worker apply {task_id}",
+            "--body",
+            "Autonomous CTO merge after worker local gates PASS. Critical infrastructure operations remain blocked.",
+        ],
+        cwd=command_root(),
+        timeout=300,
+    )
+    if not merged["ok"]:
+        return {"ok": False, "status": "PR_MERGE_FAILED", "task_id": task_id, "pr": pr, "merge": merged}
+    time.sleep(3)
+    after = run(["gh", "pr", "view", number, "--json", "number,url,state,mergeCommit"], cwd=command_root(), timeout=60)
+    merge_commit = ""
+    after_payload: dict[str, Any] = {}
+    if after["ok"]:
+        try:
+            after_payload = json.loads(after["stdout"] or "{}")
+            merge_commit = ((after_payload.get("mergeCommit") or {}).get("oid") or "").strip()
+        except Exception:
+            after_payload = {}
+    if not merge_commit:
+        merge_commit = main_head()
+    marked = mark_task_merged(task_id, merge_commit)
+    return {
+        "ok": True,
+        "status": "PR_MERGED",
+        "task_id": task_id,
+        "pr": pr,
+        "merge": merged,
+        "after": after_payload,
+        "marked": marked,
+    }
+
+
+def finalize_latest(execute: bool = False, wait: bool = False, smoke: bool = True) -> dict[str, Any]:
+    task_id = latest_deploy_candidate()
+    if task_id:
+        payload = deploy_task(task_id, execute=execute, wait=wait, smoke=smoke)
+        payload["task_id"] = task_id
+        return payload
+
+    pr_task = pr_ready_candidate()
+    if not pr_task:
+        return {"ok": False, "status": "NO_DELIVERY_CANDIDATE", "task_id": ""}
+
+    merged = merge_pr_task(pr_task, execute=execute)
+    if not merged.get("ok"):
+        merged["task_id"] = pr_task
+        return merged
+    if not execute:
+        return {"ok": True, "status": "DRY_RUN_PR_READY_TO_MERGE_THEN_DEPLOY", "task_id": pr_task, "merge": merged}
+    deployed = deploy_task(pr_task, execute=True, wait=wait, smoke=smoke)
+    deployed["merge"] = merged
+    deployed["task_id"] = pr_task
+    return deployed
+
+
 def write_report(payload: dict[str, Any]) -> None:
     REPORTS.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -659,6 +795,9 @@ def main() -> None:
     merged = sub.add_parser("mark-merged")
     merged.add_argument("task_id")
     merged.add_argument("--commit", default="")
+    merge_pr = sub.add_parser("merge-pr-ready")
+    merge_pr.add_argument("task_id")
+    merge_pr.add_argument("--execute", action="store_true")
     deploy = sub.add_parser("deploy-ready")
     deploy.add_argument("task_id")
     deploy.add_argument("--execute", action="store_true")
@@ -668,6 +807,10 @@ def main() -> None:
     latest.add_argument("--execute", action="store_true")
     latest.add_argument("--wait", action="store_true")
     latest.add_argument("--no-smoke", action="store_true")
+    finalize = sub.add_parser("finalize-latest")
+    finalize.add_argument("--execute", action="store_true")
+    finalize.add_argument("--wait", action="store_true")
+    finalize.add_argument("--no-smoke", action="store_true")
     args = parser.parse_args()
 
     if args.cmd == "status":
@@ -681,6 +824,8 @@ def main() -> None:
         payload = start_next_backlog(execute=args.execute)
     elif args.cmd == "mark-merged":
         payload = mark_task_merged(args.task_id, args.commit)
+    elif args.cmd == "merge-pr-ready":
+        payload = merge_pr_task(args.task_id, execute=args.execute)
     elif args.cmd == "deploy-ready":
         payload = deploy_task(args.task_id, execute=args.execute, wait=args.wait, smoke=not args.no_smoke)
     elif args.cmd == "deploy-latest":
@@ -691,6 +836,8 @@ def main() -> None:
             else {"ok": False, "status": "NO_DEPLOY_CANDIDATE"}
         )
         payload["task_id"] = task_id
+    elif args.cmd == "finalize-latest":
+        payload = finalize_latest(execute=args.execute, wait=args.wait, smoke=not args.no_smoke)
     else:
         payload = {"ok": False, "status": "UNKNOWN_COMMAND"}
 
