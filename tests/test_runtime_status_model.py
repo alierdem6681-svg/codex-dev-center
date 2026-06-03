@@ -917,6 +917,60 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertTrue(created)
         self.assertEqual(calls, [True])
 
+    def test_validation_can_run_while_workers_remain_active(self):
+        calls = []
+
+        originals = (
+            lifecycle_manager.VALIDATION_INTERVAL_SECONDS,
+            lifecycle_manager.validation_candidate_count,
+            lifecycle_manager.run_validation_engine,
+            lifecycle_manager.time.monotonic,
+        )
+        lifecycle_manager.VALIDATION_INTERVAL_SECONDS = 60
+        lifecycle_manager.validation_candidate_count = lambda: 3
+        lifecycle_manager.run_validation_engine = lambda: calls.append("run") or True
+        lifecycle_manager.time.monotonic = lambda: 61.0
+        try:
+            last_validation, changed = lifecycle_manager.maybe_run_validation(0.0)
+        finally:
+            (
+                lifecycle_manager.VALIDATION_INTERVAL_SECONDS,
+                lifecycle_manager.validation_candidate_count,
+                lifecycle_manager.run_validation_engine,
+                lifecycle_manager.time.monotonic,
+            ) = originals
+
+        self.assertTrue(changed)
+        self.assertEqual(last_validation, 61.0)
+        self.assertEqual(calls, ["run"])
+
+    def test_validation_respects_interval_between_runs(self):
+        calls = []
+
+        originals = (
+            lifecycle_manager.VALIDATION_INTERVAL_SECONDS,
+            lifecycle_manager.validation_candidate_count,
+            lifecycle_manager.run_validation_engine,
+            lifecycle_manager.time.monotonic,
+        )
+        lifecycle_manager.VALIDATION_INTERVAL_SECONDS = 60
+        lifecycle_manager.validation_candidate_count = lambda: 3
+        lifecycle_manager.run_validation_engine = lambda: calls.append("run") or True
+        lifecycle_manager.time.monotonic = lambda: 119.0
+        try:
+            last_validation, changed = lifecycle_manager.maybe_run_validation(60.0)
+        finally:
+            (
+                lifecycle_manager.VALIDATION_INTERVAL_SECONDS,
+                lifecycle_manager.validation_candidate_count,
+                lifecycle_manager.run_validation_engine,
+                lifecycle_manager.time.monotonic,
+            ) = originals
+
+        self.assertFalse(changed)
+        self.assertEqual(last_validation, 60.0)
+        self.assertEqual(calls, [])
+
 
 class WorkerLifecycleRepairTest(unittest.TestCase):
     def test_repair_marks_stale_running_retryable_and_clears_idle_worker(self):

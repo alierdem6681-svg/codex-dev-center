@@ -13,6 +13,7 @@ from typing import Any
 
 try:
     from .critical_operation_policy import critical_operation_findings
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_APPROVAL_REQUIRED,
         TASK_STATUS_DONE,
@@ -28,6 +29,7 @@ try:
     )
 except ImportError:
     from critical_operation_policy import critical_operation_findings
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_APPROVAL_REQUIRED,
         TASK_STATUS_DONE,
@@ -441,8 +443,6 @@ def validate_ready_tasks(
     write: bool = True,
 ) -> dict[str, Any]:
     paths = runtime_paths(runtime)
-    queue = read_json(paths["queue"], {"tasks": []})
-    queue, _changes = normalize_queue_payload(queue)
     pipeline = pipeline_gate(runtime, run_pipeline_gate, pipeline_max_age_seconds)
     statuses = candidate_statuses(include_proposal_done)
 
@@ -450,16 +450,23 @@ def validate_ready_tasks(
     changed = 0
     checked = 0
 
-    for task in queue.get("tasks", []):
-        if checked >= max(0, limit):
-            break
-        if not is_validation_candidate(task, statuses, recheck_engine_approval=recheck_engine_approval):
-            continue
-        checked += 1
-        result = evaluate_task(task, runtime, pipeline)
-        if write and apply_validation_result(task, result):
-            changed += 1
-        results.append(result)
+    with state_file_lock(paths["queue"]):
+        queue = read_json(paths["queue"], {"tasks": []})
+        queue, _changes = normalize_queue_payload(queue)
+
+        for task in queue.get("tasks", []):
+            if checked >= max(0, limit):
+                break
+            if not is_validation_candidate(task, statuses, recheck_engine_approval=recheck_engine_approval):
+                continue
+            checked += 1
+            result = evaluate_task(task, runtime, pipeline)
+            if write and apply_validation_result(task, result):
+                changed += 1
+            results.append(result)
+
+        if write and changed:
+            atomic_write_json(paths["queue"], queue)
 
     payload = {
         "ok": True,
@@ -472,8 +479,6 @@ def validate_ready_tasks(
     }
 
     if write:
-        if changed:
-            atomic_write_json(paths["queue"], queue)
         atomic_write_json(paths["status"], payload)
         write_report(runtime, payload)
         append_log(paths["log"], {

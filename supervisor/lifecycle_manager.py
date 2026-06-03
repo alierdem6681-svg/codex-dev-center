@@ -75,7 +75,7 @@ BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_STALLED,
     TASK_STATUS_VALIDATION_FAILED,
 }
-VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "5"))
+VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "25"))
 VALIDATION_INTERVAL_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_INTERVAL_SECONDS", "60"))
 VALIDATION_PIPELINE_MAX_AGE_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_PIPELINE_MAX_AGE_SECONDS", "86400"))
 
@@ -438,6 +438,14 @@ def run_validation_engine() -> bool:
         log(f"VALIDATION_ENGINE_ERROR {exc}")
         return False
 
+def maybe_run_validation(last_validation: float) -> tuple[float, bool]:
+    if validation_candidate_count() <= 0:
+        return last_validation, False
+    current = time.monotonic()
+    if current - last_validation < VALIDATION_INTERVAL_SECONDS:
+        return last_validation, False
+    return current, run_validation_engine()
+
 def dispatch():
     try:
         p = subprocess.run(
@@ -504,12 +512,9 @@ def daemon():
 
     while True:
         pending, running, active = queue_counts()
-        if active == 0 and validation_candidate_count() > 0:
-            current = time.monotonic()
-            if current - last_validation >= VALIDATION_INTERVAL_SECONDS:
-                last_validation = current
-                run_validation_engine()
-                pending, running, active = queue_counts()
+        last_validation, validation_changed = maybe_run_validation(last_validation)
+        if validation_changed:
+            pending, running, active = queue_counts()
 
         if active < max_parallel_workers():
             created = ensure_single_backlog_task()
