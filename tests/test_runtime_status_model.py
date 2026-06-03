@@ -57,6 +57,14 @@ panel_server = importlib.util.module_from_spec(PANEL_SERVER_SPEC)
 assert PANEL_SERVER_SPEC.loader is not None
 PANEL_SERVER_SPEC.loader.exec_module(panel_server)
 
+LEGACY_PANEL_SERVER_SPEC = importlib.util.spec_from_file_location(
+    "legacy_panel_server_test_module",
+    ROOT / "web_panel" / "server.py",
+)
+legacy_panel_server = importlib.util.module_from_spec(LEGACY_PANEL_SERVER_SPEC)
+assert LEGACY_PANEL_SERVER_SPEC.loader is not None
+LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
+
 
 class WorkerStatusModelTest(unittest.TestCase):
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
@@ -755,6 +763,42 @@ class DashboardControlledExecutionSummaryTest(unittest.TestCase):
         self.assertFalse(summary["proposal_mode_repo_mutation_allowed"])
         self.assertFalse(summary["proposal_mode_production_deploy_allowed"])
         self.assertFalse(summary["critical_operations_allowed"])
+
+
+class DashboardPipelineTrackingStatusTest(unittest.TestCase):
+    def test_status_payload_exposes_pipeline_tracking_for_all_panel_servers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+            (state / "github_actions_status.json").write_text(
+                json.dumps(
+                    {
+                        "runner_name": "codex-dev-center-01",
+                        "last_deploy_status": "PASS",
+                        "last_deploy_run_id": "26814905600",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "pipeline_status.json").write_text(
+                json.dumps({"task_to_deploy_test": "PASS", "checked_at": "2026-06-03T00:00:00+00:00"}),
+                encoding="utf-8",
+            )
+
+            originals = {
+                panel_server: panel_server.STATE,
+                legacy_panel_server: legacy_panel_server.STATE,
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    payload = module.status_payload()
+                    self.assertEqual(payload["github_actions"]["last_deploy_status"], "PASS")
+                    self.assertEqual(payload["github_actions"]["runner_name"], "codex-dev-center-01")
+                    self.assertEqual(payload["pipeline_status"]["task_to_deploy_test"], "PASS")
+            finally:
+                for module, original_state in originals.items():
+                    module.STATE = original_state
 
 
 class DeployGateStatusModelTest(unittest.TestCase):
