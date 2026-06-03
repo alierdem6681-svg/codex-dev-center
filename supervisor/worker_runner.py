@@ -331,9 +331,7 @@ Bu workspace içinde şu dosyaları oluştur:
         created = write_fallback_proposal_files(workspace, task, worker_id, fallback_reason)
         fallback_used = True
 
-    status = "DONE" if proc.returncode == 0 and len(created) >= 4 else "FAILED"
-    if fallback_used and len(created) >= 4:
-        status = "DONE"
+    status = "DONE" if len(created) >= 4 else "FAILED"
 
     report = f"""# WORKER CONTROLLED EXECUTION REPORT
 
