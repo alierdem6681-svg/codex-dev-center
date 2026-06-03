@@ -100,6 +100,7 @@ Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
+- Worker dispatch/backlog dispatcher basliklari `validation` kelimesi tasisa bile backend/infra worker eslesmesini onceleyen role matching kuralina tabidir.
 
 ## Servis Keşfi
 

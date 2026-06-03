@@ -61,6 +61,8 @@ Her görev:
 - test sonucunu yazmalı
 - HANDOVER.md dosyasını güncellemelidir.
 
+Worker dispatch, task queue ve backlog dispatcher başlıkları backend/infra kapsamına girer; başlık `validation` veya `apply validation` prefix'i taşısa bile worker role matching önce `worker-1` eşleşmesini korur.
+
 ## İlk Büyük Görev
 
 docs/CODEX_MASTER_PROMPT.md dosyasını oku ve bu sistemin aşağı doğru mimarisini inşa etmeye başla.

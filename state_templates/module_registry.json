@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T16:47:10+00:00",
+  "updated_at": "2026-06-03T17:13:08+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -60,6 +60,7 @@
         "stop_worker",
         "restart_worker",
         "view_worker_logs",
+        "worker_dispatch_role_matching",
         "repo_apply_validation"
       ]
     },

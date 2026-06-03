@@ -295,3 +295,22 @@ Yeni davranış:
 - `AGENTS.md.bak` veya `AGENTS.md/child` gibi tekil dosya varyantları repo apply allowlist'ten geçmez.
 - `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
 - Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmadı.
+
+---
+
+## Worker Dispatch v2 Role Matching Apply
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-170847 / CTO-DISPATCH-20260603-073030-CTO-ACTION-20260601-160827-03-WORKER-DISPATCH
+
+Eklenenler:
+- `supervisor/lifecycle_manager.py` worker seçiminde worker dispatch/task queue/backlog dispatcher başlıkları backend/infra worker olan `worker-1` ile eşleşir.
+- Bu eşleşme `validation` veya `apply validation` prefix'i taşıyan Worker Dispatch v2 başlıklarında kalite worker'ına yanlış kaymayı önler.
+- `tests/test_runtime_status_model.py` role matching, dashboard eşleşmesi, completed apply child duplicate blokajı ve failed apply child retry davranışını doğrular.
+
+Not:
+- Parent kanıt raporu bu sandbox içinde bulunamadı; proposal workspace çıktısı fallback proposal olarak doğrulandı.
+- Bu sandbox'ta git worktree metadata yolu read-only olduğu için `git add` aşaması `index.lock: Read-only file system` hatasıyla durdu; commit/PR oluşturulamadı.
+- Runtime `state/` dosyaları güncellenmedi.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapılmadı.

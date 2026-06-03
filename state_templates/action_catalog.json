@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T16:47:10+00:00",
+  "updated_at": "2026-06-03T17:13:08+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -124,6 +124,16 @@
       "requires_isolated_worktree": true,
       "requires_exact_path_allowlist": true,
       "requires_secret_scan": true
+    },
+    {
+      "id": "worker_dispatch_role_matching",
+      "label": "Worker Dispatch Rol Eşleşmesi",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "backend_dispatch_keywords_precede_quality_keywords": true
     }
   ]
 }

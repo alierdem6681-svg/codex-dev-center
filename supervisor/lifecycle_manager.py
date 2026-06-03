@@ -174,6 +174,8 @@ def choose_worker(title):
     text = str(title or "").lower()
     if any(x in text for x in ["dashboard", "panel", "ui", "frontend"]):
         return "worker-2"
+    if any(x in text for x in ["worker dispatch", "task dispatch", "task queue", "worker routing", "backlog dispatcher"]):
+        return "worker-1"
     if any(x in text for x in ["service", "watcher", "deploy", "rollback", "lifecycle"]):
         return "worker-3"
     if any(x in text for x in ["quality", "test", "gate", "validation", "pipeline"]):

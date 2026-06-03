@@ -148,3 +148,9 @@ Faz 19B-10A Model Policy
 - [x] Repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
 - [x] Runtime/secret path blokajı ve traversal koruması unit test ile sabitlendi.
 - [x] Controlled apply validation davranışı handover, onboarding, memory ve state template kayıtlarına işlendi.
+
+## Faz 32 - Worker Dispatch v2 Role Matching
+
+- [x] Backlog dispatcher worker seçiminde worker dispatch/task queue başlıkları backend/infra worker eşleşmesini önceleyecek şekilde sabitlendi.
+- [x] `Validation: Worker Dispatch v2` ve `Apply: Validation: Worker Dispatch v2` başlıkları için regression test eklendi.
+- [x] Repo apply child tamamlandıysa duplicate apply üretilmemesi ve failed apply child için sınırlı retry davranışı testle sabitlendi.

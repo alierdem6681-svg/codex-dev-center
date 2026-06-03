@@ -34,6 +34,8 @@ Başlangıç rolleri:
 - worker-3: DevOps, yayına alma ve servisler
 - worker-4: Test, kalite ve denetim
 
+Worker dispatch, task queue ve backlog dispatcher başlıkları backend/altyapı kapsamındadır; validation/apply prefix'i taşısa bile varsayılan eşleşme worker-1 olarak korunur.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.

@@ -135,3 +135,11 @@ Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/fire
 Validated proposal apply worker akışı için repo path doğrulaması güçlendirildi. `supervisor/worker_runner.py` artık apply path'lerini normalize eder, tekil allowlist dosyalarında exact match ister ve `AGENTS.md.bak`, `AGENTS.md/child`, traversal veya runtime `state/` hedeflerini bloklar.
 
 Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı.
+
+## 2026-06-03 Worker Dispatch v2 Role Matching Apply
+
+Backlog dispatcher worker seçiminde worker dispatch/task queue/backlog dispatcher başlıkları backend/infra worker olan `worker-1` ile eşleşecek şekilde sabitlendi. Böylece `Validation: Worker Dispatch v2` ve `Apply: Validation: Worker Dispatch v2` başlıkları yalnızca `validation` kelimesi nedeniyle QA worker'a kaymaz.
+
+Davranış unit testlerle sabitlendi: worker dispatch role matching, dashboard worker status başlıklarının frontend worker'da kalması, tamamlanmış repo apply child varsa duplicate apply üretilmemesi ve failed apply child için sınırlı retry. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapılmadı.
+
+Bu apply sandbox'ta git worktree metadata yolu read-only olduğu için `git add` aşaması `index.lock: Read-only file system` hatasıyla durdu; branch üzerinde commit/PR oluşturulamadı.

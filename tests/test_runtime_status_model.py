@@ -1099,6 +1099,34 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertTrue(child["repo_apply_allowed"])
         self.assertEqual(queue["tasks"][0]["repo_apply_child"], child["id"])
 
+    def test_worker_dispatch_title_stays_on_backend_worker_even_when_validation_prefixed(self):
+        self.assertEqual(lifecycle_manager.choose_worker("Validation: Worker Dispatch v2"), "worker-1")
+        self.assertEqual(lifecycle_manager.choose_worker("Apply: Validation: Worker Dispatch v2"), "worker-1")
+
+    def test_worker_dispatch_matching_does_not_steal_dashboard_tasks(self):
+        self.assertEqual(lifecycle_manager.choose_worker("Dashboard Worker Status Panel"), "worker-2")
+
+    def test_completed_repo_apply_child_prevents_duplicate_apply(self):
+        tasks = [
+            {"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "repo_apply_child": "APPLY-CHILD"},
+            {"id": "APPLY-CHILD", "status": TASK_STATUS_DONE},
+        ]
+
+        self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
+
+    def test_failed_repo_apply_child_allows_limited_retry(self):
+        tasks = [
+            {
+                "id": "PARENT",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "repo_apply_child": "APPLY-CHILD",
+                "repo_apply_attempts": 1,
+            },
+            {"id": "APPLY-CHILD", "status": TASK_STATUS_FAILED_TIMEOUT},
+        ]
+
+        self.assertEqual(lifecycle_manager.repo_apply_candidate(tasks)["id"], "PARENT")
+
     def test_idle_worker_state_clears_current_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "workers.json"
