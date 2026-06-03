@@ -53,6 +53,7 @@ PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 LOGS = APP / "logs"
+REPORTS = APP / "reports"
 JOBS = STATE / "direct_cto_jobs"
 ASYNC_STALL_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_STALL_SECONDS", "900"))
 ASYNC_GRACE_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_GRACE_SECONDS", "180"))

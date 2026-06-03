@@ -13,6 +13,7 @@ from supervisor import (  # noqa: E402
     cto_autonomous_delivery,
     lifecycle_manager,
     progress_aware_runner,
+    direct_cto_async_job,
     task_validation_engine,
     telegram_direct_cto_simulator,
     worker_runner,
@@ -160,6 +161,10 @@ class ProgressAwareRunnerTest(unittest.TestCase):
 
 
 class TelegramAsyncRoutingTest(unittest.TestCase):
+    def test_direct_cto_async_job_has_progress_paths(self):
+        self.assertTrue(hasattr(direct_cto_async_job, "REPORTS"))
+        self.assertTrue(hasattr(direct_cto_async_job, "JOBS"))
+
     def test_nonlocal_short_message_routes_to_async_job(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "short_async",
