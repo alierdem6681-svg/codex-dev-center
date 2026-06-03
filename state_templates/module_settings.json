@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T18:02:54+00:00",
+  "updated_at": "2026-06-03T19:22:54+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -85,6 +85,21 @@
     "requires_log_capture": true,
     "requires_output_guard": true,
     "requires_test_before_done": true
+  },
+  "codex_quality_gate": {
+    "enabled": true,
+    "standard_report_enabled": true,
+    "standard_report_source": "state/production_readiness_status.json",
+    "standard_report_json": "reports/quality-gate-report.json",
+    "standard_report_summary": "reports/quality-gate-summary.md",
+    "required_checks": [
+      "lint",
+      "unit_test",
+      "integration_test",
+      "simulation_dry_run"
+    ],
+    "missing_artifact_fails_gate": true,
+    "simulation_requires_non_mutating_flags": true
   },
   "production_environment_manager": {
     "enabled": true,

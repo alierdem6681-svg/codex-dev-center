@@ -386,3 +386,24 @@ Test:
 Not:
 - Production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu sandbox'ta git metadata yolu read-only oldugu icin `git add`, commit, push ve PR olusturma adimlari tamamlanamadi.
+
+---
+
+## Quality Gate Standard Report Apply
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-191722 / CTO-BACKLOG-20260603-134405-173484-RECOVERY-BACKLOG-CONTINUATION-QUALITY-GATE-TEST-AND-SIMU
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py standard-report` komutu production readiness artefact'inden standart kalite kapısı raporu üretir.
+- `reports/quality-gate-report.json` makine tarafından parse edilebilir `pass`/`fail` kararı ve `lint`, `unit_test`, `integration_test`, `simulation_dry_run` check listesini içerir.
+- `reports/quality-gate-summary.md` aynı sonucu insan tarafından okunabilir şekilde özetler.
+- Eksik artefact, eksik gate, başarısız gate veya dry-run dışı/mutating simülasyon bayrağı sonucu `fail` olur.
+
+Test:
+- `tests/test_runtime_status_model.py` fixture tabanlı pass, missing artefact ve mutating flag senaryolarını doğrular.
+
+Not:
+- Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Local `git add` işlemi git metadata dizini read-only olduğu için başarısız oldu; GitHub connector branch/PR çağrısı iptal edildiği için PR açılamadı.
