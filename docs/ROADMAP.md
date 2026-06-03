@@ -150,3 +150,9 @@ Faz 19B-10A Model Policy
 - [x] Repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
 - [x] Runtime/secret path blokajı ve traversal koruması unit test ile sabitlendi.
 - [x] Controlled apply validation davranışı handover, onboarding, memory ve state template kayıtlarına işlendi.
+
+## Faz 32 - Queue / Status Normalizer Retry
+
+- [x] Queue task status normalizer case, bosluk ve tire aliaslarini standart enumlara cevirir.
+- [x] `ready for validation`, `ready-for-validation`, `FAILED-TIMEOUT`, `in-progress` ve `completed` varyantlari unit test ile sabitlendi.
+- [x] CTO router normalizasyon davranisi onboarding, handover, memory ve state template kayitlarina islendi.

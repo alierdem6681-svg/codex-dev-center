@@ -105,8 +105,11 @@ STATUS_ALIASES = {
     "pending": TASK_STATUS_PENDING,
     "assigned": TASK_STATUS_ASSIGNED,
     "running": TASK_STATUS_RUNNING,
+    "in_progress": TASK_STATUS_RUNNING,
     "proposal_ready": TASK_STATUS_PROPOSAL_READY,
     "done": TASK_STATUS_DONE,
+    "complete": TASK_STATUS_DONE,
+    "completed": TASK_STATUS_DONE,
     "failed": TASK_STATUS_FAILED,
     "failed_no_proposal": TASK_STATUS_FAILED_NO_PROPOSAL,
     "failed_timeout": TASK_STATUS_FAILED_TIMEOUT,
@@ -139,7 +142,8 @@ def normalize_status(value: Any, default: str = TASK_STATUS_QUEUED) -> str:
     upper = raw.upper()
     if upper in KNOWN_TASK_STATUSES:
         return upper
-    return STATUS_ALIASES.get(raw.lower(), default)
+    alias_key = re.sub(r"[\s-]+", "_", raw.lower())
+    return STATUS_ALIASES.get(alias_key, default)
 
 
 def redact_sensitive_text(value: Any) -> str:

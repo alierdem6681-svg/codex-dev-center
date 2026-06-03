@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T16:47:10+00:00",
+  "updated_at": "2026-06-03T17:35:59+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -70,6 +70,7 @@
       "dashboard"
     ],
     "standard_statuses_required": true,
+    "status_alias_space_hyphen_normalization": true,
     "telegram_parent_tasks_worker_eligible": false,
     "worker_subtasks_source": "cto",
     "audit_log": "logs/cto_audit.ndjson",

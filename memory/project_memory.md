@@ -147,3 +147,9 @@ Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefi
 Production readiness suite staging ve rollback dry-run sonuçlarını artık non-mutating JSON sözleşmesiyle doğrular. Staging için `dry_run=true` ve `mutating_cloud_operations_performed=false`; rollback için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
 
 Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma senaryosuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
+## 2026-06-03 Queue / Status Normalizer Apply Retry
+
+Queue task status normalizer case, bosluk ve tire aliaslarini standart enumlara cevirecek sekilde guclendirildi. `ready for validation`, `ready-for-validation`, `FAILED-TIMEOUT`, `in-progress` ve `completed` gibi girdiler artik yanlislikla `QUEUED` default'una dusmez.
+
+Davranis `tests/test_runtime_status_model.py` icindeki unit testlerle sabitlendi. Bu paket production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
