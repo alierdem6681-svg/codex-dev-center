@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T16:47:10+00:00",
+  "updated_at": "2026-06-03T17:38:25+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -36,6 +36,61 @@
       "non_mutating": true,
       "simulation_contracts_required": true,
       "dry_run_non_mutating_contracts_required": true
+    },
+    {
+      "id": "codex_preflight",
+      "label": "Codex Preflight Kontrolü",
+      "module": "codex_quality_gate",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/codex_quality_gate.py preflight",
+      "production_mutating": false,
+      "writes_runtime_state": true
+    },
+    {
+      "id": "codex_test_suite",
+      "label": "Codex Test Suite",
+      "module": "codex_quality_gate",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/codex_quality_gate.py test-suite",
+      "production_mutating": false,
+      "writes_runtime_state": true
+    },
+    {
+      "id": "codex_diff_report",
+      "label": "Codex Diff Raporu",
+      "module": "codex_quality_gate",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/codex_quality_gate.py diff-report",
+      "production_mutating": false,
+      "writes_runtime_state": true
+    },
+    {
+      "id": "codex_gate_status",
+      "label": "Codex Gate Durumu",
+      "module": "codex_quality_gate",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/codex_quality_gate.py status",
+      "production_mutating": false,
+      "writes_runtime_state": true
+    },
+    {
+      "id": "validate_living_documentation",
+      "label": "Living Documentation Doğrula",
+      "module": "living_documentation_guard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/living_documentation_guard.py",
+      "production_mutating": false,
+      "writes_runtime_state": true
     },
     {
       "id": "staging_deploy",

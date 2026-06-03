@@ -343,3 +343,22 @@ Test:
 Not:
 - Bu sandbox'ta git worktree metadata yolu read-only olduğu için local commit oluşturulamadı.
 - GitHub branch/PR oluşturma MCP çağrısı kullanıcı tarafından iptal edildi; PR açma adımı tamamlanmadı.
+
+---
+
+## Quality Gate / Dashboard / Living Docs Sync Apply
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-173132 / CTO-DISPATCH-20260603-073143-CTO-ACTION-20260601-161747-04-QUALITY-DASHBOARD-LIVING-DOCS-SYNC
+
+Eklenenler:
+- `state_templates/action_catalog.json` içine `codex_quality_gate` ve `living_documentation_guard` aksiyon kayıtları eklendi.
+- `state_templates/module_settings.json` ve `state_templates/dashboard_settings.json` quality gate ve living docs dashboard görünürlük bayraklarıyla hizalandı.
+- Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'ları `quality_gate` ve `living_documentation` alanlarını salt okunur döndürür.
+- `supervisor/production_readiness_suite.py` içinde `quality_dashboard_living_docs_sync` kapısı action/settings/dashboard drift kontrolü yapar.
+- `tests/test_runtime_status_model.py` bu API ve readiness sözleşmesini sabitler.
+
+Not:
+- Production deploy çalıştırılmadı.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

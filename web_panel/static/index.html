@@ -276,6 +276,8 @@
       function render(data){
         latest = data;
         const readiness = data.production_readiness || {};
+        const qualityGate = data.quality_gate || {};
+        const livingDocs = data.living_documentation || {};
         const deploy = data.production_deploy || {};
         const actionsState = data.github_actions || {};
         const pipelineState = data.pipeline_status || {};
@@ -302,7 +304,9 @@
           `Ön canlı: ${staging.status || '-'}`,
           `Canlı: ${runtime.status || deploy.status || '-'}`,
           `Sağlık: ${health.status || (health.ok === undefined ? '-' : health.ok)}`,
-          `Duman: ${smoke.status || actionsState.last_smoke_status || (smoke.ok === undefined ? '-' : smoke.ok)}`
+          `Duman: ${smoke.status || actionsState.last_smoke_status || (smoke.ok === undefined ? '-' : smoke.ok)}`,
+          `Codex gate: ${qualityGate.status || (qualityGate.ok === undefined ? '-' : qualityGate.ok)}`,
+          `Living docs: ${livingDocs.status || '-'}`
         ].map(badge).join('');
         pipelineStatusBox.innerHTML = [
           `Runner: ${actionsState.runner_name || '-'}`,
@@ -329,6 +333,8 @@
         lastChecksBox.innerHTML = [
           `Son sağlık: ${health.status || health.ok || '-'}`,
           `Son duman testi: ${smoke.status || smoke.ok || '-'}`,
+          `Codex quality gate: ${qualityGate.status || (qualityGate.ok === undefined ? '-' : qualityGate.ok)}`,
+          `Living documentation: ${livingDocs.status || '-'}`,
           `Rollback noktası: ${data.rollback_point?.commit ? data.rollback_point.commit.slice(0, 8) : '-'}`,
           `Otomatik production: ${data.production_policy?.automatic_production_enabled}`,
           `Gate PASS deploy: ${delivery.policy?.production_deploy_allowed_when_all_gates_pass ?? data.production_policy?.normal_app_deploy_allowed_when_all_gates_pass ?? '-'}`

@@ -313,6 +313,8 @@ def status_payload():
         "cto_delivery": read_json(STATE / "cto_delivery_state.json", read_json(ROOT / "state_templates/cto_delivery_policy.json", {})),
         "auth": panel_auth.public_auth_state(),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
+        "quality_gate": read_json(STATE / "quality_gate_status.json", {}),
+        "living_documentation": read_json(STATE / "living_documentation_status.json", {}),
         "production_deploy": production_deploy,
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),

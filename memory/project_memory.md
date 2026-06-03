@@ -147,3 +147,11 @@ Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefi
 Production readiness suite staging ve rollback dry-run sonuçlarını artık non-mutating JSON sözleşmesiyle doğrular. Staging için `dry_run=true` ve `mutating_cloud_operations_performed=false`; rollback için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
 
 Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma senaryosuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
+## 2026-06-03 Quality Gate / Dashboard / Living Docs Sync Apply
+
+Quality gate, dashboard ve living docs kayıtları küçük repo/app değişikliğiyle senkronize edildi. `codex_quality_gate` ve `living_documentation_guard` aksiyonları `state_templates/action_catalog.json` içine eklendi; module/dashboard settings quality gate ve living docs status görünürlüğünü açıkça taşır.
+
+Ana ve legacy panel `/api/status` payload'ları runtime marker dosyalarını salt okunur `quality_gate` ve `living_documentation` alanlarıyla döndürür. `production_readiness_suite.py` içindeki `quality_dashboard_living_docs_sync` kapısı bu action/settings/dashboard sözleşmesini doğrular ve `tests/test_runtime_status_model.py` regresyonlarıyla sabitlendi.
+
+Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.

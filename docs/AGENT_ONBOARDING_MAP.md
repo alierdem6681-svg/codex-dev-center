@@ -96,7 +96,9 @@ Ajan şu klasörleri inceler:
 Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
 - Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
-- Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
+- Ana ve legacy panel `/api/status` payload'lari `quality_gate` ve `living_documentation` alanlarini da salt okunur dondurur; marker dosyalari yoksa alanlar bos nesne olarak kalir.
+- `production_readiness_suite.py` icindeki `quality_dashboard_living_docs_sync` kapisi quality gate, dashboard ve living docs action/settings kayitlarinin template tarafinda senkron kaldigini dogrular.
+- Runtime marker dosyalari henuz yoksa bu salt okunur durum alanlari bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.

@@ -89,6 +89,8 @@ def status_payload():
         "module_settings": read_json(STATE / "module_settings.json", read_json(ROOT / "state_templates/module_settings.json", {})),
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
         "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
+        "quality_gate": read_json(STATE / "quality_gate_status.json", {}),
+        "living_documentation": read_json(STATE / "living_documentation_status.json", {}),
         "production_deploy": read_json(STATE / "production_deploy_status.json", {}),
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),

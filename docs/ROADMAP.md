@@ -150,3 +150,10 @@ Faz 19B-10A Model Policy
 - [x] Repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
 - [x] Runtime/secret path blokajı ve traversal koruması unit test ile sabitlendi.
 - [x] Controlled apply validation davranışı handover, onboarding, memory ve state template kayıtlarına işlendi.
+
+## Faz 32 - Quality Gate / Dashboard / Living Docs Sync
+
+- [x] `codex_quality_gate` ve `living_documentation_guard` action kayıtları `state_templates/action_catalog.json` ile senkronize edildi.
+- [x] Ana ve legacy dashboard `/api/status` payload'larına salt okunur `quality_gate` ve `living_documentation` alanları eklendi.
+- [x] Production readiness suite `quality_dashboard_living_docs_sync` kapısı ile action/settings/dashboard drift kontrolü yapar.
+- [x] Dashboard quality gate ve living docs durumlarını pipeline görünürlüğünde gösterir.

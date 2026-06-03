@@ -169,6 +169,17 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(contracts[group]["contracts"])
             self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
+    def test_quality_dashboard_living_docs_sync_gate_is_registered(self):
+        results = {}
+
+        production_readiness_suite.quality_dashboard_living_docs_sync(results)
+
+        gate = results["quality_dashboard_living_docs_sync"]
+        self.assertTrue(gate["ok"], gate["details"])
+        self.assertEqual(gate["status"], "PASS")
+        self.assertIn("codex_gate_status", gate["details"]["expected_actions"])
+        self.assertIn("validate_living_documentation", gate["details"]["expected_actions"])
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
@@ -859,8 +870,12 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                     payload = module.status_payload()
                     self.assertIn("github_actions", payload)
                     self.assertIn("pipeline_status", payload)
+                    self.assertIn("quality_gate", payload)
+                    self.assertIn("living_documentation", payload)
                     self.assertEqual(payload["github_actions"], {})
                     self.assertEqual(payload["pipeline_status"], {})
+                    self.assertEqual(payload["quality_gate"], {})
+                    self.assertEqual(payload["living_documentation"], {})
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state
@@ -883,6 +898,14 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                 json.dumps({"task_to_deploy_test": "PASS", "checked_at": "2026-06-03T00:00:00+00:00"}),
                 encoding="utf-8",
             )
+            (state / "quality_gate_status.json").write_text(
+                json.dumps({"ok": True, "status": "PASS", "checked_at": "2026-06-03T00:00:00+00:00"}),
+                encoding="utf-8",
+            )
+            (state / "living_documentation_status.json").write_text(
+                json.dumps({"ok": True, "status": "PASS", "checked_at": "2026-06-03T00:00:00+00:00"}),
+                encoding="utf-8",
+            )
 
             originals = {
                 panel_server: panel_server.STATE,
@@ -895,6 +918,8 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                     self.assertEqual(payload["github_actions"]["last_deploy_status"], "PASS")
                     self.assertEqual(payload["github_actions"]["runner_name"], "codex-dev-center-01")
                     self.assertEqual(payload["pipeline_status"]["task_to_deploy_test"], "PASS")
+                    self.assertEqual(payload["quality_gate"]["status"], "PASS")
+                    self.assertEqual(payload["living_documentation"]["status"], "PASS")
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state

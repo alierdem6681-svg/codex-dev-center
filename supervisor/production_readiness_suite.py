@@ -32,6 +32,21 @@ FORBIDDEN_MUTATION_PATTERNS = [
     re.compile(r"\bgoogle ads\b.*\bmutate\b", re.I),
 ]
 
+QUALITY_DASHBOARD_LIVING_DOCS_ACTIONS = {
+    "codex_quality_gate": [
+        "codex_preflight",
+        "codex_test_suite",
+        "codex_diff_report",
+        "codex_gate_status",
+    ],
+    "living_documentation_guard": [
+        "validate_living_documentation",
+    ],
+    "production_readiness": [
+        "production_readiness_suite",
+    ],
+}
+
 SKIP_DIRS = {".git", "state", "logs", "workspaces", "backups", "tmp", "__pycache__"}
 TEXT_SUFFIXES = {".py", ".md", ".json", ".sh", ".html", ".css", ".js", ".txt", ".service"}
 
@@ -233,6 +248,8 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Kalite Kapıları",
         "Çıkış",
         "Pipeline Gözlemi",
+        "Codex gate",
+        "Living docs",
         "Runner",
         "Run ID",
         "Telegram CTO işleri",
@@ -440,6 +457,76 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     )
 
 
+def quality_dashboard_living_docs_sync(results: dict[str, Any]) -> None:
+    registry = read_json(ROOT / "state_templates/module_registry.json", {"modules": []})
+    catalog = read_json(ROOT / "state_templates/action_catalog.json", {"actions": []})
+    module_settings = read_json(ROOT / "state_templates/module_settings.json", {})
+    dashboard_settings = read_json(ROOT / "state_templates/dashboard_settings.json", {})
+
+    modules = registry.get("modules", []) if isinstance(registry, dict) else []
+    actions = catalog.get("actions", []) if isinstance(catalog, dict) else []
+    module_by_id = {module.get("id"): module for module in modules if isinstance(module, dict)}
+    action_ids = {action.get("id") for action in actions if isinstance(action, dict)}
+
+    expected_modules = set(QUALITY_DASHBOARD_LIVING_DOCS_ACTIONS)
+    expected_actions = {
+        action
+        for action_list in QUALITY_DASHBOARD_LIVING_DOCS_ACTIONS.values()
+        for action in action_list
+    }
+    missing_modules = sorted(module_id for module_id in expected_modules if module_id not in module_by_id)
+    missing_registry_actions = {
+        module_id: [
+            action
+            for action in expected
+            if action not in set(module_by_id.get(module_id, {}).get("actions", []))
+        ]
+        for module_id, expected in QUALITY_DASHBOARD_LIVING_DOCS_ACTIONS.items()
+        if module_id in module_by_id
+    }
+    missing_registry_actions = {key: value for key, value in missing_registry_actions.items() if value}
+    missing_catalog_actions = sorted(action for action in expected_actions if action not in action_ids)
+    missing_module_settings = sorted(
+        module_id
+        for module_id in expected_modules
+        if not isinstance(module_settings, dict) or module_id not in module_settings
+    )
+
+    dashboard = module_settings.get("dashboard", {}) if isinstance(module_settings, dict) else {}
+    production_dashboard = dashboard_settings.get("production", {}) if isinstance(dashboard_settings, dict) else {}
+    required_dashboard_flags = [
+        "show_quality_gate_status",
+        "show_living_documentation_status",
+    ]
+    missing_dashboard_flags = [
+        flag
+        for flag in required_dashboard_flags
+        if dashboard.get(flag) is not True or production_dashboard.get(flag) is not True
+    ]
+
+    ok = (
+        not missing_modules
+        and not missing_registry_actions
+        and not missing_catalog_actions
+        and not missing_module_settings
+        and not missing_dashboard_flags
+    )
+    record(
+        results,
+        "quality_dashboard_living_docs_sync",
+        ok,
+        {
+            "expected_modules": sorted(expected_modules),
+            "expected_actions": sorted(expected_actions),
+            "missing_modules": missing_modules,
+            "missing_registry_actions": missing_registry_actions,
+            "missing_catalog_actions": missing_catalog_actions,
+            "missing_module_settings": missing_module_settings,
+            "missing_dashboard_flags": missing_dashboard_flags,
+        },
+    )
+
+
 def static_contract(rel: str, markers: list[str]) -> dict[str, Any]:
     path = source_path(rel)
     exists = path.exists()
@@ -547,6 +634,7 @@ def run_suite() -> dict[str, Any]:
     required_file_regression(results)
     worker_queue_recovery(results)
     dashboard_test(results)
+    quality_dashboard_living_docs_sync(results)
     telegram_test(results)
     deploy_script_checks(results)
     security_scans(results)
