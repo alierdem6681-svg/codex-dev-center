@@ -14,6 +14,7 @@ APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
 LOGS = APP / "logs"
 JOBS = STATE / "direct_cto_jobs"
+ACTIVE_STATUSES = {"QUEUED", "RUNNING"}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -120,6 +121,9 @@ def load_job(job_id):
         return None, p
     return json.loads(p.read_text()), p
 
+def is_active_job(job):
+    return str((job or {}).get("status") or "").upper() in ACTIVE_STATUSES
+
 def save_job(path, job):
     job["updated_at"] = now()
     path.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
@@ -146,6 +150,15 @@ def dynamic_progress_interval(job):
     # Kısa async işler.
     return 60        # 1 dakika
 
+def sleep_until_next_update_or_terminal(job_id, total_seconds, poll_seconds=5):
+    deadline = time.time() + max(0, int(total_seconds or 0))
+    while time.time() < deadline:
+        job, _job_path = load_job(job_id)
+        if not job or not is_active_job(job):
+            return True
+        time.sleep(min(float(poll_seconds), max(0, deadline - time.time())))
+    return False
+
 def main(job_id):
     time.sleep(5)
 
@@ -156,8 +169,7 @@ def main(job_id):
         if not job:
             return 0
 
-        status = job.get("status")
-        if status not in ["QUEUED", "RUNNING"]:
+        if not is_active_job(job):
             return 0
 
         chat_id = job.get("chat_id")
@@ -176,7 +188,8 @@ def main(job_id):
                 with (LOGS / "direct_cto_progress_watcher.log").open("a", encoding="utf-8") as f:
                     f.write(now() + " telegram_error=" + str(e)[:300] + "\n")
 
-        time.sleep(dynamic_progress_interval(job))
+        if sleep_until_next_update_or_terminal(job_id, dynamic_progress_interval(job)):
+            return 0
 
     return 0
 
