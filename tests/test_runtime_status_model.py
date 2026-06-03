@@ -120,6 +120,12 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(worker_runner.is_safe_repo_apply_path("state/task_queue.json"))
         self.assertFalse(worker_runner.is_safe_repo_apply_path(".env"))
 
+    def test_repo_apply_ignores_generated_runtime_artifacts_only(self):
+        self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("reports/apply-worker.md"))
+        self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("logs/apply-worker.log"))
+        self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
+        self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
