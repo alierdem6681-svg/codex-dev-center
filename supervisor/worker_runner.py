@@ -134,6 +134,21 @@ SECRET_PATTERNS = [
     re.compile(r"\bya29\.[0-9A-Za-z_-]{20,}\b"),
 ]
 
+
+def normalize_repo_apply_path(path: str) -> str:
+    rel = str(path or "").replace("\\", "/").strip().strip("\"'")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return rel.lstrip("/")
+
+
+def matches_repo_apply_prefix(rel: str, prefix: str) -> bool:
+    safe_prefix = prefix.replace("\\", "/").lstrip("/")
+    if safe_prefix.endswith("/"):
+        return rel.startswith(safe_prefix)
+    return rel == safe_prefix
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -483,7 +498,7 @@ def safe_branch_fragment(value: Any, limit: int = 64) -> str:
 
 
 def is_safe_repo_apply_path(path: str) -> bool:
-    rel = path.replace("\\", "/").lstrip("/")
+    rel = normalize_repo_apply_path(path)
     if not rel or rel.startswith("../") or "/../" in rel:
         return False
     parts = set(rel.split("/"))
@@ -491,11 +506,11 @@ def is_safe_repo_apply_path(path: str) -> bool:
         return False
     if Path(rel).name in BLOCKED_REPO_APPLY_NAMES:
         return False
-    return any(rel == prefix.rstrip("/") or rel.startswith(prefix) for prefix in SAFE_REPO_APPLY_PREFIXES)
+    return any(matches_repo_apply_prefix(rel, prefix) for prefix in SAFE_REPO_APPLY_PREFIXES)
 
 
 def is_ignorable_repo_apply_artifact(path: str) -> bool:
-    rel = path.replace("\\", "/").lstrip("/")
+    rel = normalize_repo_apply_path(path)
     if not rel or rel.startswith("../") or "/../" in rel:
         return False
     return any(rel.startswith(prefix) for prefix in IGNORABLE_REPO_APPLY_PREFIXES)

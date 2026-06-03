@@ -123,3 +123,9 @@ Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
 Production readiness suite icindeki restart ve failure injection simülasyonları non-mutating static contract kanıtına bağlandı. `restart_simulation` artık service watchdog restart yolu ve safe rollback sözleşmesini, `failure_injection_simulation` ise JSON hata yakalama, security scan ve critical approval sözleşmesini repo dosyaları üzerinden doğrular.
 
 Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı. Davranış `tests/test_runtime_status_model.py` içindeki unit test ile sabitlendi.
+
+## 2026-06-03 Controlled Apply Pipeline v1 Validation
+
+Validated proposal apply worker akışı için repo path doğrulaması güçlendirildi. `supervisor/worker_runner.py` artık apply path'lerini normalize eder, tekil allowlist dosyalarında exact match ister ve `AGENTS.md.bak`, `AGENTS.md/child`, traversal veya runtime `state/` hedeflerini bloklar.
+
+Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate işlemi yapmadı.

@@ -63,6 +63,8 @@ Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templ
 
 Dashboard controlled execution proposal görünürlüğü salt okunurdur. Proposal durumu göstermek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu canlı yazma yetkisi anlamına gelmez.
 
+Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

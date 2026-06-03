@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-03T16:47:10+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -112,6 +112,18 @@
       "enabled": true,
       "requires_approval": false,
       "command": "{python} supervisor/cto_doctor.py --fix --json"
+    },
+    {
+      "id": "repo_apply_validation",
+      "label": "Controlled Repo Apply Doğrulaması",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "requires_isolated_worktree": true,
+      "requires_exact_path_allowlist": true,
+      "requires_secret_scan": true
     }
   ]
 }
