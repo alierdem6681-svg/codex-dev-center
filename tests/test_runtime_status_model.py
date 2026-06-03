@@ -5,6 +5,7 @@ import importlib.util
 import json
 import contextlib
 import io
+import time
 from pathlib import Path
 
 
@@ -16,6 +17,7 @@ from supervisor import (  # noqa: E402
     lifecycle_manager,
     progress_aware_runner,
     direct_cto_async_job,
+    direct_cto_progress_watcher,
     supervisor_cli,
     task_validation_engine,
     telegram_direct_cto_simulator,
@@ -239,6 +241,47 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
 
         self.assertTrue(result["action_command"])
         self.assertEqual(result["route"], "async_job")
+
+
+class DirectCtoProgressWatcherTest(unittest.TestCase):
+    def write_job(self, root, job_id, status):
+        path = Path(root) / f"{job_id}.json"
+        path.write_text(json.dumps({"id": job_id, "status": status}), encoding="utf-8")
+        return path
+
+    def test_terminal_job_breaks_long_progress_sleep_quickly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original_jobs = direct_cto_progress_watcher.JOBS
+            direct_cto_progress_watcher.JOBS = Path(tmp)
+            try:
+                self.write_job(tmp, "JOB-TERMINAL", "FAILED_RETRYABLE")
+                started = time.time()
+                stopped = direct_cto_progress_watcher.sleep_until_next_update_or_terminal(
+                    "JOB-TERMINAL",
+                    total_seconds=60,
+                    poll_seconds=0.05,
+                )
+            finally:
+                direct_cto_progress_watcher.JOBS = original_jobs
+
+        self.assertTrue(stopped)
+        self.assertLess(time.time() - started, 1)
+
+    def test_active_job_waits_until_short_interval_finishes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original_jobs = direct_cto_progress_watcher.JOBS
+            direct_cto_progress_watcher.JOBS = Path(tmp)
+            try:
+                self.write_job(tmp, "JOB-RUNNING", "RUNNING")
+                stopped = direct_cto_progress_watcher.sleep_until_next_update_or_terminal(
+                    "JOB-RUNNING",
+                    total_seconds=0.1,
+                    poll_seconds=0.02,
+                )
+            finally:
+                direct_cto_progress_watcher.JOBS = original_jobs
+
+        self.assertFalse(stopped)
 
 
 class DeployGateStatusModelTest(unittest.TestCase):
