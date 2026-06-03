@@ -76,6 +76,14 @@ DELIVERY_STATE = STATE / "cto_delivery_state.json"
 DEPLOY_WORKFLOW = "Deploy to VM"
 SMOKE_WORKFLOW = "VM Smoke Check"
 CONFIRM_PHRASE = "DEPLOY-CODEX-VM"
+ACTIVE_WORKFLOW_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+MERGE_FAILURE_CONFLICT_MARKERS = (
+    "not mergeable",
+    "cannot be cleanly",
+    "merge conflict",
+    "conflict",
+    "dirty",
+)
 
 
 def now() -> str:
@@ -436,12 +444,14 @@ def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
     repo_applied = deploy_gate_repo_applied(task)
     validation_pass = gate_pass(task.get("validation_status"))
     pipeline_pass = gate_pass(task.get("pipeline_status"))
+    deploy_in_progress = bool(task.get("deploy_in_progress")) or str(task.get("deployment_status") or "").upper() == "DEPLOY_IN_PROGRESS"
     ready_for_deploy_gate = (
         status in deployable_statuses
         and repo_applied
         and validation_pass
         and pipeline_pass
         and not critical["approval_required"]
+        and not deploy_in_progress
     )
     return {
         "task_id": task.get("id"),
@@ -457,6 +467,7 @@ def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
         "delivery_level": task.get("delivery_level"),
         "critical": critical,
         "ready_for_deploy_gate": ready_for_deploy_gate,
+        "deploy_in_progress": deploy_in_progress,
         "production_deployed": bool(task.get("production_deployed") or status == TASK_STATUS_DEPLOYED),
     }
 
@@ -493,7 +504,7 @@ def main_head() -> str:
     return head or git_head()
 
 
-def latest_run(workflow: str, head_sha: str = "") -> dict[str, Any]:
+def workflow_runs(workflow: str) -> dict[str, Any]:
     args = [
         "gh",
         "run",
@@ -512,10 +523,40 @@ def latest_run(workflow: str, head_sha: str = "") -> dict[str, Any]:
         runs = json.loads(result["stdout"])
     except Exception as exc:
         return {"ok": False, "error": str(exc), "run_result": result}
+    return {"ok": True, "runs": runs}
+
+
+def latest_run(workflow: str, head_sha: str = "") -> dict[str, Any]:
+    payload = workflow_runs(workflow)
+    if not payload["ok"]:
+        return payload
+    runs = payload["runs"]
     for item in runs:
         if not head_sha or item.get("headSha") == head_sha:
             return {"ok": True, "run": item}
     return {"ok": False, "error": "run_not_found", "runs": runs[:3]}
+
+
+def active_run(workflow: str, head_sha: str) -> dict[str, Any]:
+    payload = workflow_runs(workflow)
+    if not payload["ok"]:
+        return payload
+    for item in payload["runs"]:
+        if item.get("headSha") == head_sha and str(item.get("status") or "").lower() in ACTIVE_WORKFLOW_STATUSES:
+            return {"ok": True, "run": item}
+    return {"ok": False, "error": "active_run_not_found"}
+
+
+def merge_failure_conflict_reason(result: dict[str, Any], pr: dict[str, Any]) -> str:
+    merge_state = str(pr.get("mergeStateStatus") or "").upper()
+    if merge_state and merge_state not in {"CLEAN", "UNKNOWN"}:
+        return f"merge_state_{merge_state.lower()}"
+    text = "\n".join(str(result.get(key) or "") for key in ("stdout", "stderr", "cmd")).lower()
+    if any(marker in text for marker in MERGE_FAILURE_CONFLICT_MARKERS):
+        return "merge_command_not_mergeable"
+    if "exit status 1" in text and ("merge" in text or "pull request" in text):
+        return "merge_command_git_exit_status_1"
+    return ""
 
 
 def wait_run(run_id: str, timeout_seconds: int = 900) -> dict[str, Any]:
@@ -539,6 +580,14 @@ def wait_run(run_id: str, timeout_seconds: int = 900) -> dict[str, Any]:
 
 def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
     head = main_head()
+    existing = active_run(workflow, head)
+    if existing.get("ok"):
+        run_id = str(existing["run"].get("databaseId"))
+        payload = {"ok": True, "status": "WORKFLOW_ALREADY_RUNNING", "run": existing["run"], "deduped": True}
+        if wait:
+            payload["wait"] = wait_run(run_id)
+            payload["ok"] = bool(payload["wait"].get("ok"))
+        return payload
     if workflow == DEPLOY_WORKFLOW:
         args = ["gh", "workflow", "run", workflow, "--ref", "main", "-f", f"confirm={CONFIRM_PHRASE}", "-f", "ref=main"]
     else:
@@ -565,6 +614,8 @@ def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict
     task["status"] = TASK_STATUS_DEPLOYED
     task["production_deployed"] = True
     task["delivery_level"] = "DEPLOYED"
+    task["deploy_in_progress"] = False
+    task["deployment_status"] = "DEPLOYED"
     task["deploy_run_id"] = str(deploy_run.get("databaseId") or deploy_run.get("run", {}).get("databaseId") or "")
     task["deploy_run_url"] = deploy_run.get("url") or deploy_run.get("run", {}).get("url") or ""
     if smoke_run:
@@ -628,11 +679,23 @@ def mark_task_deploy_retry(task_id: str, failure_status: str) -> dict[str, Any]:
     if not task:
         return {"ok": False, "error": "task_not_found"}
     task["deployment_status"] = "DEPLOY_RETRY_REQUIRED"
+    task["deploy_in_progress"] = False
     task["deploy_retry_required"] = True
     task["last_deploy_failure_status"] = failure_status
     task["updated_at"] = now()
     atomic_write_json(QUEUE, queue)
     return {"ok": True, "task_id": task_id, "deployment_status": "DEPLOY_RETRY_REQUIRED"}
+
+
+def mark_task_deploy_in_progress(task_id: str) -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "error": "task_not_found"}
+    task["deploy_in_progress"] = True
+    task["deployment_status"] = "DEPLOY_IN_PROGRESS"
+    task["updated_at"] = now()
+    atomic_write_json(QUEUE, queue)
+    return {"ok": True, "task_id": task_id, "deployment_status": "DEPLOY_IN_PROGRESS"}
 
 
 def set_task_approval_required(task_id: str, findings: list[str]) -> dict[str, Any]:
@@ -668,6 +731,10 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
     evaluation = evaluate_task(task)
     if evaluation["critical"]["approval_required"]:
         return {"ok": False, "status": "APPROVAL_REQUIRED", "evaluation": evaluation}
+    if evaluation["production_deployed"]:
+        return {"ok": True, "status": "ALREADY_DEPLOYED", "evaluation": evaluation, "task_id": task_id}
+    if evaluation["deploy_in_progress"]:
+        return {"ok": True, "status": "DEPLOY_IN_PROGRESS", "evaluation": evaluation, "task_id": task_id}
     if cfg["production_deploy_requires_user_approval_for_normal_app_changes"]:
         return {"ok": False, "status": "POLICY_REQUIRES_USER_APPROVAL", "evaluation": evaluation}
     if not cfg["production_deploy_allowed_when_all_gates_pass"]:
@@ -684,10 +751,19 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
         marked = mark_task_deploy_retry(task_id, "SMOKE_REQUIRED_FOR_DEPLOYED")
         return {"ok": False, "status": "SMOKE_REQUIRED_FOR_DEPLOYED", "evaluation": evaluation, "readiness": readiness, "marked": marked}
 
+    in_progress = mark_task_deploy_in_progress(task_id)
     deploy = dispatch_workflow(DEPLOY_WORKFLOW, wait=wait)
     if not deploy["ok"]:
         marked = mark_task_deploy_retry(task_id, "DEPLOY_WORKFLOW_FAILED")
-        return {"ok": False, "status": "DEPLOY_WORKFLOW_FAILED", "evaluation": evaluation, "readiness": readiness, "deploy": deploy, "marked": marked}
+        return {
+            "ok": False,
+            "status": "DEPLOY_WORKFLOW_FAILED",
+            "evaluation": evaluation,
+            "readiness": readiness,
+            "deploy": deploy,
+            "in_progress": in_progress,
+            "marked": marked,
+        }
     smoke_result: dict[str, Any] | None = None
     if smoke:
         smoke_result = dispatch_workflow(SMOKE_WORKFLOW, wait=wait)
@@ -700,10 +776,20 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
                 "readiness": readiness,
                 "deploy": deploy,
                 "smoke": smoke_result,
+                "in_progress": in_progress,
                 "marked": marked,
             }
     marked = mark_task_deployed(task_id, deploy.get("run", {}), smoke_result.get("run", {}) if smoke_result else None)
-    return {"ok": True, "status": "DEPLOYED", "evaluation": evaluation, "readiness": readiness, "deploy": deploy, "smoke": smoke_result, "marked": marked}
+    return {
+        "ok": True,
+        "status": "DEPLOYED",
+        "evaluation": evaluation,
+        "readiness": readiness,
+        "deploy": deploy,
+        "smoke": smoke_result,
+        "in_progress": in_progress,
+        "marked": marked,
+    }
 
 
 def latest_deploy_candidate() -> str:
@@ -716,7 +802,13 @@ def latest_deploy_candidate() -> str:
 
 
 def pr_ready_candidate() -> str:
+    candidates = pr_ready_candidates()
+    return candidates[0] if candidates else ""
+
+
+def pr_ready_candidates() -> list[str]:
     queue = load_queue()
+    candidates: list[str] = []
     for task in reversed(queue.get("tasks", [])):
         critical = active_approval_required_payload(task)
         if critical["approval_required"]:
@@ -731,8 +823,8 @@ def pr_ready_candidate() -> str:
             continue
         if str(task.get("pipeline_status") or "").upper() != "PASS":
             continue
-        return str(task.get("id"))
-    return ""
+        candidates.append(str(task.get("id")))
+    return candidates
 
 
 def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
@@ -798,10 +890,42 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
         timeout=300,
     )
     if not merged["ok"]:
-        merge_error = f"{merged.get('stdout', '')}\n{merged.get('stderr', '')}".lower()
-        if "not mergeable" in merge_error or "cannot be cleanly" in merge_error:
-            marked = mark_task_pr_conflict(task_id, pr, "merge_command_not_mergeable")
-            return {"ok": False, "status": "PR_NOT_MERGEABLE", "task_id": task_id, "pr": pr, "merge": merged, "marked": marked}
+        after_failure = run(
+            ["gh", "pr", "view", number, "--json", "number,url,state,isDraft,mergeStateStatus,headRefName,baseRefName,mergeCommit"],
+            cwd=command_root(),
+            timeout=60,
+        )
+        after_pr: dict[str, Any] = {}
+        if after_failure["ok"]:
+            try:
+                after_pr = json.loads(after_failure["stdout"] or "{}")
+            except Exception:
+                after_pr = {}
+        if after_pr.get("state") == "MERGED":
+            merge_commit = ((after_pr.get("mergeCommit") or {}).get("oid") or "").strip()
+            marked = mark_task_merged(task_id, merge_commit)
+            return {
+                "ok": True,
+                "status": "ALREADY_MERGED",
+                "task_id": task_id,
+                "pr": after_pr,
+                "merge": merged,
+                "after_failure": after_failure,
+                "marked": marked,
+            }
+        conflict_pr = after_pr or pr
+        conflict_reason = merge_failure_conflict_reason(merged, conflict_pr)
+        if conflict_reason:
+            marked = mark_task_pr_conflict(task_id, conflict_pr, conflict_reason)
+            return {
+                "ok": False,
+                "status": "PR_NOT_MERGEABLE",
+                "task_id": task_id,
+                "pr": conflict_pr,
+                "merge": merged,
+                "after_failure": after_failure,
+                "marked": marked,
+            }
         return {"ok": False, "status": "PR_MERGE_FAILED", "task_id": task_id, "pr": pr, "merge": merged}
     time.sleep(3)
     after = run(["gh", "pr", "view", number, "--json", "number,url,state,mergeCommit"], cwd=command_root(), timeout=60)
@@ -834,20 +958,30 @@ def finalize_latest(execute: bool = False, wait: bool = False, smoke: bool = Tru
         payload["task_id"] = task_id
         return payload
 
-    pr_task = pr_ready_candidate()
-    if not pr_task:
-        return {"ok": False, "status": "NO_DELIVERY_CANDIDATE", "task_id": ""}
-
-    merged = merge_pr_task(pr_task, execute=execute)
-    if not merged.get("ok"):
-        merged["task_id"] = pr_task
-        return merged
-    if not execute:
-        return {"ok": True, "status": "DRY_RUN_PR_READY_TO_MERGE_THEN_DEPLOY", "task_id": pr_task, "merge": merged}
-    deployed = deploy_task(pr_task, execute=True, wait=wait, smoke=smoke)
-    deployed["merge"] = merged
-    deployed["task_id"] = pr_task
-    return deployed
+    skipped: list[dict[str, Any]] = []
+    for pr_task in pr_ready_candidates():
+        merged = merge_pr_task(pr_task, execute=execute)
+        if not merged.get("ok"):
+            merged["task_id"] = pr_task
+            if merged.get("status") == "PR_NOT_MERGEABLE":
+                skipped.append({"task_id": pr_task, "status": merged.get("status"), "pr": merged.get("pr")})
+                continue
+            merged["skipped"] = skipped
+            return merged
+        if not execute:
+            return {
+                "ok": True,
+                "status": "DRY_RUN_PR_READY_TO_MERGE_THEN_DEPLOY",
+                "task_id": pr_task,
+                "merge": merged,
+                "skipped": skipped,
+            }
+        deployed = deploy_task(pr_task, execute=True, wait=wait, smoke=smoke)
+        deployed["merge"] = merged
+        deployed["task_id"] = pr_task
+        deployed["skipped"] = skipped
+        return deployed
+    return {"ok": False, "status": "NO_DELIVERY_CANDIDATE", "task_id": "", "skipped": skipped}
 
 
 def write_report(payload: dict[str, Any]) -> None:
