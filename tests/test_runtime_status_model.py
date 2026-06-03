@@ -300,6 +300,21 @@ class WorkerStatusModelTest(unittest.TestCase):
 
 
 class ProgressAwareRunnerTest(unittest.TestCase):
+    def test_snapshot_paths_tolerates_deleted_directory_during_walk(self):
+        class VanishingPath:
+            name = "vanishing"
+
+            def exists(self):
+                return True
+
+            def is_dir(self):
+                return True
+
+            def rglob(self, pattern):
+                raise FileNotFoundError("deleted during scan")
+
+        self.assertEqual(progress_aware_runner.snapshot_paths([VanishingPath()]), {})
+
     def test_output_noise_without_meaningful_progress_stalls(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
