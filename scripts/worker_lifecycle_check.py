@@ -214,6 +214,20 @@ def evaluate(runtime: Path, repair: bool = False) -> dict[str, Any]:
         if status == "RUNNING" and current_task and service != "active":
             errors.append(f"{worker_id}: RUNNING current_task={current_task} but service={service}")
 
+    for task in worker_tasks:
+        if task_status(task) != "RUNNING":
+            continue
+        task_id = task.get("id")
+        assigned_worker = task.get("assigned_worker")
+        state = states.get(str(assigned_worker), {})
+        if str(state.get("status", "")).upper() != "RUNNING" or state.get("current_task") != task_id:
+            errors.append(
+                f"{task_id}: RUNNING task assigned to {assigned_worker} but worker_state="
+                + str(state.get("status"))
+                + " current_task="
+                + str(state.get("current_task"))
+            )
+
     if worker_tasks and not active_worker_services:
         sample = [task_summary(task) for task in worker_tasks[:5]]
         errors.append(
