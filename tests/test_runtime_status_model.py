@@ -662,6 +662,85 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
 
         self.assertEqual(files, [keep])
 
+    def test_dry_run_non_mutating_contract_requires_json_flags(self):
+        result = {
+            "ok": True,
+            "stdout": json.dumps(
+                {
+                    "ok": True,
+                    "status": "PASS",
+                    "dry_run": True,
+                    "mutating_cloud_operations_performed": False,
+                }
+            ),
+        }
+
+        contract = production_readiness_suite.dry_run_non_mutating_contract(
+            result,
+            ["mutating_cloud_operations_performed"],
+        )
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "dry_run_non_mutating_contract")
+
+        result["stdout"] = json.dumps(
+            {
+                "ok": True,
+                "status": "PASS",
+                "dry_run": True,
+                "mutating_cloud_operations_performed": True,
+            }
+        )
+
+        contract = production_readiness_suite.dry_run_non_mutating_contract(
+            result,
+            ["mutating_cloud_operations_performed"],
+        )
+
+        self.assertFalse(contract["ok"])
+        self.assertEqual(contract["flag_mismatches"], ["mutating_cloud_operations_performed"])
+
+    def test_staging_and_rollback_rejects_mutating_rollback_dry_run(self):
+        staging_payload = {
+            "ok": True,
+            "status": "PASS",
+            "dry_run": True,
+            "mutating_cloud_operations_performed": False,
+        }
+        rollback_payload = {
+            "ok": True,
+            "status": "PASS",
+            "dry_run": True,
+            "git_reset_performed": True,
+            "data_mutation_performed": False,
+        }
+
+        def fake_run_cmd(cmd, timeout=120):
+            if "staging-deploy" in cmd:
+                return {"ok": True, "stdout": json.dumps(staging_payload), "stderr": "", "returncode": 0}
+            if "rollback" in cmd:
+                return {"ok": True, "stdout": json.dumps(rollback_payload), "stderr": "", "returncode": 0}
+            return {"ok": False, "stdout": "", "stderr": "unexpected command", "returncode": 1}
+
+        original_run_cmd = production_readiness_suite.run_cmd
+        original_reports = production_readiness_suite.REPORTS
+        with tempfile.TemporaryDirectory(dir=production_readiness_suite.ROOT) as tmp:
+            production_readiness_suite.run_cmd = fake_run_cmd
+            production_readiness_suite.REPORTS = Path(tmp) / "reports"
+            try:
+                results = {}
+                production_readiness_suite.staging_and_rollback(results)
+            finally:
+                production_readiness_suite.run_cmd = original_run_cmd
+                production_readiness_suite.REPORTS = original_reports
+
+        self.assertTrue(results["staging_smoke_test"]["ok"])
+        self.assertFalse(results["rollback_simulation"]["ok"])
+        self.assertEqual(
+            results["rollback_simulation"]["details"]["contract"]["flag_mismatches"],
+            ["git_reset_performed"],
+        )
+
 
 class DirectCtoJobRecoveryTest(unittest.TestCase):
     def write_job(self, root, job_id, status="RUNNING", pid=999999999):

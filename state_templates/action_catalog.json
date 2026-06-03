@@ -34,7 +34,8 @@
       "enabled": true,
       "requires_approval": false,
       "non_mutating": true,
-      "simulation_contracts_required": true
+      "simulation_contracts_required": true,
+      "dry_run_non_mutating_contracts_required": true
     },
     {
       "id": "staging_deploy",
@@ -85,7 +86,8 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/production_environment_manager.py rollback --dry-run"
+      "command": "{python} supervisor/production_environment_manager.py rollback --dry-run",
+      "dry_run_non_mutating_contract_required": true
     },
     {
       "id": "github_safe_flow_dry_run",

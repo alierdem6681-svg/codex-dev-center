@@ -316,3 +316,30 @@ Yeni davranış:
 - `AGENTS.md.bak` veya `AGENTS.md/child` gibi tekil dosya varyantları repo apply allowlist'ten geçmez.
 - `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
 - Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapmadı.
+
+---
+
+## Staging / Rollback Readiness Apply Validation
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-170858 / CTO-DISPATCH-20260603-073040-CTO-ACTION-20260601-160827-05-STAGING-ROLLBACK
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` staging ve rollback dry-run sonuçlarını JSON payload üzerinden non-mutating sözleşmeyle doğrular.
+- `tests/test_runtime_status_model.py` dry-run içinde mutasyon flag'i saparsa readiness kapısının FAIL olacağını sabitler.
+- Staging ve rollback readiness dokümanları dry-run kanıt alanlarıyla güncellendi.
+
+Yeni davranış:
+- `staging_smoke_test` için `dry_run=true` ve `mutating_cloud_operations_performed=false` zorunludur.
+- `rollback_simulation` için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapılmadı.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- Geçici root ile `python3 supervisor/production_readiness_suite.py --json` PASS; repo `reports/` ve runtime `state/` dosyaları değiştirilmedi.
+
+Not:
+- Bu sandbox'ta git worktree metadata yolu read-only olduğu için local commit oluşturulamadı.
+- GitHub branch/PR oluşturma MCP çağrısı kullanıcı tarafından iptal edildi; PR açma adımı tamamlanmadı.

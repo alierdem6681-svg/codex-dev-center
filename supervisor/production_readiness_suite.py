@@ -328,13 +328,57 @@ def forbidden_operation_findings() -> list[dict[str, Any]]:
     return findings
 
 
+def command_json_payload(command_result: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    stdout = str(command_result.get("stdout") or "").strip()
+    if not stdout:
+        return {}, "empty_stdout"
+    try:
+        payload = json.loads(stdout)
+    except Exception as exc:
+        return {}, str(exc)
+    if not isinstance(payload, dict):
+        return {}, "json_payload_not_object"
+    return payload, None
+
+
+def dry_run_non_mutating_contract(command_result: dict[str, Any], false_flags: list[str]) -> dict[str, Any]:
+    payload, parse_error = command_json_payload(command_result)
+    flag_mismatches = [flag for flag in false_flags if payload.get(flag) is not False]
+    ok = (
+        bool(command_result.get("ok"))
+        and parse_error is None
+        and payload.get("ok") is True
+        and payload.get("status") == "PASS"
+        and payload.get("dry_run") is True
+        and not flag_mismatches
+    )
+    return {
+        "ok": ok,
+        "mode": "dry_run_non_mutating_contract",
+        "command_ok": bool(command_result.get("ok")),
+        "parse_error": parse_error,
+        "payload_ok": payload.get("ok"),
+        "payload_status": payload.get("status"),
+        "dry_run": payload.get("dry_run"),
+        "required_false_flags": {flag: payload.get(flag) for flag in false_flags},
+        "flag_mismatches": flag_mismatches,
+    }
+
+
 def staging_and_rollback(results: dict[str, Any]) -> None:
     docs_ok = (ROOT / "docs/STAGING_ROLLBACK_READINESS_PLAN.md").exists()
     controller_ok = (ROOT / "supervisor/production_deploy_controller.py").exists()
     manager_ok = (ROOT / "supervisor/production_environment_manager.py").exists()
     staging = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "staging-deploy", "--dry-run"], timeout=180)
     rollback = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "rollback", "--dry-run"], timeout=120)
-    record(results, "staging_smoke_test", docs_ok and controller_ok and manager_ok and staging["ok"], {"mode": "dry_run", "result": staging})
+    staging_contract = dry_run_non_mutating_contract(staging, ["mutating_cloud_operations_performed"])
+    rollback_contract = dry_run_non_mutating_contract(rollback, ["git_reset_performed", "data_mutation_performed"])
+    record(
+        results,
+        "staging_smoke_test",
+        docs_ok and controller_ok and manager_ok and staging_contract["ok"],
+        {"mode": "dry_run", "result": staging, "contract": staging_contract},
+    )
 
     report = REPORTS / "rollback_simulation_last_report.md"
     report.parent.mkdir(parents=True, exist_ok=True)
@@ -346,7 +390,12 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
         "- Canli komut calistirilmadi.\n",
         encoding="utf-8",
     )
-    record(results, "rollback_simulation", report.exists() and rollback["ok"], {"report": str(report.relative_to(ROOT)), "result": rollback})
+    record(
+        results,
+        "rollback_simulation",
+        report.exists() and rollback_contract["ok"],
+        {"report": str(report.relative_to(ROOT)), "result": rollback, "contract": rollback_contract},
+    )
 
 
 def deploy_script_checks(results: dict[str, Any]) -> None:

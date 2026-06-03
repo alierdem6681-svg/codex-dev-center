@@ -102,7 +102,9 @@
     "enabled": true,
     "simulation_contracts_required": true,
     "restart_simulation_mode": "static_non_mutating_contract",
-    "failure_injection_mode": "static_non_mutating_contract"
+    "failure_injection_mode": "static_non_mutating_contract",
+    "staging_dry_run_non_mutating_required": true,
+    "rollback_dry_run_non_mutating_required": true
   },
   "deploy_pipeline": {
     "staging_enabled": true,

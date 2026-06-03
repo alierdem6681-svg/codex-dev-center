@@ -27,6 +27,27 @@
     "restart_simulation",
     "failure_injection_simulation"
   ],
+  "dry_run_non_mutating_contracts": {
+    "staging_smoke_test": {
+      "mode": "dry_run_non_mutating_contract",
+      "required_true_fields": [
+        "dry_run"
+      ],
+      "required_false_fields": [
+        "mutating_cloud_operations_performed"
+      ]
+    },
+    "rollback_simulation": {
+      "mode": "dry_run_non_mutating_contract",
+      "required_true_fields": [
+        "dry_run"
+      ],
+      "required_false_fields": [
+        "git_reset_performed",
+        "data_mutation_performed"
+      ]
+    }
+  },
   "real_deploy_sequence": [
     "git_clean_check",
     "github_remote_sync_check",
