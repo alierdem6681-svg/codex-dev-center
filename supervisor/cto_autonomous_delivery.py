@@ -602,6 +602,27 @@ def mark_task_merged(task_id: str, commit: str = "") -> dict[str, Any]:
     return {"ok": True, "task_id": task_id, "delivery_level": "READY_FOR_DEPLOY", "merged_commit": commit}
 
 
+def mark_task_pr_conflict(task_id: str, pr: dict[str, Any], reason: str) -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "error": "task_not_found"}
+    task["status"] = TASK_STATUS_FAILED_RETRYABLE
+    task["delivery_level"] = "PR_CONFLICT"
+    task["deployment_status"] = "MERGE_CONFLICT"
+    task["merge_blocked"] = True
+    task["merge_blocked_reason"] = reason
+    task["merge_state_status"] = str(pr.get("mergeStateStatus") or "")
+    task["worker_eligible"] = False
+    task["backlog_continuation_created"] = True
+    if pr.get("number"):
+        task["pull_request_number"] = pr.get("number")
+    if pr.get("url"):
+        task["pull_request_url"] = pr.get("url")
+    task["updated_at"] = now()
+    atomic_write_json(QUEUE, queue)
+    return {"ok": True, "task_id": task_id, "delivery_level": "PR_CONFLICT", "reason": reason}
+
+
 def mark_task_deploy_retry(task_id: str, failure_status: str) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
@@ -753,6 +774,10 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
         return {"ok": True, "status": "ALREADY_MERGED", "task_id": task_id, "pr": pr, "marked": marked}
     if pr.get("state") != "OPEN":
         return {"ok": False, "status": "PR_NOT_OPEN", "task_id": task_id, "pr": pr}
+    merge_state = str(pr.get("mergeStateStatus") or "").upper()
+    if merge_state and merge_state not in {"CLEAN", "UNKNOWN"}:
+        marked = mark_task_pr_conflict(task_id, pr, f"merge_state_{merge_state.lower()}") if execute else {}
+        return {"ok": False, "status": "PR_NOT_MERGEABLE", "task_id": task_id, "pr": pr, "marked": marked}
     if not execute:
         return {"ok": True, "status": "DRY_RUN_PR_READY_TO_MERGE", "task_id": task_id, "pr": pr}
 
@@ -773,6 +798,10 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
         timeout=300,
     )
     if not merged["ok"]:
+        merge_error = f"{merged.get('stdout', '')}\n{merged.get('stderr', '')}".lower()
+        if "not mergeable" in merge_error or "cannot be cleanly" in merge_error:
+            marked = mark_task_pr_conflict(task_id, pr, "merge_command_not_mergeable")
+            return {"ok": False, "status": "PR_NOT_MERGEABLE", "task_id": task_id, "pr": pr, "merge": merged, "marked": marked}
         return {"ok": False, "status": "PR_MERGE_FAILED", "task_id": task_id, "pr": pr, "merge": merged}
     time.sleep(3)
     after = run(["gh", "pr", "view", number, "--json", "number,url,state,mergeCommit"], cwd=command_root(), timeout=60)
