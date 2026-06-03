@@ -103,6 +103,11 @@ Controlled apply notu:
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 
+Queue/status normalizer notu:
+- `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.
+- Status aliaslari case farki, bosluk ve tire varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `FAILED TIMEOUT` ve `in-progress` gibi girdiler standart enumlara cevrilir.
+- Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:

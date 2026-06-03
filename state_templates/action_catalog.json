@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T16:47:10+00:00",
+  "updated_at": "2026-06-03T17:35:59+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -104,7 +104,8 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/cto_doctor.py --json"
+      "command": "{python} supervisor/cto_doctor.py --json",
+      "status_alias_space_hyphen_normalization": true
     },
     {
       "id": "cto_doctor_fix",
@@ -113,7 +114,8 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/cto_doctor.py --fix --json"
+      "command": "{python} supervisor/cto_doctor.py --fix --json",
+      "status_alias_space_hyphen_normalization": true
     },
     {
       "id": "repo_apply_validation",

@@ -39,6 +39,9 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
+    TASK_STATUS_RUNNING,
+    normalize_queue_payload,
+    normalize_status,
 )
 
 WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
@@ -67,6 +70,28 @@ LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 
 
 class WorkerStatusModelTest(unittest.TestCase):
+    def test_task_status_normalizer_accepts_case_space_and_hyphen_variants(self):
+        self.assertEqual(normalize_status("ready for validation"), TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertEqual(normalize_status("FAILED-TIMEOUT"), TASK_STATUS_FAILED_TIMEOUT)
+        self.assertEqual(normalize_status("in-progress"), TASK_STATUS_RUNNING)
+        self.assertEqual(normalize_status("Completed"), TASK_STATUS_DONE)
+
+    def test_queue_payload_reports_noncanonical_status_normalization(self):
+        payload = {
+            "tasks": [
+                {"id": "TASK-READY", "status": "ready for validation", "risk": "medium"},
+                {"id": "TASK-DONE", "status": "completed", "risk": "low"},
+            ]
+        }
+
+        normalized, changes = normalize_queue_payload(payload)
+
+        self.assertEqual(normalized["tasks"][0]["status"], TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertEqual(normalized["tasks"][1]["status"], TASK_STATUS_DONE)
+        self.assertEqual([change["id"] for change in changes], ["TASK-READY", "TASK-DONE"])
+        self.assertEqual(changes[0]["to_status"], TASK_STATUS_READY_FOR_VALIDATION)
+        self.assertEqual(changes[1]["to_status"], TASK_STATUS_DONE)
+
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
             [

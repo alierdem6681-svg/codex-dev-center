@@ -343,3 +343,24 @@ Test:
 Not:
 - Bu sandbox'ta git worktree metadata yolu read-only olduğu için local commit oluşturulamadı.
 - GitHub branch/PR oluşturma MCP çağrısı kullanıcı tarafından iptal edildi; PR açma adımı tamamlanmadı.
+
+---
+
+## Queue / Status Normalizer Apply Retry
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-173121 / CTO-DISPATCH-20260603-073127-CTO-ACTION-20260601-161747-01-QUEUE-STATUS-NORMALIZER
+
+Eklenenler:
+- `supervisor/task_status_constants.py` status alias anahtarlarini case, bosluk ve tire farklarina karsi canonical hale getirir.
+- `tests/test_runtime_status_model.py` `ready for validation`, `FAILED-TIMEOUT`, `in-progress` ve `completed` varyantlarinin standart task enumlarina donustugunu dogrular.
+- CTO router state template kayitlari queue/status normalizer davranisini gorunur kilar.
+
+Yeni davranis:
+- `ready for validation` veya `ready-for-validation` artik yanlislikla `QUEUED` default'una dusmez; `READY_FOR_VALIDATION` olur.
+- `FAILED-TIMEOUT` `FAILED_TIMEOUT`, `in-progress` `RUNNING`, `completed` `DONE` olarak normalize edilir.
+- Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir.
+
+Not:
+- Production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
