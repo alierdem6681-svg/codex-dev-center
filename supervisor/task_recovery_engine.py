@@ -257,7 +257,7 @@ def main():
             task["production_deployed"] = False
 
             retries = int(task.get("recovery_retry_count", 0) or 0)
-            if retries < 2 and retry_created < 6:
+            if retries < 2 and retry_created < 1:
                 retry_id = f"RECOVERY-{run_id}-{safe_id(tid)}-R{retries + 1}"
                 if retry_id not in existing:
                     retry_worker = choose_worker(title)
@@ -326,11 +326,11 @@ def main():
     with (LOGS / "task_recovery_engine.log").open("a", encoding="utf-8") as f:
         f.write(now() + f" recovered={recovered} stale={stale} retry={retry_created}\n")
 
-    try:
-        subprocess.run(["python3", "supervisor/supervisor_cli.py", "dispatch"], cwd=str(APP), timeout=30, text=True, capture_output=True)
-        subprocess.run(["python3", "supervisor/lifecycle_manager.py", "wake-now"], cwd=str(APP), timeout=30, text=True, capture_output=True)
-    except Exception:
-        pass
+    if retry_created or stale:
+        try:
+            subprocess.run(["python3", "supervisor/lifecycle_manager.py", "wake-now"], cwd=str(APP), timeout=30, text=True, capture_output=True)
+        except Exception:
+            pass
 
     print("RECOVERY=OK")
     print("READY_FOR_VALIDATION_OR_PROPOSAL_READY=" + str(recovered))
