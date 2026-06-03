@@ -2,15 +2,44 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-APP = Path("/opt/codex-dev-center")
+APP = Path(os.environ.get("CODEX_DEV_CENTER_HOME", "/opt/codex-dev-center")).resolve()
 STATE = APP / "state"
 REPORTS = APP / "reports"
 LOGS = APP / "logs"
+
+STANDARD_REPORT_SOURCE = "state/production_readiness_status.json"
+STANDARD_REPORT_JSON = "quality-gate-report.json"
+STANDARD_REPORT_SUMMARY = "quality-gate-summary.md"
+
+STANDARD_REPORT_GATES = {
+    "lint": [
+        "python_compile_check",
+        "json_validation",
+        "yaml_validation",
+        "secret_leakage_scan",
+        "forbidden_operation_scan",
+    ],
+    "unit_test": ["unit_test"],
+    "integration_test": ["integration_test"],
+    "simulation_dry_run": [
+        "staging_smoke_test",
+        "rollback_simulation",
+        "restart_simulation",
+        "failure_injection_simulation",
+    ],
+}
+
+NON_MUTATING_FLAGS = [
+    "production_deploy_performed",
+    "staging_deploy_performed",
+    "mutating_cloud_operations_performed",
+]
 
 REQUIRED_FILES = [
     "AGENTS.md",
@@ -49,7 +78,7 @@ def read_json(path, default):
     try:
         p = Path(path)
         if p.exists():
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8-sig"))
     except Exception:
         pass
     return default
@@ -244,10 +273,163 @@ def gate_status():
     write_json(STATE / "quality_gate_status.json", result)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
+def _missing_artifact_checks(reason):
+    return [
+        {
+            "name": name,
+            "status": "missing",
+            "reason": reason,
+            "artifact": STANDARD_REPORT_SOURCE,
+        }
+        for name in STANDARD_REPORT_GATES
+    ]
+
+def _summarize_gate_group(payload, check_name, gate_names):
+    tests = payload.get("tests")
+    if not isinstance(tests, dict):
+        return {
+            "name": check_name,
+            "status": "missing",
+            "reason": "missing_tests_object",
+            "artifact": STANDARD_REPORT_SOURCE,
+            "gates": gate_names,
+        }
+
+    missing = [name for name in gate_names if name not in tests]
+    if missing:
+        return {
+            "name": check_name,
+            "status": "missing",
+            "reason": "missing_gates:" + ",".join(missing),
+            "artifact": STANDARD_REPORT_SOURCE,
+            "gates": gate_names,
+        }
+
+    failed = [name for name in gate_names if tests.get(name, {}).get("ok") is not True]
+    if failed:
+        return {
+            "name": check_name,
+            "status": "fail",
+            "reason": "failed_gates:" + ",".join(failed),
+            "artifact": STANDARD_REPORT_SOURCE,
+            "gates": gate_names,
+        }
+
+    return {
+        "name": check_name,
+        "status": "pass",
+        "reason": "all_required_gates_passed",
+        "artifact": STANDARD_REPORT_SOURCE,
+        "gates": gate_names,
+    }
+
+def _summarize_simulation_group(payload):
+    check = _summarize_gate_group(payload, "simulation_dry_run", STANDARD_REPORT_GATES["simulation_dry_run"])
+    if check["status"] != "pass":
+        return check
+
+    unsafe_flags = [name for name in NON_MUTATING_FLAGS if payload.get(name) is not False]
+    if unsafe_flags:
+        check["status"] = "fail"
+        check["reason"] = "mutating_flags_not_false:" + ",".join(unsafe_flags)
+        check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
+        return check
+
+    check["reason"] = "dry_run_non_mutating_simulation_gates_passed"
+    check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
+    return check
+
+def build_standard_quality_report(root=APP, generated_at=None):
+    root = Path(root)
+    artifact = root / STANDARD_REPORT_SOURCE
+    generated_at = generated_at or now()
+
+    if not artifact.exists():
+        checks = _missing_artifact_checks("missing_artifact:" + STANDARD_REPORT_SOURCE)
+        return {
+            "status": "fail",
+            "generated_at": generated_at,
+            "source_artifacts": [STANDARD_REPORT_SOURCE],
+            "checks": checks,
+            "production_deploy_performed": None,
+            "staging_deploy_performed": None,
+            "mutating_cloud_operations_performed": None,
+        }
+
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        checks = _missing_artifact_checks("invalid_json:" + str(exc))
+        return {
+            "status": "fail",
+            "generated_at": generated_at,
+            "source_artifacts": [STANDARD_REPORT_SOURCE],
+            "checks": checks,
+            "production_deploy_performed": None,
+            "staging_deploy_performed": None,
+            "mutating_cloud_operations_performed": None,
+        }
+
+    checks = [
+        _summarize_gate_group(payload, "lint", STANDARD_REPORT_GATES["lint"]),
+        _summarize_gate_group(payload, "unit_test", STANDARD_REPORT_GATES["unit_test"]),
+        _summarize_gate_group(payload, "integration_test", STANDARD_REPORT_GATES["integration_test"]),
+        _summarize_simulation_group(payload),
+    ]
+    status = "pass" if all(item["status"] == "pass" for item in checks) else "fail"
+    return {
+        "status": status,
+        "generated_at": generated_at,
+        "source_artifacts": [STANDARD_REPORT_SOURCE],
+        "checks": checks,
+        "production_deploy_performed": payload.get("production_deploy_performed"),
+        "staging_deploy_performed": payload.get("staging_deploy_performed"),
+        "mutating_cloud_operations_performed": payload.get("mutating_cloud_operations_performed"),
+    }
+
+def render_standard_quality_summary(report):
+    lines = [
+        "# Quality Gate Summary",
+        "",
+        f"Generated at: {report['generated_at']}",
+        f"Status: {report['status']}",
+        "",
+        "## Checks",
+    ]
+    for check in report["checks"]:
+        lines.append(f"- {check['name']}: {check['status']} - {check['reason']} ({check['artifact']})")
+    lines += [
+        "",
+        "## Safety",
+        f"- Production deploy performed: {str(report.get('production_deploy_performed')).lower()}",
+        f"- Staging deploy performed: {str(report.get('staging_deploy_performed')).lower()}",
+        f"- Mutating cloud operations performed: {str(report.get('mutating_cloud_operations_performed')).lower()}",
+    ]
+    return "\n".join(lines) + "\n"
+
+def write_standard_quality_report(root=APP):
+    root = Path(root)
+    reports = root / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    report = build_standard_quality_report(root)
+    (reports / STANDARD_REPORT_JSON).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (reports / STANDARD_REPORT_SUMMARY).write_text(render_standard_quality_summary(report), encoding="utf-8")
+    return report
+
+def standard_report():
+    result = write_standard_quality_report(APP)
+    log(f"STANDARD_REPORT status={result['status']}")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    if result["status"] != "pass":
+        raise SystemExit(1)
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["preflight", "test-suite", "json-check", "diff-report", "status"])
+    parser.add_argument(
+        "command",
+        choices=["preflight", "test-suite", "json-check", "diff-report", "status", "standard-report"],
+    )
     args = parser.parse_args()
 
     if args.command == "preflight":
@@ -260,6 +442,8 @@ def main():
         diff_report()
     elif args.command == "status":
         gate_status()
+    elif args.command == "standard-report":
+        standard_report()
 
 if __name__ == "__main__":
     main()

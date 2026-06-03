@@ -159,3 +159,11 @@ Davranis `tests/test_runtime_status_model.py` icindeki unit testlerle sabitlendi
 Queue task status normalizer yaygin noktalama/ayirici farklarina karsi guclendirildi. `ready/for.validation` artik `READY_FOR_VALIDATION`, `FAILED.TIMEOUT` artik `FAILED_TIMEOUT` olarak normalize edilir.
 
 Davranis `tests/test_runtime_status_model.py` icindeki unit testlerle sabitlendi. Compile, unit test ve gecici `/tmp` repo kopyasinda production readiness suite PASS oldu. Bu sandbox'ta git metadata yolu read-only oldugu icin commit/push/PR olusturulamadi. Bu paket production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-03 Quality Gate Standard Report Apply
+
+Codex quality gate artik production readiness artefact'ini standart kalite raporuna indirger. `supervisor/codex_quality_gate.py standard-report` komutu `quality-gate-report.json` ve `quality-gate-summary.md` uretir; `lint`, `unit_test`, `integration_test` ve `simulation_dry_run` check'lerinden herhangi biri eksik veya basarisizsa sonuc `fail` olur.
+
+Simulasyon dry-run kaniti icin `production_deploy_performed=false`, `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` bayraklari zorunludur. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local git metadata dizini read-only oldugu icin commit hazirlanamadi. GitHub connector branch/PR cagrisinin iptal edilmesi nedeniyle PR acma adimi tamamlanamadi.

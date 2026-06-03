@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T18:02:54+00:00",
+  "updated_at": "2026-06-03T19:22:54+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -36,6 +36,19 @@
       "non_mutating": true,
       "simulation_contracts_required": true,
       "dry_run_non_mutating_contracts_required": true
+    },
+    {
+      "id": "codex_quality_report",
+      "label": "Standart Kalite Kapısı Raporu Üret",
+      "module": "codex_quality_gate",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} supervisor/codex_quality_gate.py standard-report",
+      "output_json": "reports/quality-gate-report.json",
+      "output_summary": "reports/quality-gate-summary.md",
+      "missing_artifact_fails_gate": true
     },
     {
       "id": "staging_deploy",

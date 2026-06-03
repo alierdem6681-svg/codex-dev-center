@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T18:02:54+00:00",
+  "updated_at": "2026-06-03T19:22:54+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -189,12 +189,13 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Codex çalışmadan önce preflight, test suite ve diff raporu üretir.",
+      "description": "Codex çalışmadan önce preflight, test suite, diff ve standart kalite kapısı raporu üretir.",
       "actions": [
         "codex_preflight",
         "codex_test_suite",
         "codex_diff_report",
-        "codex_gate_status"
+        "codex_gate_status",
+        "codex_quality_report"
       ]
     },
     {
