@@ -234,6 +234,29 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(failure["status"], TASK_STATUS_FAILED_RETRYABLE)
         self.assertEqual(failure["result"], "codex_failed_retryable")
 
+    def test_direct_cto_save_job_preserves_progress_watcher_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job_file = Path(tmp) / "JOB-MERGE.json"
+            job_file.write_text(
+                json.dumps(
+                    {
+                        "id": "JOB-MERGE",
+                        "status": "RUNNING",
+                        "progress_update_count": 2,
+                        "last_progress_sent_at": "2026-06-03T10:00:00+00:00",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            job = {"id": "JOB-MERGE", "status": "FINAL_REPORTED", "result": "telegram_notified"}
+            direct_cto_async_job.save_job(job_file, job)
+            payload = json.loads(job_file.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["status"], "FINAL_REPORTED")
+        self.assertEqual(payload["result"], "telegram_notified")
+        self.assertEqual(payload["progress_update_count"], 2)
+        self.assertEqual(job["progress_update_count"], 2)
+
     def test_nonlocal_short_message_routes_to_async_job(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "short_async",
