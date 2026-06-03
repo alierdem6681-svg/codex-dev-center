@@ -21,6 +21,8 @@ Hiçbir agent doğrudan kontrolsüz canlı değişiklik yapamaz.
 
 Önce görevi anlar, plan çıkarır, dosya değişikliklerini yapar, test eder, log yazar, rapor üretir ve risk seviyesine göre onay ister veya otomatik kapılardan geçer.
 
+Repo apply akışında PR_READY durumu, local gate'ler PASS olmadan ve PR numarası kaydedilmeden verilemez.
+
 ## 4. Telegram Kuralı
 
 Kullanıcının Telegram mesajları Codex'e aynen iletilir. Kod çıktısı, uzun terminal çıktısı, diff, stack trace ve log dump Telegram'a gönderilmez; teknik çıktı log dosyasına kaydedilir.

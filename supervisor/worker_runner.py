@@ -586,6 +586,11 @@ def pipeline_passed(results: list[dict[str, Any]]) -> bool:
     return bool(results) and all(item.get("ok") for item in results)
 
 
+def pull_request_number_from_url(url: str) -> str:
+    match = re.search(r"/pull/(\d+)(?:\b|$)", str(url or "").strip())
+    return match.group(1) if match else ""
+
+
 def create_pull_request(worktree: Path, branch: str, title: str, body: str) -> dict[str, Any]:
     if not shutil.which("gh"):
         return {"ok": False, "reason": "gh_not_found"}
@@ -597,13 +602,24 @@ def create_pull_request(worktree: Path, branch: str, title: str, body: str) -> d
     if not created["ok"]:
         return {"ok": False, "create": created}
     viewed = run_cmd(["gh", "pr", "view", branch, "--json", "number,url,headRefName,state"], cwd=worktree, timeout=60)
-    payload: dict[str, Any] = {"ok": True, "create": created, "url": created.get("stdout", "").strip()}
+    created_url = created.get("stdout", "").strip().splitlines()[-1] if created.get("stdout", "").strip() else ""
+    payload: dict[str, Any] = {
+        "ok": True,
+        "create": created,
+        "url": created_url,
+        "number": pull_request_number_from_url(created_url),
+    }
     if viewed["ok"]:
         try:
             info = json.loads(viewed.get("stdout") or "{}")
             payload.update(info)
         except Exception:
             payload["view"] = viewed
+    else:
+        payload["view"] = viewed
+    if not str(payload.get("number") or "").strip():
+        payload["ok"] = False
+        payload["reason"] = "pull_request_number_missing"
     return payload
 
 

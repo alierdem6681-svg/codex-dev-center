@@ -61,6 +61,8 @@ Her görev:
 - test sonucunu yazmalı
 - HANDOVER.md dosyasını güncellemelidir.
 
+Repo apply görevlerinde `PR_READY` ancak local gate'ler PASS olduktan ve PR numarası güvenilir şekilde kaydedildikten sonra verilebilir.
+
 ## İlk Büyük Görev
 
 docs/CODEX_MASTER_PROMPT.md dosyasını oku ve bu sistemin aşağı doğru mimarisini inşa etmeye başla.

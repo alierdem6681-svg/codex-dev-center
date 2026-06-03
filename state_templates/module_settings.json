@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-03T16:21:02+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -146,5 +146,11 @@
     "branch_sync_required": true,
     "push_after_tests_pass": true,
     "runtime_state_committed": false
+  },
+  "repo_apply": {
+    "enabled": true,
+    "local_gates_required_before_pr": true,
+    "pull_request_number_required_for_pr_ready": true,
+    "production_deploy_allowed": false
   }
 }

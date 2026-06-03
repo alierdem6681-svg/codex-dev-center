@@ -221,3 +221,29 @@ Yeni davranis:
 - Deploy smoke kapısı gerekirse recovery + lifecycle wake dener ve tekrar ölçer.
 - `IDLE`, `SLEEPING` veya `STOPPED` worker üstünde `current_task` dolu kalırsa kapı fail olur.
 - `RUNNING` worker current_task taşırken servis aktif değilse kapı fail olur.
+
+---
+
+## Controlled Apply Pipeline PR Guard v1
+
+Tarih: 2026-06-03
+
+Task: `CTO-APPLY-20260603-155402-CTO-DISPATCH-20260603-072043-CTO-AUTO-03-CONTROLLED-APPLY-PIPELINE`
+Worker: `worker-4`
+
+Değişiklik:
+- Repo apply worker PR oluşturduktan sonra PR numarasını doğrulamadan `PR_READY` üretmez.
+- `gh pr view` başarısız olursa `gh pr create` çıktısındaki GitHub PR URL'sinden PR numarası güvenli fallback olarak okunur.
+- PR numarası çözülemezse apply sonucu retryable kalır; downstream merge/deploy adayı sayılmaz.
+- `lifecycle_manager` runtime kökü `CODEX_DEV_CENTER_HOME` ile worktree testlerinde izole çalışır.
+
+Test:
+- `git diff --check`: PASS
+- `python3 -m compileall -q supervisor web_panel scripts`: PASS
+- `python3 -m unittest tests.test_runtime_status_model`: PASS, 64 test
+- `CODEX_DEV_CENTER_HOME="$PWD" python3 supervisor/production_readiness_suite.py --json`: PASS
+
+Not:
+- Production deploy yapılmadı.
+- Runtime `state/` dosyaları repo içinde yok; ilgili davranış template olarak `state_templates/module_settings.json` içine kaydedildi.
+- Commit/push/PR adımı sandbox nedeniyle tamamlanamadı: git metadata dizini `/home/alierdem6681/codex-dev-center-github-export/.git/worktrees/...` altında read-only olduğu için `index.lock` oluşturulamadı.

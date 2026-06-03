@@ -58,7 +58,7 @@ except ImportError:
         worker_block_reason,
     )
 
-APP = Path("/opt/codex-dev-center")
+APP = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
 STATE = APP / "state"
 LOGS = APP / "logs"
 WORKERS_PATH = STATE / "workers.json"

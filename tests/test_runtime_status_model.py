@@ -143,6 +143,58 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
 
+    def test_create_pull_request_uses_create_url_number_when_view_fails(self):
+        original_which = worker_runner.shutil.which
+        original_run_cmd = worker_runner.run_cmd
+
+        def fake_which(name):
+            return "/usr/bin/gh" if name == "gh" else original_which(name)
+
+        def fake_run_cmd(args, cwd, timeout=300, env=None):
+            if args[:3] == ["gh", "pr", "create"]:
+                return {"ok": True, "returncode": 0, "stdout": "https://github.com/acme/repo/pull/42\n", "stderr": "", "cmd": "gh pr create"}
+            if args[:3] == ["gh", "pr", "view"]:
+                return {"ok": False, "returncode": 1, "stdout": "", "stderr": "view failed", "cmd": "gh pr view"}
+            return {"ok": False, "returncode": 1, "stdout": "", "stderr": "unexpected", "cmd": " ".join(args)}
+
+        worker_runner.shutil.which = fake_which
+        worker_runner.run_cmd = fake_run_cmd
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                payload = worker_runner.create_pull_request(Path(tmp), "worker/task", "title", "body")
+        finally:
+            worker_runner.run_cmd = original_run_cmd
+            worker_runner.shutil.which = original_which
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["number"], "42")
+
+    def test_create_pull_request_requires_resolved_pr_number(self):
+        original_which = worker_runner.shutil.which
+        original_run_cmd = worker_runner.run_cmd
+
+        def fake_which(name):
+            return "/usr/bin/gh" if name == "gh" else original_which(name)
+
+        def fake_run_cmd(args, cwd, timeout=300, env=None):
+            if args[:3] == ["gh", "pr", "create"]:
+                return {"ok": True, "returncode": 0, "stdout": "created\n", "stderr": "", "cmd": "gh pr create"}
+            if args[:3] == ["gh", "pr", "view"]:
+                return {"ok": False, "returncode": 1, "stdout": "", "stderr": "view failed", "cmd": "gh pr view"}
+            return {"ok": False, "returncode": 1, "stdout": "", "stderr": "unexpected", "cmd": " ".join(args)}
+
+        worker_runner.shutil.which = fake_which
+        worker_runner.run_cmd = fake_run_cmd
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                payload = worker_runner.create_pull_request(Path(tmp), "worker/task", "title", "body")
+        finally:
+            worker_runner.run_cmd = original_run_cmd
+            worker_runner.shutil.which = original_which
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["reason"], "pull_request_number_missing")
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"

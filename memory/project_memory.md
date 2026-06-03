@@ -111,3 +111,14 @@ Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
 - Deploy smoke bu durumda recovery engine ve lifecycle wake dener, sonra tekrar olcer.
 - Worker state `IDLE`, `SLEEPING` veya `STOPPED` iken `current_task` dolu kalirsa workflow fail olur.
 - Worker state `RUNNING` ve servis inactive ise workflow fail olur.
+
+## 2026-06-03 Controlled Apply Pipeline PR Guard v1
+
+Apply worker paketi `CTO-APPLY-20260603-155402-CTO-DISPATCH-20260603-072043-CTO-AUTO-03-CONTROLLED-APPLY-PIPELINE` icin repo apply PR guard guclendirildi.
+
+- `supervisor/worker_runner.py` PR olusturma sonucunda PR numarasi olmadan `PR_READY` uretmez.
+- `gh pr view` gecici olarak basarisiz olursa `gh pr create` URL ciktisindaki `/pull/<number>` degeri fallback olarak kullanilir.
+- `supervisor/lifecycle_manager.py` runtime kokunu `CODEX_DEV_CENTER_HOME` uzerinden alabilir; boylece isolated worktree testleri production dizinine log yazmaya calismaz.
+- Testler: compile PASS, `tests.test_runtime_status_model` 64 test PASS, production readiness suite PASS.
+- Production deploy yapilmadi; kritik altyapi/secret/IAM/billing/DNS/firewall/database/Google Ads kapsamina girilmedi.
+- Commit/push/PR bu worker sandbox'inda tamamlanamadi; git metadata `/home/alierdem6681/codex-dev-center-github-export/.git/worktrees/...` altinda read-only oldugu icin `index.lock` olusturulamadi.

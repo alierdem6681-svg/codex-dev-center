@@ -134,3 +134,10 @@ Faz 19B-10A Model Policy
 - [x] `IDLE/SLEEPING + current_task` ve `RUNNING + inactive service` tutarsizliklari fail olur.
 - [x] Telegram ve high/critical approval görevleri worker-eligible sayilmadan raporlanir.
 - [x] Deploy smoke worker-eligible görev varsa recovery + lifecycle wake dener.
+
+## Faz 30 - Controlled Apply Pipeline PR Guard
+
+- [x] Repo apply PR_READY durumu PR numarası doğrulanmadan üretilmez.
+- [x] `gh pr view` başarısız olduğunda `gh pr create` URL çıktısından PR numarası fallback olarak okunur.
+- [x] Worktree testleri için `lifecycle_manager` runtime kökü `CODEX_DEV_CENTER_HOME` ile izole çalışır.
+- [x] Controlled apply guard hedefli unit test ve production readiness gate ile doğrulandı.

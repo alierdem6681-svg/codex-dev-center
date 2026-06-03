@@ -79,6 +79,7 @@ Ajan şu klasörleri inceler:
 
 - supervisor/supervisor_cli.py
 - supervisor/lifecycle_manager.py
+- supervisor/worker_runner.py
 - supervisor/drift_checker.py
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
@@ -120,6 +121,8 @@ Yeni ajan dosyaları okuduktan sonra ilk yanıtında şunu vermelidir:
 ## Ana Kural
 
 Yeni ajan sistemi okumadan işlem yapmaz. Dashboard, handover, roadmap, state ve audit kaydı bırakmadan işi bitirmez.
+
+Repo apply görevlerinde `supervisor/worker_runner.py` local gate PASS sonucunu ve PR numarasını doğrulamadan `PR_READY` üretmemelidir.
 
 MODEL POLICY GPT55 XHIGH
 New agents must know that CTO, workers and future Codex executions use gpt-5.5 with xhigh reasoning by default.
