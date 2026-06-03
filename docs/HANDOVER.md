@@ -220,6 +220,29 @@ Canli dogrulama:
 
 ---
 
+## Dashboard Pipeline Tracking Apply Retry
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-165614 / CTO-DISPATCH-20260603-072943-CTO-ACTION-20260601-144858-04-DASHBOARD-TRACKING
+
+Eklenenler:
+- Legacy `web_panel/server.py` status payload'u ana `web_panel/panel_server.py` ile hizalandi.
+- Her iki panel server `/api/status` payload'u `github_actions` ve `pipeline_status` alanlarini dondurur.
+- `tests/test_runtime_status_model.py` pipeline tracking payload sozlesmesini ana ve legacy panel server icin dogrular.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- `python3 supervisor/production_readiness_suite.py --json` PASS; production deploy yapilmadi.
+
+Not:
+- Production deploy calistirilmadi.
+- Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi calistirilamadi.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write islemi yapilmadi.
+
+---
+
 ## Worker Lifecycle Smoke Check v1
 
 Tarih: 2026-06-02

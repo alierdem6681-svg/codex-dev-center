@@ -107,6 +107,12 @@ Dashboard pipeline gorunurlugu ve deploy QA kapilari genisletildi.
 
 Bu paket CTO task-to-deploy zinciri icin non-destructive dashboard/pipeline marker testi olarak kullanilacak.
 
+## 2026-06-03 Dashboard Pipeline Tracking Apply Retry
+
+Legacy `web_panel/server.py` `/api/status` payload'u ana `web_panel/panel_server.py` ile hizalandi. Artik iki panel server da runtime `state/github_actions_status.json` ve `state/pipeline_status.json` dosyalarini dashboard payload'unda `github_actions` ve `pipeline_status` olarak dondurur.
+
+Davranis `tests/test_runtime_status_model.py` icindeki unit test ile sabitlendi. Compile, unit test ve production readiness suite PASS oldu. Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi tamamlanamadi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapilmadi.
+
 ## 2026-06-02 Worker Lifecycle Smoke Check v1
 
 Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
