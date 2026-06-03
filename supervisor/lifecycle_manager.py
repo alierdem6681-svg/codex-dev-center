@@ -170,7 +170,14 @@ def choose_worker(title):
         return "worker-4"
     return "worker-1"
 
-def selected_workers_for_single_mode() -> list[str]:
+def max_parallel_workers() -> int:
+    try:
+        configured = int(cto_autonomous_delivery.policy().get("max_parallel_tasks") or 1)
+    except Exception:
+        configured = 1
+    return max(1, min(len(WORKERS), configured))
+
+def selected_workers_for_active_mode() -> list[str]:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     queue, _changes = normalize_queue_payload(queue)
     tasks = [
@@ -178,15 +185,22 @@ def selected_workers_for_single_mode() -> list[str]:
         for task in queue.get("tasks", [])
         if is_worker_eligible_task(task) and normalize_status(task.get("status")) in {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
     ]
+    selected: list[str] = []
+    max_workers = max_parallel_workers()
     for status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
         for task in tasks:
             if normalize_status(task.get("status")) != status:
                 continue
             worker_id = task.get("assigned_worker")
             if worker_id in WORKERS:
-                return [worker_id]
-            return [choose_worker(task.get("title") or task.get("id"))]
-    return ["worker-1"]
+                chosen = worker_id
+            else:
+                chosen = choose_worker(task.get("title") or task.get("id"))
+            if chosen not in selected:
+                selected.append(chosen)
+            if len(selected) >= max_workers:
+                return selected
+    return selected or ["worker-1"]
 
 def active_child_exists(tasks: list[dict[str, Any]], child_id: str | None) -> bool:
     if not child_id:
@@ -313,7 +327,7 @@ def ensure_single_backlog_task() -> bool:
         "backlog_dispatcher_last_tick": now(),
         "backlog_dispatcher_worker_active": len(worker_active),
     }
-    if worker_active:
+    if len(worker_active) >= max_parallel_workers():
         update_system_state(**state_updates, backlog_dispatcher_last_result="worker_active")
         return False
 
@@ -441,23 +455,31 @@ def sleep_now():
     return {"ok": True, "mode": "SLEEPING"}
 
 def wake_now():
-    selected = set(selected_workers_for_single_mode())
+    selected = set(selected_workers_for_active_mode())
+    max_workers = max_parallel_workers()
     log(f"WAKE_NOW requested selected={','.join(sorted(selected))}")
     for w in WORKERS:
         if w in selected:
             systemctl("start", w)
-            update_worker_state(w, "IDLE", "woken_by_lifecycle_single_mode")
+            update_worker_state(w, "IDLE", "woken_by_lifecycle_active_mode")
         else:
             update_worker_state(w, "SLEEPING", "single_mode_not_selected")
             systemctl("stop", w)
     dispatch()
     update_system_state(
         worker_sleep_wake_implemented=True,
-        worker_fleet_mode="AWAKE_SINGLE",
-        worker_single_mode_active=True,
+        worker_fleet_mode="AWAKE_PARALLEL" if max_workers > 1 else "AWAKE_SINGLE",
+        worker_single_mode_active=max_workers == 1,
+        worker_parallel_mode_active=max_workers > 1,
+        worker_parallel_limit=max_workers,
         worker_single_mode_selected=sorted(selected),
     )
-    return {"ok": True, "mode": "AWAKE_SINGLE", "selected_workers": sorted(selected)}
+    return {
+        "ok": True,
+        "mode": "AWAKE_PARALLEL" if max_workers > 1 else "AWAKE_SINGLE",
+        "selected_workers": sorted(selected),
+        "parallel_limit": max_workers,
+    }
 
 def update_system_state(**updates):
     data = read_json(SYSTEM_STATE_PATH, {})
@@ -479,7 +501,7 @@ def daemon():
                 run_validation_engine()
                 pending, running, active = queue_counts()
 
-        if active == 0:
+        if active < max_parallel_workers():
             created = ensure_single_backlog_task()
             if created:
                 pending, running, active = queue_counts()

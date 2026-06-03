@@ -448,6 +448,48 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(payload["workers"][0]["status"], "RUNNING")
         self.assertEqual(payload["workers"][0]["current_task"], "TASK-1")
 
+    def test_active_mode_selects_multiple_assigned_workers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "task_queue.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-1",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                            },
+                            {
+                                "id": "TASK-2",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-2",
+                            },
+                            {
+                                "id": "TASK-3",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-3",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original = lifecycle_manager.QUEUE_PATH
+            lifecycle_manager.QUEUE_PATH = path
+            try:
+                selected = lifecycle_manager.selected_workers_for_active_mode()
+            finally:
+                lifecycle_manager.QUEUE_PATH = original
+
+        self.assertEqual(selected, ["worker-1", "worker-2", "worker-3"])
+
     def test_no_standard_candidate_uses_autonomous_backlog_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
@@ -494,6 +536,62 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertEqual(system_state["backlog_dispatcher_last_result"], "autonomous_backlog_created")
         self.assertEqual(system_state["backlog_dispatcher_last_child"], "CHILD")
+
+    def test_backlog_fallback_can_fill_parallel_capacity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            system_state_path = state / "system_state.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "ACTIVE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                            },
+                            {"id": "DONE-PARENT", "status": TASK_STATUS_DONE, "risk": "low"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            calls = []
+
+            def fake_start_next_backlog(execute=False):
+                calls.append(execute)
+                return {
+                    "ok": True,
+                    "status": "BACKLOG_CONTINUATION_CREATED",
+                    "parent_task_id": "DONE-PARENT",
+                    "child_task": {"id": "CHILD"},
+                }
+
+            originals = (
+                lifecycle_manager.QUEUE_PATH,
+                lifecycle_manager.SYSTEM_STATE_PATH,
+                lifecycle_manager.cto_autonomous_delivery.start_next_backlog,
+            )
+            lifecycle_manager.QUEUE_PATH = queue_path
+            lifecycle_manager.SYSTEM_STATE_PATH = system_state_path
+            lifecycle_manager.cto_autonomous_delivery.start_next_backlog = fake_start_next_backlog
+            try:
+                created = lifecycle_manager.ensure_single_backlog_task()
+            finally:
+                (
+                    lifecycle_manager.QUEUE_PATH,
+                    lifecycle_manager.SYSTEM_STATE_PATH,
+                    lifecycle_manager.cto_autonomous_delivery.start_next_backlog,
+                ) = originals
+
+        self.assertTrue(created)
+        self.assertEqual(calls, [True])
 
 
 class WorkerLifecycleRepairTest(unittest.TestCase):

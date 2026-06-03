@@ -106,7 +106,7 @@
     "direct_vm_ssh_forbidden": true,
     "production_requires_explicit_approval": false,
     "normal_app_deploy_allowed_when_all_gates_pass": true,
-    "max_parallel_tasks_until_stable": 1,
+    "max_parallel_tasks_until_stable": 4,
     "stable_successful_low_risk_deploy_threshold": 3,
     "production_requires_readiness_pass": true,
     "production_requires_staging_pass": true,
