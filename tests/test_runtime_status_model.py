@@ -624,6 +624,31 @@ class DirectCtoProgressWatcherTest(unittest.TestCase):
         self.assertFalse(stopped)
 
 
+class ProductionReadinessSuiteScanTest(unittest.TestCase):
+    def test_iter_repo_text_files_tolerates_deleted_directory_during_walk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            keep = root / "keep.py"
+            keep.write_text("print('ok')\n", encoding="utf-8")
+
+            def fake_walk(path, onerror=None):
+                yield str(root), ["workspaces"], ["keep.py"]
+                if onerror:
+                    onerror(FileNotFoundError(str(root / "workspaces" / "vanished")))
+
+            original_root = production_readiness_suite.ROOT
+            original_walk = production_readiness_suite.os.walk
+            production_readiness_suite.ROOT = root
+            production_readiness_suite.os.walk = fake_walk
+            try:
+                files = list(production_readiness_suite.iter_repo_text_files())
+            finally:
+                production_readiness_suite.ROOT = original_root
+                production_readiness_suite.os.walk = original_walk
+
+        self.assertEqual(files, [keep])
+
+
 class DirectCtoJobRecoveryTest(unittest.TestCase):
     def write_job(self, root, job_id, status="RUNNING", pid=999999999):
         jobs_dir = Path(root) / "state" / "direct_cto_jobs"

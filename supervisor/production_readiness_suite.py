@@ -84,15 +84,29 @@ def path_exists(rel: str) -> bool:
 
 
 def iter_repo_text_files():
-    for path in ROOT.rglob("*"):
-        if not path.is_file():
+    def ignore_walk_error(_exc: OSError) -> None:
+        return
+
+    for dirpath, dirnames, filenames in os.walk(ROOT, onerror=ignore_walk_error):
+        current = Path(dirpath)
+        try:
+            rel_dir = current.relative_to(ROOT)
+        except ValueError:
             continue
-        rel = path.relative_to(ROOT)
-        if any(part in SKIP_DIRS for part in rel.parts):
+        if any(part in SKIP_DIRS for part in rel_dir.parts):
+            dirnames[:] = []
             continue
-        if path.suffix.lower() not in TEXT_SUFFIXES:
-            continue
-        yield path
+        dirnames[:] = [name for name in dirnames if name not in SKIP_DIRS]
+
+        for filename in filenames:
+            path = current / filename
+            if path.suffix.lower() not in TEXT_SUFFIXES:
+                continue
+            try:
+                if path.is_file():
+                    yield path
+            except (FileNotFoundError, NotADirectoryError, OSError):
+                continue
 
 
 def record(results: dict[str, Any], name: str, ok: bool, details: Any = None) -> None:
