@@ -39,6 +39,7 @@ EXPECTED = [
     "LIVING_DOCS_CHECKLIST.md",
     "WORKER_SUMMARY.md",
 ]
+REQUIRED_ARTIFACT_COUNT = len(EXPECTED)
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -151,7 +152,7 @@ def main():
 
             status = normalize_status(t.get("status"))
 
-            if created >= 4:
+            if created >= REQUIRED_ARTIFACT_COUNT:
                 t["status"] = TASK_STATUS_READY_FOR_VALIDATION
                 t["result"] = "worker_output_ready_for_validation_not_done"
                 t["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION

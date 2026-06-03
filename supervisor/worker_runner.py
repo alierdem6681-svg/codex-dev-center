@@ -80,6 +80,7 @@ EXPECTED_WORKER_FILES = [
     "LIVING_DOCS_CHECKLIST.md",
     "WORKER_SUMMARY.md",
 ]
+REQUIRED_WORKER_FILE_COUNT = len(EXPECTED_WORKER_FILES)
 
 SAFE_REPO_APPLY_PREFIXES = (
     ".github/workflows/",
@@ -190,7 +191,7 @@ def classify_worker_result(
     fallback_used: bool,
 ) -> tuple[str, str]:
     has_output = bool(str(raw_output or "").strip())
-    has_expected_set = len(created_files) >= 4
+    has_expected_set = len(created_files) >= REQUIRED_WORKER_FILE_COUNT
     has_partial_proposal = bool(created_files) or fallback_used
 
     if has_expected_set:
@@ -983,12 +984,12 @@ Bu workspace içinde şu dosyaları oluştur:
     created = [name for name in EXPECTED_WORKER_FILES if (workspace / name).exists()]
     raw_output = tail_file(out_file) + "\n" + tail_file(err_file)
     fallback_used = False
-    if not progress_stalled and len(created) < 4 and (raw_output.strip() or returncode == 0):
+    if not progress_stalled and len(created) < REQUIRED_WORKER_FILE_COUNT and (raw_output.strip() or returncode == 0):
         fallback_reason = "codex_timeout_or_incomplete_output" if returncode != 0 else "incomplete_worker_output"
         created = write_fallback_proposal_files(workspace, task, worker_id, fallback_reason)
         fallback_used = True
 
-    if progress_stalled and len(created) < 4:
+    if progress_stalled and len(created) < REQUIRED_WORKER_FILE_COUNT:
         status, result = TASK_STATUS_FAILED_RETRYABLE, "progress_watchdog_stalled_without_meaningful_progress"
     else:
         status, result = classify_worker_result(returncode, created, raw_output, fallback_used)

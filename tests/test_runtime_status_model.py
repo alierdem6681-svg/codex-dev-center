@@ -39,6 +39,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
+    TASK_STATUS_VALIDATION_FAILED,
 )
 
 WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
@@ -112,12 +113,40 @@ class WorkerStatusModelTest(unittest.TestCase):
     def test_timeout_with_expected_files_waits_for_validation(self):
         status, _reason = worker_runner.classify_worker_result(
             124,
-            ["PLAN.md", "CHANGE_PROPOSAL.md", "TEST_PLAN.md", "RISK_REVIEW.md"],
+            worker_runner.EXPECTED_WORKER_FILES,
             "partial output",
             False,
         )
 
         self.assertEqual(status, TASK_STATUS_READY_FOR_VALIDATION)
+
+    def test_incomplete_proposal_artifacts_stay_proposal_ready(self):
+        status, _reason = worker_runner.classify_worker_result(
+            124,
+            worker_runner.EXPECTED_WORKER_FILES[:-1],
+            "partial output",
+            False,
+        )
+
+        self.assertEqual(status, TASK_STATUS_PROPOSAL_READY)
+
+    def test_fallback_proposal_files_complete_expected_set_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            plan = workspace / "PLAN.md"
+            plan.write_text("# Existing Plan\n", encoding="utf-8")
+
+            created = worker_runner.write_fallback_proposal_files(
+                workspace,
+                {"id": "TASK-FALLBACK", "title": "Fallback", "description": "Safe fallback.", "risk": "medium"},
+                "worker-4",
+                "unit_test",
+            )
+
+            self.assertEqual(created, worker_runner.EXPECTED_WORKER_FILES)
+            self.assertEqual(plan.read_text(encoding="utf-8"), "# Existing Plan\n")
+            for name in worker_runner.EXPECTED_WORKER_FILES:
+                self.assertTrue((workspace / name).exists())
 
     def test_partial_proposal_is_proposal_ready(self):
         status, _reason = worker_runner.classify_worker_result(
@@ -1563,7 +1592,7 @@ class TaskValidationEngineTest(unittest.TestCase):
         workspace = runtime / "workspaces" / "worker_worker-1_TASK-VAL_20260603_000000"
         state.mkdir(parents=True)
         workspace.mkdir(parents=True)
-        for name in task_validation_engine.EXPECTED_WORKER_FILES[:4]:
+        for name in task_validation_engine.EXPECTED_WORKER_FILES:
             (workspace / name).write_text(
                 "# Test\n\n"
                 "Kapsam disi:\n"
@@ -1614,6 +1643,20 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["pipeline_status"], "PASS")
         self.assertEqual(queue["tasks"][0]["deployment_status"], "APPLY_REQUIRED")
         self.assertFalse(queue["tasks"][0]["production_deployed"])
+
+    def test_validation_requires_complete_proposal_artifact_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
+            workspace = runtime / "workspaces" / "worker_worker-1_TASK-VAL_20260603_000000"
+            (workspace / "WORKER_SUMMARY.md").unlink()
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_VALIDATION_FAILED)
+        self.assertEqual(queue["tasks"][0]["validation_status"], "FAIL")
+        self.assertEqual(queue["tasks"][0]["pipeline_status"], "NOT_RUN")
+        self.assertEqual(queue["tasks"][0]["created_files"], task_validation_engine.EXPECTED_WORKER_FILES[:-1])
 
     def test_ready_repo_applied_task_can_be_done_with_pipeline_pass(self):
         with tempfile.TemporaryDirectory() as tmp:

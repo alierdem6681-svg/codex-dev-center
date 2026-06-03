@@ -150,3 +150,4 @@ Faz 19B-10A Model Policy
 - [x] Repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
 - [x] Runtime/secret path blokajı ve traversal koruması unit test ile sabitlendi.
 - [x] Controlled apply validation davranışı handover, onboarding, memory ve state template kayıtlarına işlendi.
+- [x] Worker proposal output'u tam 6 artifact seti olmadan validation-ready sayılmayacak şekilde sabitlendi.

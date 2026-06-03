@@ -101,6 +101,7 @@ Dashboard status API notu:
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
+- Worker proposal output'u ancak `PLAN.md`, `CHANGE_PROPOSAL.md`, `TEST_PLAN.md`, `RISK_REVIEW.md`, `LIVING_DOCS_CHECKLIST.md` ve `WORKER_SUMMARY.md` tam setiyle validation-ready sayilir.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 
 ## Servis Keşfi

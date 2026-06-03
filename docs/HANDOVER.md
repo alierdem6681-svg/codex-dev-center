@@ -343,3 +343,21 @@ Test:
 Not:
 - Bu sandbox'ta git worktree metadata yolu read-only olduğu için local commit oluşturulamadı.
 - GitHub branch/PR oluşturma MCP çağrısı kullanıcı tarafından iptal edildi; PR açma adımı tamamlanmadı.
+
+---
+
+## Deterministic Proposal Artifacts Apply Validation
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-173126 / CTO-DISPATCH-20260603-073137-CTO-ACTION-20260601-161747-03-DETERMINISTIC-PROPOSAL-ARTIFACTS
+
+Eklenenler:
+- Worker proposal çıktısı `PLAN.md`, `CHANGE_PROPOSAL.md`, `TEST_PLAN.md`, `RISK_REVIEW.md`, `LIVING_DOCS_CHECKLIST.md` ve `WORKER_SUMMARY.md` dosyalarının tamamı oluşmadan validation-ready sayılmaz.
+- Worker fallback üretimi eksik artifact setini tamamlar; mevcut proposal dosyalarını ezmez.
+- Recovery engine ve action watcher aynı 6 dosyalık tamamlık kuralına hizalandı.
+- `tests/test_runtime_status_model.py` eksik `WORKER_SUMMARY.md` senaryosunun validation failure olduğunu doğrular.
+
+Not:
+- Production deploy çalıştırılmadı.
+- Secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

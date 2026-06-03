@@ -49,6 +49,7 @@ EXPECTED = [
     "LIVING_DOCS_CHECKLIST.md",
     "WORKER_SUMMARY.md",
 ]
+REQUIRED_ARTIFACT_COUNT = len(EXPECTED)
 
 RECOVERABLE_FAILURE_STATUSES = {
     TASK_STATUS_FAILED,
@@ -142,7 +143,7 @@ def classify_failure(workspace, returncode=None):
         return "codex_no_final_output"
     if len(created_files(ws)) == 0:
         return "no_proposal_files"
-    if len(created_files(ws)) < 4:
+    if len(created_files(ws)) < REQUIRED_ARTIFACT_COUNT:
         return "partial_proposal"
     return "unknown"
 
@@ -205,7 +206,7 @@ def main():
             files = created_files(workspace)
             active = task_has_process(tid)
 
-            if len(files) >= 4:
+            if len(files) >= REQUIRED_ARTIFACT_COUNT:
                 task["status"] = TASK_STATUS_READY_FOR_VALIDATION
                 task["result"] = "worker_output_ready_for_validation_not_done"
                 task["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
@@ -220,7 +221,7 @@ def main():
                 details.append(f"{tid}|READY_FOR_VALIDATION|files={len(files)}")
                 continue
 
-            if 0 < len(files) < 4:
+            if 0 < len(files) < REQUIRED_ARTIFACT_COUNT:
                 task["status"] = TASK_STATUS_PROPOSAL_READY
                 task["result"] = "partial_worker_proposal_ready_for_cto_review"
                 task["delivery_level"] = TASK_STATUS_PROPOSAL_READY

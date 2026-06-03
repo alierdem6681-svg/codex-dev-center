@@ -147,3 +147,9 @@ Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefi
 Production readiness suite staging ve rollback dry-run sonuçlarını artık non-mutating JSON sözleşmesiyle doğrular. Staging için `dry_run=true` ve `mutating_cloud_operations_performed=false`; rollback için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
 
 Davranış `tests/test_runtime_status_model.py` içinde mutasyon flag'i sapma senaryosuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
+## 2026-06-03 Deterministic Proposal Artifacts Apply Validation
+
+Worker proposal çıktıları artık yalnızca altı beklenen artifact dosyasının tamamı oluştuğunda validation-ready kabul edilir: `PLAN.md`, `CHANGE_PROPOSAL.md`, `TEST_PLAN.md`, `RISK_REVIEW.md`, `LIVING_DOCS_CHECKLIST.md` ve `WORKER_SUMMARY.md`.
+
+`supervisor/worker_runner.py`, `supervisor/task_validation_engine.py`, `supervisor/task_recovery_engine.py` ve `supervisor/action_result_watcher.py` aynı tamamlık kuralına hizalandı. Eksik artifact seti `tests/test_runtime_status_model.py` içinde validation failure regresyonuyla sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
