@@ -118,6 +118,13 @@ BLOCKED_REPO_APPLY_NAMES = {
     ".env.prod",
 }
 
+IGNORABLE_REPO_APPLY_PREFIXES = (
+    "logs/",
+    "reports/",
+    "state/",
+    "tmp/",
+)
+
 TEXT_SUFFIXES_FOR_SCAN = {".py", ".md", ".json", ".sh", ".html", ".css", ".js", ".txt", ".yml", ".yaml", ".service"}
 
 SECRET_PATTERNS = [
@@ -487,6 +494,13 @@ def is_safe_repo_apply_path(path: str) -> bool:
     return any(rel == prefix.rstrip("/") or rel.startswith(prefix) for prefix in SAFE_REPO_APPLY_PREFIXES)
 
 
+def is_ignorable_repo_apply_artifact(path: str) -> bool:
+    rel = path.replace("\\", "/").lstrip("/")
+    if not rel or rel.startswith("../") or "/../" in rel:
+        return False
+    return any(rel.startswith(prefix) for prefix in IGNORABLE_REPO_APPLY_PREFIXES)
+
+
 def changed_repo_files(worktree: Path) -> list[str]:
     status = run_cmd(["git", "status", "--porcelain"], cwd=worktree, timeout=60)
     files: list[str] = []
@@ -728,8 +742,10 @@ Beklenen çıktı:
     )
     returncode = int(progress_result.get("returncode") if progress_result.get("returncode") is not None else 1)
     changed_files = changed_repo_files(worktree)
-    unsafe_files = [rel for rel in changed_files if not is_safe_repo_apply_path(rel)]
-    secret_findings = secret_scan_changed_files(worktree, changed_files)
+    ignored_generated_files = [rel for rel in changed_files if is_ignorable_repo_apply_artifact(rel)]
+    commit_files = [rel for rel in changed_files if rel not in ignored_generated_files]
+    unsafe_files = [rel for rel in commit_files if not is_safe_repo_apply_path(rel)]
+    secret_findings = secret_scan_changed_files(worktree, commit_files)
 
     status = TASK_STATUS_DONE
     result = "repo_apply_pr_ready_pipeline_passed"
@@ -740,12 +756,12 @@ Beklenen çıktı:
     commit_result: dict[str, Any] = {}
     push_result: dict[str, Any] = {}
 
-    if returncode != 0 and not changed_files:
+    if returncode != 0 and not commit_files:
         status = TASK_STATUS_FAILED_RETRYABLE
         result = "repo_apply_worker_failed_without_changes"
         validation_status = "NOT_READY"
         pipeline_status = "NOT_RUN"
-    elif not changed_files:
+    elif not commit_files:
         status = TASK_STATUS_FAILED_NO_PROPOSAL
         result = "repo_apply_worker_completed_without_changes"
         validation_status = "NOT_READY"
@@ -768,7 +784,7 @@ Beklenen çıktı:
             validation_status = "PASS"
             pipeline_status = "FAIL"
         else:
-            add_result = run_cmd(["git", "add", "-A", "--", *changed_files], cwd=worktree, timeout=120)
+            add_result = run_cmd(["git", "add", "-A", "--", *commit_files], cwd=worktree, timeout=120)
             commit_result = run_cmd(["git", "commit", "-m", f"Worker apply {task_id}"], cwd=worktree, timeout=180)
             push_result = run_cmd(["git", "push", "-u", "origin", branch], cwd=worktree, timeout=300)
             if not (add_result["ok"] and commit_result["ok"] and push_result["ok"]):
@@ -813,7 +829,10 @@ Beklenen çıktı:
         "",
         "## Changed Files",
     ]
-    report.extend([f"- {rel}" for rel in changed_files] or ["- Yok"])
+    report.extend([f"- {rel}" for rel in commit_files] or ["- Yok"])
+    if ignored_generated_files:
+        report += ["", "## Ignored Generated Files"]
+        report.extend([f"- {rel}" for rel in ignored_generated_files])
     if unsafe_files:
         report += ["", "## Unsafe Path Findings"]
         report.extend([f"- {rel}" for rel in unsafe_files])
@@ -831,6 +850,8 @@ Beklenen çıktı:
         "repo_worktree": str(worktree),
         "branch": branch,
         "changed_files": changed_files,
+        "commit_files": commit_files,
+        "ignored_generated_files": ignored_generated_files,
         "unsafe_files": unsafe_files,
         "secret_scan_findings": secret_findings,
         "codex_return_code": returncode,
