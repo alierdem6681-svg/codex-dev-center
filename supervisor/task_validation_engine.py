@@ -350,10 +350,15 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
             "critical_operation_findings": [],
         }
 
+    repo_applied = bool(
+        task.get("repo_applied")
+        or task.get("branch_merged")
+        or str(task.get("delivery_level") or "").upper() in {"READY_FOR_DEPLOY", "MERGED", "DEPLOYED"}
+    )
     return {
         "task_id": task_id,
-        "target_status": TASK_STATUS_DONE,
-        "result": "validated_worker_output_pipeline_passed",
+        "target_status": TASK_STATUS_DONE if repo_applied else TASK_STATUS_PROPOSAL_DONE,
+        "result": "validated_repo_change_pipeline_passed" if repo_applied else "validated_worker_proposal_ready_for_apply",
         "validation_status": "PASS",
         "pipeline_status": "PASS",
         "workspace": str(workspace) if workspace else "",
@@ -385,7 +390,7 @@ def apply_validation_result(task: dict[str, Any], result: dict[str, Any]) -> boo
     task["pipeline_status"] = result.get("pipeline_status")
     task["validated_at"] = utc_now()
     task["updated_at"] = utc_now()
-    if target_status in {TASK_STATUS_DONE, TASK_STATUS_VALIDATION_FAILED, TASK_STATUS_PIPELINE_FAILED, TASK_STATUS_APPROVAL_REQUIRED}:
+    if target_status in {TASK_STATUS_DONE, TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_VALIDATION_FAILED, TASK_STATUS_PIPELINE_FAILED, TASK_STATUS_APPROVAL_REQUIRED}:
         task["finished_at"] = utc_now()
     if result.get("workspace"):
         task["workspace"] = result["workspace"]
@@ -394,7 +399,11 @@ def apply_validation_result(task: dict[str, Any], result: dict[str, Any]) -> boo
     if target_status == TASK_STATUS_DONE:
         task["production_deployed"] = bool(task.get("production_deployed", False))
         task["repo_applied"] = bool(task.get("repo_applied", False))
-        task["deployment_status"] = "NOT_REQUIRED_FOR_ISOLATED_WORKER_OUTPUT"
+        task["deployment_status"] = "READY_FOR_DEPLOY" if task["repo_applied"] else "REPO_APPLIED_FALSE"
+    elif target_status == TASK_STATUS_PROPOSAL_DONE:
+        task["production_deployed"] = False
+        task["repo_applied"] = False
+        task["deployment_status"] = "APPLY_REQUIRED"
     return True
 
 

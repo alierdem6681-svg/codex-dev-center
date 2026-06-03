@@ -11,8 +11,11 @@ from typing import Any
 
 try:
     from . import cto_autonomous_delivery
+    from .critical_operation_policy import approval_required_payload
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
+        TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -32,8 +35,11 @@ try:
     )
 except ImportError:
     import cto_autonomous_delivery
+    from critical_operation_policy import approval_required_payload
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
+        TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -78,6 +84,7 @@ BACKLOG_RECOVERABLE_STATUSES = {
 VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "25"))
 VALIDATION_INTERVAL_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_INTERVAL_SECONDS", "60"))
 VALIDATION_PIPELINE_MAX_AGE_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_PIPELINE_MAX_AGE_SECONDS", "86400"))
+DELIVERY_INTERVAL_SECONDS = int(os.environ.get("CODEX_AUTONOMOUS_DELIVERY_INTERVAL_SECONDS", "120"))
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -239,7 +246,9 @@ def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> boo
     return True
 
 def backlog_dispatch_mode(status: str) -> str:
-    if status in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_PROPOSAL_READY, TASK_STATUS_READY_FOR_VALIDATION}:
+    if status == TASK_STATUS_PROPOSAL_DONE:
+        return "apply"
+    if status in {TASK_STATUS_PROPOSAL_READY, TASK_STATUS_READY_FOR_VALIDATION}:
         return "validation"
     if status in {TASK_STATUS_VALIDATION_FAILED, TASK_STATUS_PIPELINE_FAILED}:
         return "repair"
@@ -262,6 +271,95 @@ def backlog_description(parent: dict[str, Any], mode: str) -> str:
         f"{action} Work only in the isolated worker workspace. "
         "Do not mutate production, secrets, IAM, billing, DNS, firewall, credentials, database, or Google Ads."
     )
+
+def task_text(task: dict[str, Any]) -> str:
+    return "\n".join(str(task.get(key, "")) for key in ["title", "description", "raw_message"])
+
+def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -> bool:
+    status = normalize_status(task.get("status"))
+    if status not in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
+        return False
+    if status == TASK_STATUS_DONE and (
+        str(task.get("validation_status") or "").upper() != "PASS"
+        or str(task.get("pipeline_status") or "").upper() != "PASS"
+    ):
+        return False
+    if task.get("source") == BACKLOG_DISPATCHER_SOURCE and task.get("dispatcher_mode") == "apply":
+        return False
+    if task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged"):
+        return False
+    if task.get("approval_required") or status == TASK_STATUS_APPROVAL_REQUIRED:
+        return False
+    if worker_block_reason(task):
+        return False
+    child_id = task.get("repo_apply_child")
+    if active_child_exists(tasks, child_id):
+        return False
+    if not child_allows_retry(tasks, child_id):
+        return False
+    attempts = int(task.get("repo_apply_attempts", 0) or 0)
+    return attempts < 2
+
+def repo_apply_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for task in tasks:
+        if is_repo_apply_candidate(task, tasks):
+            return task
+    return None
+
+def mark_approval_required(task: dict[str, Any], findings: list[str]) -> None:
+    task["status"] = TASK_STATUS_APPROVAL_REQUIRED
+    task["worker_eligible"] = False
+    task["approval_required"] = True
+    task["approval_reason"] = "critical_infrastructure_operation"
+    task["critical_operation_findings"] = findings
+    task["updated_at"] = now()
+
+def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dict[str, Any]:
+    parent_id = str(parent.get("id") or "TASK")
+    title = parent.get("title") or parent_id
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    child_id = f"CTO-APPLY-{stamp}-{safe_id(parent_id)}"
+    risk = normalize_risk(parent.get("risk") or parent.get("risk_level") or "medium")
+    evidence = parent.get("workspace") or parent.get("report_path") or "-"
+    child = {
+        "id": child_id,
+        "title": f"Apply: {str(title)[:90]}",
+        "description": (
+            f"Repo apply child for validated proposal {parent_id}. "
+            f"Parent status: {normalize_status(parent.get('status'))}. Evidence: {evidence}. "
+            "Worker must implement the smallest safe repo/app change in an isolated git worktree and branch, "
+            "then create a PR after local gates pass. Do not deploy production. Do not touch secret/env/token/private key, "
+            "IAM, billing, DNS, firewall, destructive database, credential rotation, or advertising platform live-write operations."
+        ),
+        "status": TASK_STATUS_PENDING,
+        "source": BACKLOG_DISPATCHER_SOURCE,
+        "parent_task": parent_id,
+        "parent_task_id": parent_id,
+        "proposal_workspace": parent.get("workspace", ""),
+        "proposal_report_path": parent.get("report_path", ""),
+        "risk": risk,
+        "risk_level": risk,
+        "assigned_worker": choose_worker(title),
+        "worker_eligible": True,
+        "dispatcher_mode": "apply",
+        "execution_mode": "repo_apply",
+        "repo_apply_allowed": True,
+        "requires_pipeline_before_deploy": True,
+        "created_at": now(),
+        "updated_at": now(),
+        "repo_applied": False,
+        "branch_merged": False,
+        "production_deployed": False,
+        "validation_status": "PENDING",
+        "pipeline_status": "NOT_RUN",
+        "delivery_level": "REPO_APPLY_QUEUED",
+    }
+    queue.setdefault("tasks", []).append(child)
+    parent["repo_apply_child"] = child_id
+    parent["repo_apply_attempts"] = int(parent.get("repo_apply_attempts", 0) or 0) + 1
+    parent["repo_apply_created_at"] = now()
+    parent["updated_at"] = now()
+    return child
 
 def dispatcher_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     referenced_children = {task.get("backlog_dispatcher_child") for task in tasks if task.get("backlog_dispatcher_child")}
@@ -340,6 +438,31 @@ def ensure_single_backlog_task() -> bool:
     if len(worker_active) >= max_parallel_workers():
         update_system_state(**state_updates, backlog_dispatcher_last_result="worker_active")
         return False
+
+    apply_parent = repo_apply_candidate(tasks)
+    if apply_parent:
+        evaluation = approval_required_payload(task_text(apply_parent))
+        if evaluation["approval_required"]:
+            mark_approval_required(apply_parent, evaluation["critical_operation_findings"])
+            write_json(QUEUE_PATH, queue)
+            update_system_state(
+                **state_updates,
+                backlog_dispatcher_last_result="repo_apply_approval_required",
+                backlog_dispatcher_last_parent=apply_parent.get("id"),
+            )
+            log(f"BACKLOG_DISPATCH repo_apply_approval_required parent={apply_parent.get('id')}")
+            return False
+        child = create_repo_apply_task(queue, apply_parent)
+        write_json(QUEUE_PATH, queue)
+        update_system_state(
+            **state_updates,
+            backlog_dispatcher_last_result="repo_apply_created",
+            backlog_dispatcher_last_parent=apply_parent.get("id"),
+            backlog_dispatcher_last_child=child.get("id"),
+            backlog_dispatcher_last_mode="apply",
+        )
+        log(f"BACKLOG_DISPATCH repo_apply_created child={child.get('id')} parent={apply_parent.get('id')}")
+        return True
 
     parent = dispatcher_candidate(tasks)
     if not parent:
@@ -446,6 +569,39 @@ def maybe_run_validation(last_validation: float) -> tuple[float, bool]:
         return last_validation, False
     return current, run_validation_engine()
 
+def run_delivery_finalizer() -> bool:
+    try:
+        p = subprocess.run(
+            [
+                "python3",
+                "supervisor/cto_autonomous_delivery.py",
+                "finalize-latest",
+                "--execute",
+            ],
+            cwd=str(APP),
+            text=True,
+            capture_output=True,
+            timeout=600,
+        )
+        status = "UNKNOWN"
+        if p.stdout.strip():
+            try:
+                payload = json.loads(p.stdout)
+                status = str(payload.get("status") or status)
+            except Exception:
+                status = "UNPARSEABLE"
+        log(f"DELIVERY_FINALIZER rc={p.returncode} status={status} stdout={p.stdout[-500:]} stderr={p.stderr[-500:]}")
+        return p.returncode == 0
+    except Exception as exc:
+        log(f"DELIVERY_FINALIZER_ERROR {exc}")
+        return False
+
+def maybe_run_delivery(last_delivery: float) -> tuple[float, bool]:
+    current = time.monotonic()
+    if current - last_delivery < DELIVERY_INTERVAL_SECONDS:
+        return last_delivery, False
+    return current, run_delivery_finalizer()
+
 def dispatch():
     try:
         p = subprocess.run(
@@ -508,6 +664,7 @@ def daemon():
     log("LIFECYCLE_DAEMON started")
     idle_cycles = 0
     last_validation = 0.0
+    last_delivery = 0.0
     update_system_state(worker_lifecycle_daemon_active=True)
 
     while True:
@@ -515,6 +672,7 @@ def daemon():
         last_validation, validation_changed = maybe_run_validation(last_validation)
         if validation_changed:
             pending, running, active = queue_counts()
+        last_delivery, _delivery_changed = maybe_run_delivery(last_delivery)
 
         if active < max_parallel_workers():
             created = ensure_single_backlog_task()

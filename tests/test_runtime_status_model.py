@@ -109,6 +109,17 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         self.assertEqual(status, TASK_STATUS_FAILED_RETRYABLE)
 
+    def test_repo_apply_requires_explicit_task_flag(self):
+        self.assertFalse(worker_runner.task_allows_repo_apply({"dispatcher_mode": "validation"}))
+        self.assertTrue(worker_runner.task_allows_repo_apply({"execution_mode": "repo_apply"}))
+        self.assertTrue(worker_runner.task_allows_repo_apply({"repo_apply_allowed": True}))
+
+    def test_repo_apply_path_allowlist_blocks_runtime_state(self):
+        self.assertTrue(worker_runner.is_safe_repo_apply_path("supervisor/worker_runner.py"))
+        self.assertTrue(worker_runner.is_safe_repo_apply_path("tests/test_runtime_status_model.py"))
+        self.assertFalse(worker_runner.is_safe_repo_apply_path("state/task_queue.json"))
+        self.assertFalse(worker_runner.is_safe_repo_apply_path(".env"))
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
@@ -702,6 +713,15 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertEqual(lifecycle_manager.dispatcher_candidate(tasks)["id"], "PARENT")
 
+    def test_proposal_done_prefers_repo_apply_child(self):
+        queue = {"tasks": [{"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "risk": "low", "title": "safe app work"}]}
+        child = lifecycle_manager.create_repo_apply_task(queue, queue["tasks"][0])
+
+        self.assertEqual(child["dispatcher_mode"], "apply")
+        self.assertEqual(child["execution_mode"], "repo_apply")
+        self.assertTrue(child["repo_apply_allowed"])
+        self.assertEqual(queue["tasks"][0]["repo_apply_child"], child["id"])
+
     def test_idle_worker_state_clears_current_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "workers.json"
@@ -1106,17 +1126,32 @@ class TaskValidationEngineTest(unittest.TestCase):
         )
         return runtime
 
-    def test_ready_task_becomes_done_only_with_pipeline_pass(self):
+    def test_ready_proposal_becomes_proposal_done_only_with_pipeline_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
-        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
         self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
         self.assertEqual(queue["tasks"][0]["pipeline_status"], "PASS")
+        self.assertEqual(queue["tasks"][0]["deployment_status"], "APPLY_REQUIRED")
         self.assertFalse(queue["tasks"][0]["production_deployed"])
+
+    def test_ready_repo_applied_task_can_be_done_with_pipeline_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
+            queue_path = runtime / "state" / "task_queue.json"
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            queue["tasks"][0]["repo_applied"] = True
+            queue_path.write_text(json.dumps(queue), encoding="utf-8")
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["deployment_status"], "READY_FOR_DEPLOY")
 
     def test_pipeline_failure_does_not_mark_task_done(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1152,7 +1187,7 @@ class TaskValidationEngineTest(unittest.TestCase):
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
-        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
         self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
 
 
