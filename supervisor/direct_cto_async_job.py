@@ -15,7 +15,6 @@ try:
     from cto_task_router import mark_task_status
     from task_status_constants import (
         TASK_STATUS_ERROR,
-        TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_RUNNING,
@@ -28,7 +27,6 @@ except ImportError:
     from .cto_task_router import mark_task_status
     from .task_status_constants import (
         TASK_STATUS_ERROR,
-        TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_RUNNING,
@@ -40,7 +38,6 @@ except Exception:
     run_progress_aware = None
     mark_task_status = None
     TASK_STATUS_ERROR = "ERROR"
-    TASK_STATUS_FAILED = "FAILED"
     TASK_STATUS_FAILED_RETRYABLE = "FAILED_RETRYABLE"
     TASK_STATUS_PROPOSAL_READY = "PROPOSAL_READY"
     TASK_STATUS_RUNNING = "RUNNING"
@@ -182,6 +179,37 @@ def build_prompt(raw_user_message):
         "RAW_USER_MESSAGE_END",
     ])
 
+def classify_codex_failure(raw_out, raw_err, progress):
+    combined = "\n".join([raw_out or "", raw_err or "", json.dumps(progress or {}, ensure_ascii=False)])
+    lowered = combined.lower()
+
+    if any(marker in lowered for marker in [
+        "usage limit",
+        "purchase more credits",
+        "try again at",
+        "rate limit",
+        "too many requests",
+    ]):
+        return {
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "result": "codex_usage_limit_retryable",
+            "router_reason": "async_cto_codex_usage_limit_retryable",
+            "telegram_message": (
+                "CTO arka plan işi geçici Codex kullanım limitine takıldı. "
+                "Billing veya credential işlemi yapmadım; limit açıldığında güvenli şekilde retry edilebilir."
+            ),
+        }
+
+    return {
+        "status": TASK_STATUS_FAILED_RETRYABLE,
+        "result": "codex_failed_retryable",
+        "router_reason": "async_cto_codex_failed_retryable",
+        "telegram_message": (
+            "CTO arka plan işi tamamlanamadı. Teknik çıktı Telegram'a gönderilmedi; "
+            "iş retry edilebilir hata durumuna alındı."
+        ),
+    }
+
 def run_job(job_id):
     job_file = JOBS / (job_id + ".json")
     job = json.loads(job_file.read_text())
@@ -293,6 +321,7 @@ def run_job(job_id):
             if router_task_id and mark_task_status is not None:
                 mark_task_status(APP, router_task_id, TASK_STATUS_PROPOSAL_READY, "async_cto_job_final_reported")
         else:
+            failure = classify_codex_failure(raw_out, raw_err, progress)
             with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
                 f.write(json.dumps({
                     "created_at": now(),
@@ -302,14 +331,16 @@ def run_job(job_id):
                     "stdout_bytes": len(raw_out or ""),
                     "stderr_bytes": len(raw_err or ""),
                     "progress_status": progress.get("status"),
+                    "failure_status": failure["status"],
+                    "failure_result": failure["result"],
                     "prompt_or_message_content_logged": False,
                 }, ensure_ascii=False, sort_keys=True) + "\n")
-            send_message(chat_id, "Teknik hata oluştu, düzeltiyorum. Kısa özet: CTO arka plan işi tamamlanamadı; teknik çıktı Telegram'a gönderilmedi.")
-            job["status"] = TASK_STATUS_FAILED
-            job["result"] = "codex_failed"
+            send_message(chat_id, failure["telegram_message"])
+            job["status"] = failure["status"]
+            job["result"] = failure["result"]
             job["progress_watchdog"] = progress
             if router_task_id and mark_task_status is not None:
-                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED_RETRYABLE, "async_cto_job_failed")
+                mark_task_status(APP, router_task_id, TASK_STATUS_FAILED_RETRYABLE, failure["router_reason"])
 
     except subprocess.TimeoutExpired:
         send_message(chat_id, "CTO arka plan işi süre sınırına takıldı. Teknik çıktı gönderilmedi. İşi daha küçük parçalara bölelim.")
