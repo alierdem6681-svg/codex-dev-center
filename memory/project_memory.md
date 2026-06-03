@@ -29,6 +29,12 @@ Telegram görevlerinin yanlışlıkla workerlar tarafından alınması düzeltil
 STEP 19B-10A Memory
 User requires CTO, workers and all future Codex processes to use gpt-5.5 with xhigh reasoning.
 
+## 2026-06-03 Dashboard Controlled Execution Proposal Visibility
+
+Controlled execution proposal durumu dashboard status API'sine `controlled_execution` olarak eklendi. Panel Ayarlar bolumu son controlled execution task/rapor bilgisini ve proposal modunda repo degisikligi ile production deploy'un kapali oldugunu gosterir.
+
+Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya Google Ads live mutate islemi yapmadi.
+
 ## Autonomous Production Delivery System v1 Memory
 
 2026-06-02 tarihinde Codex Dev Center kendi repo/app deploy akisi icin otomatik production delivery iskeleti eklendi. Production deploy controller, production readiness suite, GitHub safe flow, staging/rollback dokumanlari, production readiness gate, action catalog, dashboard settings ve production policy template dosyalari eklendi. Dashboard Turkce pipeline bolumleriyle genisletildi.

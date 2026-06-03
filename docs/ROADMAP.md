@@ -74,6 +74,7 @@
 Faz 19B-10A Model Policy
 - [x] gpt-5.5 model policy documented
 - [x] xhigh reasoning policy documented
+- [x] Dashboard controlled execution proposal status visibility
 - [ ] CTO Controlled Execution v1
 
 ## Faz 25 - Autonomous Production Delivery System v1
