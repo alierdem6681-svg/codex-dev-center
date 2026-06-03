@@ -12,6 +12,7 @@ try:
         TASK_STATUS_DONE,
         TASK_STATUS_PENDING,
         TASK_STATUS_QUEUED,
+        TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -25,6 +26,7 @@ except ImportError:
         TASK_STATUS_DONE,
         TASK_STATUS_PENDING,
         TASK_STATUS_QUEUED,
+        TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -158,6 +160,11 @@ def dispatch(_args):
 
     print(json.dumps({"ok": True, "assignments": assignments}, indent=2, ensure_ascii=False))
 
+def completion_target_status(task):
+    if task.get("validation_status") == "PASS" and task.get("pipeline_status") == "PASS":
+        return TASK_STATUS_DONE, "manual_completion_validated_pipeline_passed"
+    return TASK_STATUS_READY_FOR_VALIDATION, "manual_completion_requires_validation_pipeline_pass"
+
 def complete_task(args):
     queue_path = STATE_DIR / "task_queue.json"
     workers_path = STATE_DIR / "workers.json"
@@ -165,11 +172,18 @@ def complete_task(args):
     workers = read_json(workers_path, {"workers": []})
 
     found = False
+    completed_status = None
     for t in queue.get("tasks", []):
         if t.get("id") == args.task_id:
-            t["status"] = TASK_STATUS_DONE
-            t["result"] = args.result
+            target_status, default_result = completion_target_status(t)
+            t["status"] = target_status
+            t["result"] = args.result if target_status == TASK_STATUS_DONE else default_result
+            t["delivery_level"] = target_status
+            if target_status != TASK_STATUS_DONE:
+                t["validation_status"] = t.get("validation_status") or "PENDING"
+                t["pipeline_status"] = t.get("pipeline_status") or "NOT_RUN"
             t["updated_at"] = now()
+            completed_status = target_status
             found = True
             break
 
@@ -181,13 +195,13 @@ def complete_task(args):
 
     write_json(queue_path, queue)
     write_json(workers_path, workers)
-    log(f"TASK_DONE {args.task_id} {args.result}")
+    log(f"TASK_COMPLETION_RECORDED {args.task_id} {completed_status} {args.result}")
 
     if not found:
         print(json.dumps({"ok": False, "error": "task_not_found"}, indent=2, ensure_ascii=False))
         sys.exit(1)
 
-    print(json.dumps({"ok": True, "task_id": args.task_id, "status": "DONE"}, indent=2, ensure_ascii=False))
+    print(json.dumps({"ok": True, "task_id": args.task_id, "status": completed_status}, indent=2, ensure_ascii=False))
 
 def main():
     parser = argparse.ArgumentParser(description="Codex Dev Center Supervisor CLI")
