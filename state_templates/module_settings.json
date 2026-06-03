@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-03T16:48:54+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -19,6 +19,7 @@
     "auth_mode": "username_password",
     "token_login_enabled": false,
     "show_runner_status": true,
+    "show_pipeline_tracking_summary": true,
     "show_last_deploy_run": true,
     "show_last_smoke_run": true,
     "show_backup_status": true,

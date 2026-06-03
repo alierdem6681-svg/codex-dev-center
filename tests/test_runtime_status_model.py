@@ -751,6 +751,53 @@ class DashboardControlledExecutionSummaryTest(unittest.TestCase):
         self.assertFalse(summary["critical_operations_allowed"])
 
 
+class DashboardPipelineTrackingSummaryTest(unittest.TestCase):
+    def test_pipeline_tracking_summary_marks_complete_runtime_chain_pass(self):
+        summary = panel_server.pipeline_tracking_summary(
+            {
+                "last_deploy_status": "PASS",
+                "last_smoke_status": "PASS",
+                "last_deploy_run_id": "26814905600",
+                "last_deploy_commit": "abcdef123456",
+                "last_deploy_at": "2026-06-03T00:00:00+00:00",
+            },
+            {
+                "task_to_deploy_test": "PASS",
+                "source": "github_actions_deploy_workflow",
+            },
+        )
+
+        self.assertEqual(summary["status"], "PASS")
+        self.assertTrue(summary["runtime_state_present"])
+        self.assertEqual(summary["workflow_run_id"], "26814905600")
+        self.assertEqual(summary["commit_short"], "abcdef12")
+        self.assertEqual(summary["missing_markers"], [])
+        self.assertTrue(summary["read_only"])
+        self.assertFalse(summary["visibility_grants_production_deploy"])
+
+    def test_status_payload_exposes_waiting_pipeline_tracking_when_runtime_state_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+            originals = (panel_server.STATE, panel_server.services)
+            panel_server.STATE = state
+            panel_server.services = lambda: []
+            try:
+                payload = panel_server.status_payload()
+            finally:
+                panel_server.STATE, panel_server.services = originals
+
+        tracking = payload["pipeline_tracking"]
+        self.assertEqual(tracking["status"], "WAITING_FOR_RUNTIME_STATE")
+        self.assertFalse(tracking["runtime_state_present"])
+        self.assertEqual(
+            tracking["missing_markers"],
+            ["last_deploy_status", "last_smoke_status", "task_to_deploy_test"],
+        )
+        self.assertTrue(tracking["read_only"])
+        self.assertFalse(tracking["visibility_grants_production_deploy"])
+
+
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
         return {

@@ -93,6 +93,7 @@ Ajan şu klasörleri inceler:
 
 Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
+- `/api/status` payload'u `pipeline_tracking` alaninda GitHub Actions deploy, son smoke ve task-to-deploy marker durumunu normalize, salt okunur ve production yetkisi vermeyen ozet olarak gosterir.
 
 ## Servis Keşfi
 

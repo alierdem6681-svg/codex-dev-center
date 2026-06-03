@@ -233,8 +233,10 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Kalite Kapıları",
         "Çıkış",
         "Pipeline Gözlemi",
+        "Takip",
         "Runner",
         "Run ID",
+        "Kaynak",
         "Telegram CTO işleri",
     ]
     missing = [item for item in required_text if item not in index]

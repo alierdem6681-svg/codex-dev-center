@@ -222,8 +222,10 @@
         DEPLOYED: 'Canlıda',
         PASS: 'Geçti',
         FAIL: 'Kaldı',
+        TRACKING: 'İzleniyor',
         BLOCKED: 'Bloklandı',
         WAITING: 'Bekliyor',
+        WAITING_FOR_RUNTIME_STATE: 'Runtime bekliyor',
         TRUE: 'Açık',
         FALSE: 'Kapalı'
       };
@@ -233,7 +235,7 @@
         const u = s.toUpperCase();
         let cls = 'badge';
         if (['PASS','OK','DONE','TRUE','ACTIVE'].includes(u)) cls += ' ok';
-        if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN'].includes(u)) cls += ' warn';
+        if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN','TRACKING','WAITING','WAITING_FOR_RUNTIME_STATE'].includes(u)) cls += ' warn';
         if (['FAIL','FAILED','ERROR','FALSE','INACTIVE','STALLED'].includes(u)) cls += ' bad';
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
@@ -279,6 +281,7 @@
         const deploy = data.production_deploy || {};
         const actionsState = data.github_actions || {};
         const pipelineState = data.pipeline_status || {};
+        const pipelineTracking = data.pipeline_tracking || {};
         const staging = data.staging_deploy || {};
         const runtime = data.production_runtime || {};
         const rollback = data.rollback || {};
@@ -305,15 +308,17 @@
           `Duman: ${smoke.status || actionsState.last_smoke_status || (smoke.ok === undefined ? '-' : smoke.ok)}`
         ].map(badge).join('');
         pipelineStatusBox.innerHTML = [
+          `Takip: ${pipelineTracking.status || '-'}`,
           `Runner: ${actionsState.runner_name || '-'}`,
           `VM: ${actionsState.vm_target || '-'}`,
           `Son deploy: ${actionsState.last_deploy_status || '-'}`,
-          `Run ID: ${actionsState.last_deploy_run_id || '-'}`,
-          `Commit: ${(actionsState.last_deploy_commit || '').slice(0, 8) || '-'}`,
-          `Zaman: ${actionsState.last_deploy_at || '-'}`,
+          `Run ID: ${pipelineTracking.workflow_run_id || actionsState.last_deploy_run_id || '-'}`,
+          `Commit: ${pipelineTracking.commit_short || (actionsState.last_deploy_commit || '').slice(0, 8) || '-'}`,
+          `Zaman: ${pipelineTracking.updated_at || actionsState.last_deploy_at || '-'}`,
           `Son smoke: ${actionsState.last_smoke_status || '-'}`,
           `Backup: ${actionsState.last_backup_path ? 'var' : '-'}`,
-          `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`,
+          `Zincir testi: ${pipelineTracking.task_to_deploy_test || pipelineState.task_to_deploy_test || '-'}`,
+          `Kaynak: ${pipelineTracking.source || '-'}`,
           `CTO router: ${router.enabled ? 'active' : '-'}`,
           `CTO doctor: ${doctor.ok === undefined ? '-' : doctor.ok}`,
           `Delivery stable: ${delivery.stable === undefined ? '-' : delivery.stable}`,

@@ -254,3 +254,22 @@ Yeni davranış:
 - `restart_simulation` canlı servis restart etmeden service watchdog ve safe rollback sözleşmesini kontrol eder.
 - `failure_injection_simulation` canlı işlem yapmadan JSON hata yakalama, security scan ve critical approval sözleşmesini kontrol eder.
 - Production deploy, secret, IAM, billing, DNS/firewall, database veya Google Ads live mutate yapılmadı.
+
+---
+
+## Dashboard Pipeline Tracking Summary v1
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-164335 / CTO-DISPATCH-20260603-072943-CTO-ACTION-20260601-144858-04-DASHBOARD-TRACKING
+
+Eklenenler:
+- `/api/status` payload'u raw `github_actions_status` ve `pipeline_status` yanında normalize `pipeline_tracking` özeti döndürür.
+- Panel `Pipeline Gözlemi` bölümünde Takip, Run ID, kısa commit, güncelleme zamanı, zincir testi ve kaynak bilgisi normalize özetten gösterilir.
+- Legacy `web_panel/server.py` status payload'u da aynı salt okunur pipeline tracking özetini döndürür.
+- Unit testler runtime chain PASS ve runtime state eksikliği durumlarını doğrular.
+
+Not:
+- Runtime `state/` dosyası oluşturulmadı veya değiştirilmedi.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write işlemi yapılmadı.
+- `production_readiness_suite.py --json` PASS döndü ve `production_deploy_performed=false` kanıtı üretti.

@@ -123,3 +123,11 @@ Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
 Production readiness suite icindeki restart ve failure injection simülasyonları non-mutating static contract kanıtına bağlandı. `restart_simulation` artık service watchdog restart yolu ve safe rollback sözleşmesini, `failure_injection_simulation` ise JSON hata yakalama, security scan ve critical approval sözleşmesini repo dosyaları üzerinden doğrular.
 
 Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı. Davranış `tests/test_runtime_status_model.py` içindeki unit test ile sabitlendi.
+
+## 2026-06-03 Dashboard Pipeline Tracking Summary v1
+
+Dashboard pipeline takip görünürlüğü normalize edildi. `/api/status` artık raw `github_actions_status` ve `pipeline_status` yanında `pipeline_tracking` özetini döndürür. Özet son deploy, son smoke, task-to-deploy marker, workflow run ID, kısa commit, kaynak, eksik marker listesi ve salt okunur güvenlik bayraklarını içerir.
+
+Panel `Pipeline Gözlemi` bölümünde Takip ve Kaynak satırları görünür. Runtime state yoksa durum `WAITING_FOR_RUNTIME_STATE` olur; production deploy yetkisi veya kritik altyapı yetkisi verilmez.
+
+Testler: dashboard pipeline tracking unit testleri, tam `tests.test_runtime_status_model`, compile/json kontrolleri ve `production_readiness_suite.py --json` PASS. Production deploy veya mutating cloud operation yapılmadı.

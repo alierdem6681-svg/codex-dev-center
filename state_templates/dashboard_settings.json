@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-03T16:48:54+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
@@ -37,6 +37,7 @@
     "stable_successful_low_risk_deploy_threshold": 3,
     "show_deploy_command_status": true,
     "show_runner_status": true,
+    "show_pipeline_tracking_summary": true,
     "show_last_deploy_run": true,
     "show_last_smoke_run": true,
     "show_backup_status": true,

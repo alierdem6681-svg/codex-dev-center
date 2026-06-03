@@ -126,6 +126,7 @@ Faz 19B-10A Model Policy
 - [x] Runtime `github_actions_status.json` ve `pipeline_status.json` state dosyalari dashboard'a baglandi.
 - [x] Production readiness suite `yaml_validation` kapisi eklendi.
 - [x] Bu paket PR/merge/deploy akisi ile canli dashboard'da dogrulandi.
+- [x] Dashboard `/api/status` icin normalize `pipeline_tracking` ozeti ve UI Takip/Kaynak gorunurlugu eklendi.
 
 ## Faz 29 - Worker Lifecycle Smoke Gate
 

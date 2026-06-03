@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-01T10:39:55.700706+00:00",
+  "updated_at": "2026-06-03T16:48:54+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -100,8 +100,9 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Ön canlı, test kapıları, GitHub Actions manuel canlı yayına alma ve geri alma denetleyicisi.",
+      "description": "Ön canlı, test kapıları, GitHub Actions manuel canlı yayına alma, pipeline tracking görünürlüğü ve geri alma denetleyicisi.",
       "actions": [
+        "view_pipeline_tracking_summary",
         "production_readiness_suite",
         "staging_deploy",
         "health_check",

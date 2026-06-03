@@ -289,6 +289,59 @@ def controlled_execution_summary(system_state):
     }
 
 
+def pipeline_tracking_summary(github_actions, pipeline_status):
+    github_actions = github_actions if isinstance(github_actions, dict) else {}
+    pipeline_status = pipeline_status if isinstance(pipeline_status, dict) else {}
+    task_marker = pipeline_status.get("task_to_deploy_test") or pipeline_status.get("status")
+    deploy_status = github_actions.get("last_deploy_status") or pipeline_status.get("deploy_status")
+    smoke_status = github_actions.get("last_smoke_status") or pipeline_status.get("last_smoke_status")
+    workflow_run_id = pipeline_status.get("workflow_run_id") or github_actions.get("last_deploy_run_id") or github_actions.get("last_smoke_run_id")
+    commit = pipeline_status.get("commit") or github_actions.get("last_deploy_commit") or github_actions.get("last_smoke_commit")
+    updated_at = (
+        pipeline_status.get("updated_at")
+        or github_actions.get("updated_at")
+        or github_actions.get("last_deploy_at")
+        or github_actions.get("last_smoke_at")
+    )
+    missing = [
+        name
+        for name, value in (
+            ("last_deploy_status", deploy_status),
+            ("last_smoke_status", smoke_status),
+            ("task_to_deploy_test", task_marker),
+        )
+        if not value
+    ]
+    values = [str(value).upper() for value in (deploy_status, smoke_status, task_marker) if value]
+    errors = [payload.get("error") for payload in (github_actions, pipeline_status) if payload.get("error")]
+    if errors:
+        status = "ERROR"
+    elif not values:
+        status = "WAITING_FOR_RUNTIME_STATE"
+    elif any(value in {"FAIL", "FAILED", "ERROR"} for value in values):
+        status = "FAIL"
+    elif not missing and all(value == "PASS" for value in values):
+        status = "PASS"
+    else:
+        status = "TRACKING"
+    return {
+        "status": status,
+        "runtime_state_present": bool(values),
+        "last_deploy_status": deploy_status,
+        "last_smoke_status": smoke_status,
+        "task_to_deploy_test": task_marker,
+        "workflow_run_id": workflow_run_id,
+        "commit": commit,
+        "commit_short": str(commit)[:8] if commit else None,
+        "updated_at": updated_at,
+        "source": pipeline_status.get("source") or github_actions.get("source") or ("runtime_state_files" if values else None),
+        "missing_markers": missing,
+        "read_only": True,
+        "visibility_grants_production_deploy": False,
+        "errors": errors,
+    }
+
+
 def status_payload():
     system_state = read_json(STATE / "system_state.json", {})
     workers_payload = read_json(STATE / "workers.json", {"workers": []})
@@ -319,6 +372,7 @@ def status_payload():
         "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
         "github_actions": github_actions,
         "pipeline_status": pipeline_status,
+        "pipeline_tracking": pipeline_tracking_summary(github_actions, pipeline_status),
         "direct_cto_jobs": direct_cto_jobs_summary(),
         "rollback": read_json(STATE / "rollback_status.json", {}),
         "rollback_point": read_json(STATE / "rollback_point.json", {}),

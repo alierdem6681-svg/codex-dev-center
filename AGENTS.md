@@ -142,3 +142,7 @@ Production kapsami sadece Codex Dev Center kendi panel/CTO/worker/recovery/dashb
 ## DASHBOARD CONTROLLED EXECUTION VISIBILITY V1
 
 Dashboard `/api/status` payload'u controlled execution proposal durumunu salt okunur olarak gosterebilir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write yetkisi vermez.
+
+## DASHBOARD PIPELINE TRACKING V1
+
+Dashboard `/api/status` payload'u `pipeline_tracking` alaninda GitHub Actions deploy, son smoke ve task-to-deploy marker bilgisini normalize salt okunur ozet olarak gosterebilir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write yetkisi vermez.
