@@ -128,6 +128,7 @@ def main():
     keys = [run_key(t.get("id")) for t in action_tasks if run_key(t.get("id"))]
     latest_key = sorted(keys)[-1] if keys else None
     current = [t for t in action_tasks if run_key(t.get("id")) == latest_key] if latest_key else action_tasks[-10:]
+    current_ids = {t.get("id") for t in current}
 
     ready_for_validation = 0
     failed_no_proposal = 0
@@ -199,10 +200,11 @@ def main():
     workers = read_json(wpath, {"workers": []})
     if running == 0:
         for w in workers.get("workers", []):
-            w["status"] = "IDLE"
-            w["current_task"] = None
-            w["note"] = "action_watcher_reconciled"
-            w["last_seen"] = now()
+            if w.get("current_task") in current_ids:
+                w["status"] = "IDLE"
+                w["current_task"] = None
+                w["note"] = "action_watcher_reconciled"
+                w["last_seen"] = now()
         write_json(wpath, workers)
 
     spath = STATE / "system_state.json"

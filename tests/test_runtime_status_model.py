@@ -171,6 +171,38 @@ class WorkerLifecycleRepairTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_FAILED_RETRYABLE)
         self.assertIsNone(workers["workers"][0]["current_task"])
 
+    def test_running_task_requires_matching_worker_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            (state / "system_state.json").write_text("{}", encoding="utf-8")
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-RUN",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
+
+            result = worker_lifecycle_check.evaluate(runtime, repair=False)
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("RUNNING task assigned to worker-1" in item for item in result["errors"]))
+
 
 if __name__ == "__main__":
     unittest.main()
