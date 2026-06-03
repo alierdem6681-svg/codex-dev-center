@@ -121,6 +121,7 @@ Canliya alma sadece su kosullarda calisabilir:
 - `CODEX_STAGING_DEPLOY_COMMAND`, `CODEX_PRODUCTION_DEPLOY_COMMAND`, `CODEX_ROLLBACK_COMMAND` tanimli olmali.
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmali.
 - Kritik istisna bulunmamali.
+- Restart ve failure injection kalite kapıları production işlemi yapmadan `static_non_mutating_contract` kanıtı üretmelidir.
 
 `production_deploy_channel=github_actions_manual` iken controller GitHub Actions disinda production deploy denemesini `github_actions_workflow_required` blocker'i ile durdurur.
 

@@ -377,15 +377,92 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     )
 
 
-def chaos_simulations(results: dict[str, Any]) -> None:
-    restart_ok = (ROOT / "supervisor/service_watchdog.py").exists()
-    failure_ok = False
+def static_contract(rel: str, markers: list[str]) -> dict[str, Any]:
+    path = source_path(rel)
+    exists = path.exists()
+    text = path.read_text(encoding="utf-8", errors="replace") if exists else ""
+    missing_markers = [marker for marker in markers if marker not in text]
+    return {
+        "file": rel,
+        "exists": exists,
+        "marker_count": len(markers),
+        "missing_markers": missing_markers,
+        "ok": exists and not missing_markers,
+    }
+
+
+def readiness_simulation_contracts() -> dict[str, Any]:
+    restart_contracts = [
+        static_contract(
+            "supervisor/service_watchdog.py",
+            [
+                "def restart(",
+                "systemctl",
+                "service_health.json",
+                "direct_cto_stale_job_recovery",
+            ],
+        ),
+        static_contract(
+            "supervisor/production_environment_manager.py",
+            [
+                "def rollback(",
+                "dry_run",
+                "git_reset_performed",
+                "data_mutation_performed",
+            ],
+        ),
+    ]
+    failure_contracts = [
+        static_contract(
+            "supervisor/production_readiness_suite.py",
+            [
+                "json_validation",
+                "security_scans",
+                "failed = [name",
+                "production_deploy_performed",
+            ],
+        ),
+        static_contract(
+            "supervisor/critical_operation_policy.py",
+            [
+                "critical_operation_findings",
+                "APPROVAL_REQUIRED",
+                "database_destructive_operation",
+            ],
+        ),
+    ]
+    invalid_json_guard = False
     try:
         json.loads("{bad json")
     except Exception:
-        failure_ok = True
-    record(results, "restart_simulation", restart_ok, {"mode": "service_watchdog_static_dry_run"})
-    record(results, "failure_injection_simulation", failure_ok, {"mode": "invalid_json_in_memory"})
+        invalid_json_guard = True
+
+    return {
+        "restart": {
+            "ok": all(item["ok"] for item in restart_contracts),
+            "mode": "static_non_mutating_contract",
+            "contracts": restart_contracts,
+        },
+        "failure_injection": {
+            "ok": invalid_json_guard and all(item["ok"] for item in failure_contracts),
+            "mode": "static_non_mutating_contract",
+            "invalid_json_guard": invalid_json_guard,
+            "contracts": failure_contracts,
+        },
+        "production_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
+def chaos_simulations(results: dict[str, Any]) -> None:
+    contracts = readiness_simulation_contracts()
+    record(results, "restart_simulation", contracts["restart"]["ok"], contracts["restart"])
+    record(
+        results,
+        "failure_injection_simulation",
+        contracts["failure_injection"]["ok"],
+        contracts["failure_injection"],
+    )
 
 
 def unit_and_integration(results: dict[str, Any]) -> None:

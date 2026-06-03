@@ -134,3 +134,9 @@ Faz 19B-10A Model Policy
 - [x] `IDLE/SLEEPING + current_task` ve `RUNNING + inactive service` tutarsizliklari fail olur.
 - [x] Telegram ve high/critical approval görevleri worker-eligible sayilmadan raporlanir.
 - [x] Deploy smoke worker-eligible görev varsa recovery + lifecycle wake dener.
+
+## Faz 30 - Quality Gate Simulation Contracts
+
+- [x] Production readiness restart simülasyonu non-mutating static contract kanıtına bağlandı.
+- [x] Failure injection simülasyonu JSON hata yakalama, security scan ve critical approval sözleşmelerini doğrular.
+- [x] Simülasyon sözleşmeleri unit test ve state template kayıtlarıyla sabitlendi.

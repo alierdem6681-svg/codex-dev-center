@@ -74,6 +74,7 @@ Her görev için kayıt tutulur:
 - Hata varsa hata özeti
 - Son durum
 - Devam notu
+- Simülasyon kapıları için canlı mutasyon yapılmadığını gösteren kanıt
 
 ## 9. Devir Teslim Kuralı
 

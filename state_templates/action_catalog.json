@@ -32,7 +32,9 @@
       "module": "production_readiness",
       "risk": "medium",
       "enabled": true,
-      "requires_approval": false
+      "requires_approval": false,
+      "non_mutating": true,
+      "simulation_contracts_required": true
     },
     {
       "id": "staging_deploy",

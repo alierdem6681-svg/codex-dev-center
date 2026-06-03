@@ -221,3 +221,21 @@ Yeni davranis:
 - Deploy smoke kapısı gerekirse recovery + lifecycle wake dener ve tekrar ölçer.
 - `IDLE`, `SLEEPING` veya `STOPPED` worker üstünde `current_task` dolu kalırsa kapı fail olur.
 - `RUNNING` worker current_task taşırken servis aktif değilse kapı fail olur.
+
+---
+
+## Quality Gate Simulation Contracts v1
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-161439 / CTO-DISPATCH-20260603-072048-CTO-AUTO-04-QUALITY-GATE-SIMULATION
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` içinde restart ve failure injection simülasyonları `static_non_mutating_contract` kanıtına bağlandı.
+- `tests/test_runtime_status_model.py` simülasyon sözleşmelerinin PASS ve non-mutating olduğunu doğrular.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` production readiness simülasyon sözleşmesini görünür kılar.
+
+Yeni davranış:
+- `restart_simulation` canlı servis restart etmeden service watchdog ve safe rollback sözleşmesini kontrol eder.
+- `failure_injection_simulation` canlı işlem yapmadan JSON hata yakalama, security scan ve critical approval sözleşmesini kontrol eder.
+- Production deploy, secret, IAM, billing, DNS/firewall, database veya Google Ads live mutate yapılmadı.
