@@ -22,8 +22,10 @@ CRITICAL_OPERATION_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"\b(owner|editor)\b.*\b(grant|role|yetki|ver)\b", re.I),
     ],
     "billing_change": [
-        re.compile(r"\bbilling\b.*\b(change|update|set|enable|disable|değiş|degis)\b", re.I),
-        re.compile(r"\b(ödeme|odeme|fatura|billing).*\b(değiş|degis|update|change)\b", re.I),
+        re.compile(r"\bbilling\b.*\b(change|update|set|enable|disable)\b", re.I),
+        re.compile(r"\bbilling\b.*(değiş|degis)", re.I),
+        re.compile(r"\b(ödeme|odeme|fatura|billing).*\b(update|change)\b", re.I),
+        re.compile(r"\b(ödeme|odeme|fatura|billing).*(değiş|degis)", re.I),
     ],
     "firewall_change": [
         re.compile(r"\bfirewall\b.*\b(open|allow|add|change|update|delete|aç|ac|değiş|degis|sil)\b", re.I),

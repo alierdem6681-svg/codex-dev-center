@@ -122,7 +122,8 @@ def evaluate(root: Path, fix: bool = False) -> dict[str, Any]:
         warnings.append("queue_has_lowercase_statuses")
     if worker_reconcile["stale_worker_task_refs"]:
         warnings.append("worker_stale_terminal_task_refs")
-    if telegram_config.get("enabled") is False and telegram_config.get("direct_cto_mode") is True:
+    direct_cto_active = services.get("codex-direct-cto") in {"active", "unknown"}
+    if telegram_config.get("enabled") is False and telegram_config.get("direct_cto_mode") is True and not direct_cto_active:
         warnings.append("telegram_enabled_false_but_direct_cto_mode_true")
 
     result = {
