@@ -353,14 +353,36 @@ Tarih: 2026-06-03
 Görev: CTO-APPLY-20260603-173121 / CTO-DISPATCH-20260603-073127-CTO-ACTION-20260601-161747-01-QUEUE-STATUS-NORMALIZER
 
 Eklenenler:
-- `supervisor/task_status_constants.py` status alias anahtarlarini case, bosluk ve tire farklarina karsi canonical hale getirir.
-- `tests/test_runtime_status_model.py` `ready for validation`, `FAILED-TIMEOUT`, `in-progress` ve `completed` varyantlarinin standart task enumlarina donustugunu dogrular.
+- `supervisor/task_status_constants.py` status alias anahtarlarini case ve yaygin ayirici farklarina karsi canonical hale getirir.
+- `tests/test_runtime_status_model.py` `ready for validation`, `ready/for.validation`, `FAILED-TIMEOUT`, `FAILED.TIMEOUT`, `in-progress` ve `completed` varyantlarinin standart task enumlarina donustugunu dogrular.
 - CTO router state template kayitlari queue/status normalizer davranisini gorunur kilar.
 
 Yeni davranis:
-- `ready for validation` veya `ready-for-validation` artik yanlislikla `QUEUED` default'una dusmez; `READY_FOR_VALIDATION` olur.
-- `FAILED-TIMEOUT` `FAILED_TIMEOUT`, `in-progress` `RUNNING`, `completed` `DONE` olarak normalize edilir.
+- `ready for validation`, `ready-for-validation` veya `ready/for.validation` artik yanlislikla `QUEUED` default'una dusmez; `READY_FOR_VALIDATION` olur.
+- `FAILED-TIMEOUT` ve `FAILED.TIMEOUT` `FAILED_TIMEOUT`, `in-progress` `RUNNING`, `completed` `DONE` olarak normalize edilir.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir.
 
 Not:
 - Production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+---
+
+## Queue / Status Normalizer Apply Retry - Separator Hardening
+
+Tarih: 2026-06-03
+
+Görev: CTO-APPLY-20260603-175845 / CTO-DISPATCH-20260603-073231-CTO-ACTION-20260602-034638-01-QUEUE-STATUS-NORMALIZER
+
+Eklenenler:
+- Status alias normalizasyonu harf/rakam disi ayiricilari tek `_` canonical formuna indirir.
+- `ready/for.validation` ve `FAILED.TIMEOUT` regresyonlari unit test kapsamına alindi.
+- CTO router state template kayitlari ayirici tabanli status alias normalizasyonunu gorunur kilar.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- Geçici `/tmp` repo kopyasında `python3 supervisor/production_readiness_suite.py --json` PASS; production deploy ve mutating cloud operation yapılmadı.
+
+Not:
+- Production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu sandbox'ta git metadata yolu read-only oldugu icin `git add`, commit, push ve PR olusturma adimlari tamamlanamadi.
