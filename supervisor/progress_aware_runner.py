@@ -74,15 +74,18 @@ def snapshot_paths(paths: list[Path], ignore_names: set[str] | None = None) -> d
     for root in paths:
         if not root.exists():
             continue
-        candidates = root.rglob("*") if root.is_dir() else [root]
-        for path in candidates:
-            if not path.is_file() or path.name in ignore:
-                continue
-            try:
-                stat = path.stat()
-                snapshot[str(path)] = (stat.st_size, stat.st_mtime_ns)
-            except Exception:
-                continue
+        try:
+            candidates = root.rglob("*") if root.is_dir() else [root]
+            for path in candidates:
+                if not path.is_file() or path.name in ignore:
+                    continue
+                try:
+                    stat = path.stat()
+                    snapshot[str(path)] = (stat.st_size, stat.st_mtime_ns)
+                except Exception:
+                    continue
+        except (FileNotFoundError, NotADirectoryError, OSError):
+            continue
     return snapshot
 
 
