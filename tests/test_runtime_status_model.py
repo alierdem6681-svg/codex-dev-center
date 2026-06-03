@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "web_panel"))
 
 from supervisor import (  # noqa: E402
+    critical_operation_policy,
     cto_autonomous_delivery,
     lifecycle_manager,
     progress_aware_runner,
@@ -54,6 +55,27 @@ PANEL_SERVER_SPEC.loader.exec_module(panel_server)
 
 
 class WorkerStatusModelTest(unittest.TestCase):
+    def test_critical_policy_ignores_explicit_safety_boundaries(self):
+        safe_text = "\n".join(
+            [
+                "Kapsam dışı:",
+                "- database destructive operation",
+                "- credential rotation",
+                "Secret, IAM, billing, DNS, firewall, database veya credential rotation işlemi yapılmadı.",
+                "Ana repo dosyalarını değiştirme; token/private key/env değerlerine dokunma.",
+            ]
+        )
+
+        self.assertEqual(critical_operation_policy.critical_operation_findings(safe_text), [])
+
+    def test_critical_policy_keeps_real_critical_changes_blocked(self):
+        findings = critical_operation_policy.critical_operation_findings(
+            "production token rotate and credential rotation"
+        )
+
+        self.assertIn("token_private_key_env_value_change", findings)
+        self.assertIn("credential_rotation", findings)
+
     def test_timeout_without_output_is_not_done(self):
         status, reason = worker_runner.classify_worker_result(124, [], "", False)
 
