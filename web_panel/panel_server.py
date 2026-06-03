@@ -220,11 +220,33 @@ def direct_cto_jobs_summary(limit: int = 12):
     jobs_dir = STATE / "direct_cto_jobs"
     if not jobs_dir.exists():
         return {"count": 0, "active_count": 0, "jobs": []}
-    jobs = []
-    for path in sorted(jobs_dir.glob("JOB-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
+    active_statuses = {"QUEUED", "RUNNING"}
+    paths = sorted(
+        [path for path in jobs_dir.glob("JOB-*.json") if not path.name.endswith(".progress.json")],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    payloads = []
+    active_paths = []
+    for path in paths:
         payload = read_json(path, {})
         if not isinstance(payload, dict):
             continue
+        payloads.append((path, payload))
+        if str(payload.get("status", "")).upper() in active_statuses:
+            active_paths.append(path)
+
+    selected_paths = paths[:limit]
+    selected = {str(path) for path in selected_paths}
+    for path in active_paths:
+        if str(path) not in selected:
+            selected_paths.append(path)
+            selected.add(str(path))
+
+    payload_by_path = {str(path): payload for path, payload in payloads}
+    jobs = []
+    for path in selected_paths:
+        payload = payload_by_path.get(str(path), {})
         progress = payload.get("progress_watchdog") if isinstance(payload.get("progress_watchdog"), dict) else {}
         jobs.append(
             {
@@ -246,8 +268,8 @@ def direct_cto_jobs_summary(limit: int = 12):
                 },
             }
         )
-    active = [job for job in jobs if str(job.get("status", "")).upper() in {"QUEUED", "RUNNING"}]
-    return {"count": len(jobs), "active_count": len(active), "jobs": jobs}
+    hidden_active_count = max(0, len(active_paths) - len([job for job in jobs if str(job.get("status", "")).upper() in active_statuses]))
+    return {"count": len(payloads), "active_count": len(active_paths), "hidden_active_count": hidden_active_count, "jobs": jobs}
 
 
 def status_payload():

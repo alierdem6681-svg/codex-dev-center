@@ -5,12 +5,14 @@ import importlib.util
 import json
 import contextlib
 import io
+import os
 import time
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "web_panel"))
 
 from supervisor import (  # noqa: E402
     cto_autonomous_delivery,
@@ -41,6 +43,14 @@ WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
 worker_lifecycle_check = importlib.util.module_from_spec(WORKER_LIFECYCLE_SPEC)
 assert WORKER_LIFECYCLE_SPEC.loader is not None
 WORKER_LIFECYCLE_SPEC.loader.exec_module(worker_lifecycle_check)
+
+PANEL_SERVER_SPEC = importlib.util.spec_from_file_location(
+    "panel_server_test_module",
+    ROOT / "web_panel" / "panel_server.py",
+)
+panel_server = importlib.util.module_from_spec(PANEL_SERVER_SPEC)
+assert PANEL_SERVER_SPEC.loader is not None
+PANEL_SERVER_SPEC.loader.exec_module(panel_server)
 
 
 class WorkerStatusModelTest(unittest.TestCase):
@@ -282,6 +292,35 @@ class DirectCtoProgressWatcherTest(unittest.TestCase):
                 direct_cto_progress_watcher.JOBS = original_jobs
 
         self.assertFalse(stopped)
+
+
+class DashboardDirectCtoJobsSummaryTest(unittest.TestCase):
+    def write_job(self, jobs_dir, name, status, mtime):
+        path = jobs_dir / f"{name}.json"
+        path.write_text(json.dumps({"id": name, "status": status}), encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+        return path
+
+    def test_active_direct_cto_job_outside_recent_limit_is_counted_and_listed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            jobs_dir = state / "direct_cto_jobs"
+            jobs_dir.mkdir(parents=True)
+            self.write_job(jobs_dir, "JOB-OLD-ACTIVE", "RUNNING", 1)
+            for idx in range(8):
+                self.write_job(jobs_dir, f"JOB-RECENT-{idx}", "FINAL_REPORTED", 100 + idx)
+
+            original_state = panel_server.STATE
+            panel_server.STATE = state
+            try:
+                summary = panel_server.direct_cto_jobs_summary(limit=4)
+            finally:
+                panel_server.STATE = original_state
+
+        ids = [job.get("id") for job in summary["jobs"]]
+        self.assertEqual(summary["count"], 9)
+        self.assertEqual(summary["active_count"], 1)
+        self.assertIn("JOB-OLD-ACTIVE", ids)
 
 
 class DeployGateStatusModelTest(unittest.TestCase):
