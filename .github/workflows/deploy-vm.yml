@@ -320,9 +320,36 @@ jobs:
               "commit": os.environ.get("GITHUB_SHA", ""),
               "runner": os.environ.get("RUNNER_NAME", ""),
           }
+          production_deploy = {
+              "updated_at": now,
+              "status": "PASS",
+              "source": "github_actions_deploy_workflow",
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "workflow_run_url": github_actions["last_deploy_run_url"],
+              "commit": os.environ.get("GITHUB_SHA", ""),
+              "ref": os.environ.get("GITHUB_REF_NAME", ""),
+              "backup_path": os.environ.get("LAST_BACKUP_PATH", ""),
+              "staging_deploy_performed": True,
+              "production_deploy_performed": True,
+              "post_deploy_smoke_status": "PASS",
+              "blockers": [],
+          }
+          production_runtime = {
+              "updated_at": now,
+              "status": "PASS",
+              "source": "github_actions_deploy_workflow",
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "commit": os.environ.get("GITHUB_SHA", ""),
+              "runtime_dir": os.environ.get("RUNTIME_DIR", ""),
+              "dashboard_url": os.environ.get("DASHBOARD_URL", ""),
+              "public_dashboard_url": os.environ.get("PUBLIC_DASHBOARD_URL", ""),
+              "blockers": [],
+          }
           for name, payload in {
               "github_actions_status.json": github_actions,
               "pipeline_status.json": pipeline_status,
+              "production_deploy_status.json": production_deploy,
+              "production_runtime_status.json": production_runtime,
           }.items():
               tmp = state / f"{name}.{os.getpid()}.tmp"
               tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

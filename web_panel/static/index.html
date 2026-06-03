@@ -287,7 +287,7 @@
         const delivery = data.cto_delivery || {};
         const ops = data.operations || {};
         clock.textContent = new Date().toLocaleTimeString();
-        deployMetric.textContent = runtime.status || deploy.status || 'Bekliyor';
+        deployMetric.textContent = actionsState.last_deploy_status || runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
         rollbackMetric.textContent = rollback.status || (deploy.rollback_performed ? 'PASS' : 'Bekliyor');
         queueMetric.textContent = tasks().length;
