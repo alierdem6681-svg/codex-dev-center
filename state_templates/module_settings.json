@@ -22,7 +22,8 @@
     "show_last_deploy_run": true,
     "show_last_smoke_run": true,
     "show_backup_status": true,
-    "show_task_to_deploy_status": true
+    "show_task_to_deploy_status": true,
+    "show_controlled_execution_status": true
   },
   "panel_auth": {
     "enabled": true,

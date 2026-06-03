@@ -669,6 +669,35 @@ class DashboardDirectCtoJobsSummaryTest(unittest.TestCase):
         self.assertIn("JOB-OLD-ACTIVE", ids)
 
 
+class DashboardControlledExecutionSummaryTest(unittest.TestCase):
+    def test_controlled_execution_summary_exposes_proposal_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            reports = Path(tmp) / "reports"
+            reports.mkdir(parents=True)
+            report = reports / "CONTROLLED_EXECUTION_20260603_120000.md"
+            report.write_text("# report\n", encoding="utf-8")
+            original_reports = panel_server.REPORTS
+            panel_server.REPORTS = reports
+            try:
+                summary = panel_server.controlled_execution_summary(
+                    {
+                        "controlled_execution_proposal_ready": True,
+                        "last_controlled_execution_task": "TASK-CONTROLLED",
+                        "last_controlled_execution_workspace": "/opt/codex-dev-center/workspaces/controlled_TASK",
+                    }
+                )
+            finally:
+                panel_server.REPORTS = original_reports
+
+        self.assertEqual(summary["status"], "PROPOSAL_READY")
+        self.assertTrue(summary["proposal_ready"])
+        self.assertEqual(summary["last_task"], "TASK-CONTROLLED")
+        self.assertEqual(summary["latest_report"], "CONTROLLED_EXECUTION_20260603_120000.md")
+        self.assertFalse(summary["proposal_mode_repo_mutation_allowed"])
+        self.assertFalse(summary["proposal_mode_production_deploy_allowed"])
+        self.assertFalse(summary["critical_operations_allowed"])
+
+
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
         return {

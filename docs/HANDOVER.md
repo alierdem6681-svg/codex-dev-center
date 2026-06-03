@@ -58,6 +58,21 @@ Codex model policy documented: model=gpt-5.5, reasoning=xhigh, bubblewrap instal
 
 ---
 
+## Dashboard Controlled Execution Proposal Visibility
+
+Tarih: 2026-06-03
+
+Eklenenler:
+- `web_panel/panel_server.py` ve legacy `web_panel/server.py` status payload'u `controlled_execution` ozeti dondurur.
+- Dashboard Ayarlar bolumu son controlled execution task/rapor durumunu ve proposal modunun repo mutation/deploy kapali oldugunu gosterir.
+- `state_templates/dashboard_settings.json` ve `state_templates/module_settings.json` icinde `show_controlled_execution_status` bayragi eklendi.
+
+Not:
+- Bu paket production deploy calistirmadi.
+- Runtime `state/` dosyalari repo tarafinda ignore edildigi icin repo icinde state dosyasi olusturulmadi.
+
+---
+
 ## Autonomous Production Delivery System v1
 
 Tarih: 2026-06-02

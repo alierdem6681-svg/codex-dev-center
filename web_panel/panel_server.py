@@ -272,6 +272,23 @@ def direct_cto_jobs_summary(limit: int = 12):
     return {"count": len(payloads), "active_count": len(active_paths), "hidden_active_count": hidden_active_count, "jobs": jobs}
 
 
+def controlled_execution_summary(system_state):
+    reports = []
+    if REPORTS.exists():
+        reports = sorted(REPORTS.glob("CONTROLLED_EXECUTION_*.md"), key=lambda path: path.stat().st_mtime, reverse=True)
+    proposal_ready = bool(system_state.get("controlled_execution_proposal_ready"))
+    return {
+        "status": "PROPOSAL_READY" if proposal_ready else "WAITING",
+        "proposal_ready": proposal_ready,
+        "last_task": system_state.get("last_controlled_execution_task"),
+        "last_workspace": system_state.get("last_controlled_execution_workspace"),
+        "latest_report": reports[0].name if reports else None,
+        "proposal_mode_repo_mutation_allowed": False,
+        "proposal_mode_production_deploy_allowed": False,
+        "critical_operations_allowed": False,
+    }
+
+
 def status_payload():
     system_state = read_json(STATE / "system_state.json", {})
     workers_payload = read_json(STATE / "workers.json", {"workers": []})
@@ -283,6 +300,7 @@ def status_payload():
         "ok": True,
         "time": now(),
         "system_state": system_state,
+        "controlled_execution": controlled_execution_summary(system_state),
         "workers": workers_payload,
         "tasks": tasks_payload,
         "operations": queue_diagnostics(tasks_payload, workers_payload, system_state, production_deploy, github_actions),

@@ -90,6 +90,9 @@ Ajan şu klasörleri inceler:
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
 
+Dashboard status API notu:
+- `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:

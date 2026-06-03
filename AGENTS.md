@@ -137,3 +137,7 @@ Default komutlar:
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1`
 
 Production kapsami sadece Codex Dev Center kendi panel/CTO/worker/recovery/dashboard runtime akisi ile sinirlidir.
+
+## DASHBOARD CONTROLLED EXECUTION VISIBILITY V1
+
+Dashboard `/api/status` payload'u controlled execution proposal durumunu salt okunur olarak gosterebilir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, credential rotation veya reklam platformu live-write yetkisi vermez.

@@ -223,6 +223,7 @@
         PASS: 'Geçti',
         FAIL: 'Kaldı',
         BLOCKED: 'Bloklandı',
+        WAITING: 'Bekliyor',
         TRUE: 'Açık',
         FALSE: 'Kapalı'
       };
@@ -287,6 +288,7 @@
         const router = data.cto_router || {};
         const doctor = data.cto_doctor || {};
         const delivery = data.cto_delivery || {};
+        const controlled = data.controlled_execution || {};
         const ops = data.operations || {};
         const directJobs = data.direct_cto_jobs || {};
         clock.textContent = new Date().toLocaleTimeString();
@@ -361,7 +363,12 @@
           'Git temizliği': s.git_clean_required,
           'GitHub senkron': s.github_remote_sync_required,
           'Health check': s.post_deploy_health_check_required,
-          'Duman testi': s.post_deploy_smoke_test_required
+          'Duman testi': s.post_deploy_smoke_test_required,
+          'Kontrollü öneri': controlled.status || '-',
+          'Kontrollü görev': controlled.last_task || '-',
+          'Kontrollü rapor': controlled.latest_report || '-',
+          'Öneri repo değişikliği': controlled.proposal_mode_repo_mutation_allowed ? 'Açık' : 'Kapalı',
+          'Öneri deploy': controlled.proposal_mode_production_deploy_allowed ? 'Açık' : 'Kapalı'
         }).map(([k,v]) => `${esc(k)}: ${badge(v)}`).join('<br>');
         workersTable.innerHTML = `<table><thead><tr><th>Çalışan</th><th>Durum</th><th>Görev</th></tr></thead><tbody>${
           workers().map(w => `<tr><td>${esc(w.id)}</td><td>${badge(w.status)}</td><td>${esc(w.current_task || '-')}</td></tr>`).join('')

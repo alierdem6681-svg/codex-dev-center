@@ -90,9 +90,12 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 def log(msg):
-    LOGS.mkdir(parents=True, exist_ok=True)
-    with (LOGS / "lifecycle.log").open("a", encoding="utf-8") as f:
-        f.write(f"{now()} {msg}\n")
+    try:
+        LOGS.mkdir(parents=True, exist_ok=True)
+        with (LOGS / "lifecycle.log").open("a", encoding="utf-8") as f:
+            f.write(f"{now()} {msg}\n")
+    except OSError:
+        return
 
 def read_json(path, default):
     try:
