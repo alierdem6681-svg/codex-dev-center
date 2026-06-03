@@ -24,6 +24,7 @@ from supervisor import (  # noqa: E402
     direct_cto_progress_watcher,
     supervisor_cli,
     task_validation_engine,
+    telegram_direct_cto,
     telegram_direct_cto_simulator,
     worker_runner,
 )
@@ -400,6 +401,124 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
 
         self.assertTrue(result["action_command"])
         self.assertEqual(result["route"], "async_job")
+        self.assertEqual(result["ack_deadline_seconds"], 3)
+
+    def test_long_task_routes_to_async_before_local_reply(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "long_multistep",
+            "Uçtan uca çalış: worker ata, pipeline çalıştır, fail olursa düzelt, gate PASS olunca production'a al.",
+        )
+
+        self.assertTrue(result["long_task"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertTrue(result["async_ack_expected"])
+        self.assertEqual(result["ack_deadline_seconds"], 3)
+
+    def test_critical_operation_routes_to_approval_before_async(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "database_destructive",
+            "Production database " + "delete" + " from users çalıştır.",
+        )
+
+        self.assertIn("database_destructive_operation", result["critical_operation_findings"])
+        self.assertEqual(result["route"], "local_natural_reply")
+        self.assertEqual(result["reply_kind"], "approval_required")
+        self.assertFalse(result["async_ack_expected"])
+
+    def test_handle_message_starts_async_job_and_sends_ack_without_sync_codex(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False):
+            calls.append(("start_async_job", chat_id, router_task_id, action_command))
+            return "JOB-ACK"
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fail_run_codex(_text):
+            raise AssertionError("run_codex must not be called by Telegram handler")
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.run_codex,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.run_codex = fail_run_codex
+            try:
+                started = time.monotonic()
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "Bana sistem mimarisi için kısa bir öneri hazırla.",
+                    },
+                )
+                elapsed = time.monotonic() - started
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.run_codex,
+                ) = originals
+
+        self.assertLess(elapsed, 1)
+        self.assertEqual(calls[0][0], "start_async_job")
+        self.assertEqual(calls[1][0], "send_message")
+        self.assertIn("JOB-ACK", calls[1][2])
+
+    def test_handle_message_blocks_critical_operation_before_async_job(self):
+        calls = []
+
+        def fail_start_async_job(*_args, **_kwargs):
+            raise AssertionError("critical operation must not start async job")
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fail_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "Production database " + "delete" + " from users çalıştır.",
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                ) = originals
+
+        self.assertEqual(len(calls), 1)
+        self.assertIn("APPROVAL_REQUIRED", calls[0][2])
 
 
 class DirectCtoProgressWatcherTest(unittest.TestCase):

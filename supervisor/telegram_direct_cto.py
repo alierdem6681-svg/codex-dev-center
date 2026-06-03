@@ -12,16 +12,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from critical_operation_policy import critical_operation_findings
-    from cto_task_router import submit_task, trigger_lifecycle
-    from task_status_constants import redact_sensitive_text
+    from .critical_operation_policy import critical_operation_findings
+    from .cto_task_router import submit_task, trigger_lifecycle
+    from .task_status_constants import redact_sensitive_text
 except ImportError:
-    def critical_operation_findings(value):
-        return []
-    submit_task = None
-    trigger_lifecycle = None
-    def redact_sensitive_text(value):
-        return str(value or "")
+    try:
+        from critical_operation_policy import critical_operation_findings
+        from cto_task_router import submit_task, trigger_lifecycle
+        from task_status_constants import redact_sensitive_text
+    except ImportError:
+        def critical_operation_findings(value):
+            return []
+        submit_task = None
+        trigger_lifecycle = None
+        def redact_sensitive_text(value):
+            return str(value or "")
 
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
@@ -591,6 +596,12 @@ def handle_message(token, expected_chat_id, msg):
 
     safe_text = redact_sensitive_text(text)
     audit_passthrough(chat_id, from_user, text, safe_text, "intake")
+
+    critical_reply = local_natural_reply(safe_text) if critical_operation_findings(safe_text) else None
+    if critical_reply:
+        audit_passthrough(chat_id, from_user, text, safe_text, "approval_required")
+        send_message(token, chat_id, critical_reply)
+        return
 
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
     # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
