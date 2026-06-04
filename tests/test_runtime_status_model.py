@@ -2687,6 +2687,44 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertIsNone(lifecycle_manager.dispatcher_candidate(tasks))
 
+    def test_active_repo_apply_child_prevents_duplicate_backlog_dispatch(self):
+        tasks = [
+            {
+                "id": "PARENT",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "risk": "medium",
+                "repo_apply_child": "APPLY-CHILD",
+            },
+            {
+                "id": "APPLY-CHILD",
+                "status": TASK_STATUS_RUNNING,
+                "risk": "medium",
+            },
+        ]
+
+        self.assertIsNone(lifecycle_manager.dispatcher_candidate(tasks))
+
+    def test_pr_backed_repo_apply_child_prevents_duplicate_backlog_dispatch(self):
+        tasks = [
+            {
+                "id": "PARENT",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "risk": "medium",
+                "repo_apply_child": "APPLY-CHILD",
+            },
+            {
+                "id": "APPLY-CHILD",
+                "status": TASK_STATUS_FAILED_RETRYABLE,
+                "source": lifecycle_manager.BACKLOG_DISPATCHER_SOURCE,
+                "risk": "medium",
+                "result": "repo_apply_pr_ready_pipeline_passed",
+                "pull_request_url": "https://example.invalid/pull/1",
+                "merge_blocked": True,
+            },
+        ]
+
+        self.assertIsNone(lifecycle_manager.dispatcher_candidate(tasks))
+
     def test_proposal_done_prefers_repo_apply_child(self):
         queue = {"tasks": [{"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "risk": "low", "title": "safe app work"}]}
         child = lifecycle_manager.create_repo_apply_task(queue, queue["tasks"][0])

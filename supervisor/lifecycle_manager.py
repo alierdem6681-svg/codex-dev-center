@@ -397,6 +397,11 @@ def dispatcher_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
             continue
         if worker_block_reason(task):
             continue
+        repo_child_id = task.get("repo_apply_child")
+        if active_child_exists(tasks, repo_child_id):
+            continue
+        if not child_allows_retry(tasks, repo_child_id):
+            continue
         child_id = task.get("backlog_dispatcher_child")
         if active_child_exists(tasks, child_id):
             continue
