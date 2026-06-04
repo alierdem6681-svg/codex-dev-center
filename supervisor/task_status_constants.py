@@ -316,6 +316,42 @@ def atomic_write_json(path: Path, data: Any) -> None:
         _fsync_parent(path)
 
 
+def atomic_json_state_audit(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    tmp_files = sorted(path.parent.glob(path.name + ".*.tmp")) if path.parent.exists() else []
+    valid_tmp_files = []
+    invalid_tmp_files = []
+    for candidate in tmp_files:
+        try:
+            _load_json_text(candidate)
+            valid_tmp_files.append(str(candidate))
+        except Exception:
+            invalid_tmp_files.append(str(candidate))
+
+    state_valid = False
+    state_error = ""
+    if path.exists():
+        try:
+            _load_json_text(path)
+            state_valid = True
+        except Exception as exc:
+            state_error = str(exc)[:200]
+
+    return {
+        "path": str(path),
+        "state_exists": path.exists(),
+        "state_valid_json": state_valid,
+        "state_error": state_error,
+        "tmp_count": len(tmp_files),
+        "valid_tmp_count": len(valid_tmp_files),
+        "invalid_tmp_count": len(invalid_tmp_files),
+        "valid_tmp_files": valid_tmp_files,
+        "invalid_tmp_files": invalid_tmp_files,
+        "safe_to_use_state": bool(path.exists() and state_valid),
+        "recovery_candidate_available": bool(valid_tmp_files),
+    }
+
+
 def append_audit(root: Path, event: str, payload: dict[str, Any]) -> None:
     log_dir = root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)

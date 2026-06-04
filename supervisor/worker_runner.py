@@ -17,6 +17,7 @@ from typing import Any
 try:
     from .critical_operation_policy import approval_required_payload
     from .progress_aware_runner import run_progress_aware
+    from .repo_apply_outcome import classify_repo_apply_outcome
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -37,9 +38,11 @@ try:
         read_json as read_state_json,
         redact_sensitive_text,
     )
+    from .worker_bootstrap import bootstrap_preflight, write_bootstrap_diagnostics
 except ImportError:
     from critical_operation_policy import approval_required_payload
     from progress_aware_runner import run_progress_aware
+    from repo_apply_outcome import classify_repo_apply_outcome
     from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -60,6 +63,7 @@ except ImportError:
         read_json as read_state_json,
         redact_sensitive_text,
     )
+    from worker_bootstrap import bootstrap_preflight, write_bootstrap_diagnostics
 
 APP_DIR = Path("/opt/codex-dev-center")
 STATE_DIR = APP_DIR / "state"
@@ -921,6 +925,20 @@ Beklenen çıktı:
                     validation_status = "PASS"
                     pipeline_status = "PASS"
 
+    if status in {TASK_STATUS_DONE, TASK_STATUS_NO_CHANGE}:
+        apply_status = "SUCCESS"
+    elif status == TASK_STATUS_APPROVAL_REQUIRED:
+        apply_status = "SKIPPED"
+    else:
+        apply_status = "FAILED"
+    repo_apply_outcome = classify_repo_apply_outcome(
+        apply_status=apply_status,
+        changed_paths=commit_files,
+        reason=result,
+        already_satisfied=status == TASK_STATUS_NO_CHANGE and returncode == 0,
+        transient_failure=status == TASK_STATUS_FAILED_RETRYABLE,
+    )
+
     delivery_level = "PR_READY" if status == TASK_STATUS_DONE and pr_payload.get("ok") else status
     report = [
         "# WORKER REPO APPLY REPORT",
@@ -935,6 +953,9 @@ Beklenen çıktı:
         f"Codex return code: {returncode}",
         f"Validation status: {validation_status}",
         f"Pipeline status: {pipeline_status}",
+        f"Repo apply final state: {repo_apply_outcome['final_state']}",
+        f"Repo apply terminal: {str(repo_apply_outcome['terminal']).lower()}",
+        f"Repo apply enqueue target: {repo_apply_outcome['enqueue_target']}",
         "",
         "## Changed Files",
     ]
@@ -983,6 +1004,7 @@ Beklenen çıktı:
         "progress_watchdog": progress_result,
         "validation_status": validation_status,
         "pipeline_status": pipeline_status,
+        "repo_apply_outcome": repo_apply_outcome,
         "pipeline_results": [{"name": item.get("name"), "ok": item.get("ok"), "returncode": item.get("returncode")} for item in pipeline_results],
         "delivery_level": delivery_level,
         "production_deployed": False,
@@ -1026,9 +1048,30 @@ def execute_safe_task(worker_id: str, task: dict) -> tuple[str, str, str, dict[s
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     workspace = Path("/opt/codex-dev-center/workspaces") / f"worker_{worker_id}_{safe_id}_{run_id}"
     workspace.mkdir(parents=True, exist_ok=True)
+    bootstrap = bootstrap_preflight(workspace)
+    bootstrap_report = write_bootstrap_diagnostics(workspace, bootstrap)
 
     task_log = Path("/opt/codex-dev-center/logs") / f"{task_id}_{worker_id}.log"
     report_path = Path("/opt/codex-dev-center/reports") / f"{task_id}_{worker_id}_REPORT.md"
+    if not bootstrap["ok"] and not bootstrap.get("diagnostic_only"):
+        report_path.write_text(
+            "# WORKER BOOTSTRAP REPORT\n\n"
+            f"Tarih: {now()}\n"
+            f"Worker: {worker_id}\n"
+            f"Task: {task_id}\n"
+            f"Sonuç: {TASK_STATUS_FAILED_RETRYABLE}\n"
+            f"Bootstrap status: {bootstrap['status']}\n"
+            f"Diagnostics: {bootstrap_report}\n",
+            encoding="utf-8",
+        )
+        return TASK_STATUS_FAILED_RETRYABLE, "worker_bootstrap_preflight_failed", str(report_path), {
+            "workspace": str(workspace),
+            "bootstrap_preflight": bootstrap,
+            "bootstrap_diagnostics": str(bootstrap_report),
+            "production_deployed": False,
+            "repo_applied": False,
+            "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
+        }
 
     prompt = f"""
 Sen Codex Dev Center worker'ısın.
@@ -1149,6 +1192,8 @@ Log:
 
     metadata = {
         "workspace": str(workspace),
+        "bootstrap_preflight": bootstrap,
+        "bootstrap_diagnostics": str(bootstrap_report),
         "created_files": created,
         "codex_return_code": returncode,
         "fallback_used": fallback_used,

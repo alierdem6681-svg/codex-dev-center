@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T13:52:42+00:00",
+  "updated_at": "2026-06-04T14:18:45+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -349,6 +349,84 @@
       "actions": [
         "cto_doctor_check",
         "cto_doctor_fix"
+      ]
+    },
+    {
+      "id": "drift_registry_sync",
+      "name": "Drift Module Settings Registry",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Evidence-based classifier for module registry/settings/action catalog drift candidates without auto-adding false positives.",
+      "actions": [
+        "classify_drift_registry_candidates"
+      ]
+    },
+    {
+      "id": "repo_apply_terminal_state",
+      "name": "Repo Apply Terminal State",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Explicit repo apply outcome contract for DONE, NO_CHANGE, RETRY and BACKLOG terminal/enqueue decisions.",
+      "actions": [
+        "classify_repo_apply_outcome"
+      ]
+    },
+    {
+      "id": "control_task_router",
+      "name": "Control Task Router",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Routes readiness, audit, risk review and proposal-only work to Controls / Readiness instead of feature delivery.",
+      "actions": [
+        "classify_control_task_route"
+      ]
+    },
+    {
+      "id": "worker_workspace_bootstrap",
+      "name": "Worker Workspace Bootstrap",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Worker workspace bootstrap preflight and local diagnostics before Codex execution starts.",
+      "actions": [
+        "run_worker_bootstrap_preflight"
+      ]
+    },
+    {
+      "id": "retry_policy",
+      "name": "Timeout / Usage-limit Retry Policy",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Deterministic same-task retry/backoff decisions for timeout and usage-limit failures with idempotency keys.",
+      "actions": [
+        "decide_retry_policy"
+      ]
+    },
+    {
+      "id": "atomic_json_state_audit",
+      "name": "Atomic JSON Tmp State Audit",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Audit helper for parseable state JSON and leftover atomic tmp files without trusting partial writes.",
+      "actions": [
+        "audit_atomic_json_state"
       ]
     }
   ]

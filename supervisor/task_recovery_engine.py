@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
+    from .retry_policy import decide_retry, failure_kind_from_reason, format_retry_event
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_FAILED,
@@ -22,6 +23,7 @@ try:
         worker_block_reason,
     )
 except ImportError:
+    from retry_policy import decide_retry, failure_kind_from_reason, format_retry_event
     from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_FAILED,
@@ -257,8 +259,39 @@ def main():
                 details.append(f"{tid}|STALE_TO_FAILED_NO_PROPOSAL")
 
             if status in RECOVERABLE_FAILURE_STATUSES:
+                next_retry_at = str(task.get("next_retry_at") or "")
+                if task.get("result") == "retry_policy_same_task_scheduled" and next_retry_at:
+                    try:
+                        if datetime.fromisoformat(next_retry_at) > datetime.now(timezone.utc):
+                            details.append(f"{tid}|RETRY_POLICY_WAIT|next_retry_at={next_retry_at}")
+                            continue
+                    except Exception:
+                        pass
                 reason = classify_failure(workspace, task.get("codex_return_code"))
                 task["failure_class"] = reason
+                failure_kind = failure_kind_from_reason(reason)
+                if failure_kind in {"timeout", "usage_limit"}:
+                    decision = decide_retry(
+                        task_id=tid,
+                        failure_kind=failure_kind,
+                        current_attempt=int(task.get("attempt", 1) or 1),
+                        max_attempts=int(task.get("max_attempts", 3) or 3),
+                    )
+                    task["retry_policy"] = decision
+                    task["retry_policy_event"] = format_retry_event("decision", tid, run_id, decision)
+                    if not decision["terminal"]:
+                        task["status"] = TASK_STATUS_FAILED_RETRYABLE
+                        task["delivery_level"] = "RETRY_SCHEDULED"
+                        task["result"] = "retry_policy_same_task_scheduled"
+                        task["next_retry_at"] = decision["next_retry_at"]
+                        task["attempt"] = decision["attempt_no"]
+                        task["max_attempts"] = decision["max_attempts"]
+                        task["repo_applied"] = False
+                        task["staging_deployed"] = False
+                        task["production_deployed"] = False
+                        task["updated_at"] = now()
+                        details.append(f"{tid}|RETRY_POLICY_SAME_TASK|{decision['failure_kind']}|attempt={decision['attempt_no']}/{decision['max_attempts']}")
+                        continue
                 if reason == "timeout_empty_output":
                     task["status"] = TASK_STATUS_FAILED_TIMEOUT
                     task["delivery_level"] = TASK_STATUS_FAILED_TIMEOUT

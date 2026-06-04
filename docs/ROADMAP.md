@@ -287,3 +287,14 @@ Faz 19B-10A Model Policy
 - [x] Repo write guard allowlist disi checkout mutasyonunu yakalayacak sekilde sabitlendi.
 - [x] Module registry, settings ve action template kayitlari eklendi.
 - [ ] Mevcut uzun test dosyalarinin tempfile kullanimlari sonraki kucuk paketlerde helper'a kademeli tasinacak.
+
+## Faz 47 - Observed Issue Completion Pack
+
+- [x] Drift module registry/settings adaylari kanit ve confidence ile siniflandirildi.
+- [x] Repo apply no-change/DONE terminal outcome sozlesmesi eklendi.
+- [x] Production readiness ve audit isleri `Controls / Readiness` lane'ine yonlendirildi.
+- [x] Worker workspace bootstrap preflight ve diagnostics dosyasi eklendi.
+- [x] Timeout/usage-limit retry/backoff idempotency sozlesmesi eklendi.
+- [x] Atomic JSON state/tmp audit helper'i eklendi.
+- [x] Production readiness dry-run JSON stdout parser'i uzun/prefixed payload icin sabitlendi.
+- [x] Module registry, settings, action catalog ve runtime status unit testleri guncellendi.

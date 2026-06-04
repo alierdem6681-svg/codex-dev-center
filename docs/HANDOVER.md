@@ -894,3 +894,27 @@ Not:
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.
 - Local `git add` `.git/index.lock` yolunda read-only filesystem hatasi verdigi icin commit olusturulamadi.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu tamamlanmadigi icin PR acilamadi.
+
+---
+
+## Observed Issue Completion Pack Apply
+
+Tarih: 2026-06-04
+Görevler: CTO-ACTION-20260604-131808-04, 05, 07, 08, 09, 10
+
+Eklenenler:
+- `supervisor/drift_checker.py` module registry/settings/action catalog drift adaylarini kanit ve confidence ile siniflandirir.
+- `supervisor/repo_apply_outcome.py` bos diff/no-change sonucunu terminal basari olarak raporlar; retry/backlog enqueue hedefi uretmez.
+- `supervisor/cto_task_router.py` production readiness, audit, risk review, test plan ve proposal-only isleri `Controls / Readiness` lane'ine alir.
+- `supervisor/worker_bootstrap.py` worker workspace preflight ve `bootstrap_diagnostics.json` tanisi uretir.
+- `supervisor/retry_policy.py` timeout/usage-limit icin ayni task uzerinde idempotency key'li backoff karari uretir.
+- `supervisor/task_status_constants.py` atomic JSON state/tmp audit helper'i ekler.
+- `supervisor/production_readiness_suite.py` uzun dry-run JSON stdout'unu kesmeden okur ve prefixed JSON payload'lari toleransli parse eder.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, anayasa, roadmap ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.

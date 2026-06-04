@@ -97,8 +97,69 @@ def is_dashboard_cleanup_request(text: str) -> bool:
     return any(term in lowered for term in dashboard_terms) and any(term in lowered for term in cleanup_terms)
 
 
+CONTROL_SIGNAL_MAP = [
+    ("production_readiness", ["production readiness", "readiness analysis", "readiness analizi", "go/no-go", "preflight"]),
+    ("risk_review", ["risk review", "risk incelemesi"]),
+    ("audit", ["audit", "denetim"]),
+    ("test_plan", ["test plan", "test planı", "test plani"]),
+    ("docs_check", ["checklist", "docs check", "living docs"]),
+]
+
+DELIVERY_SIGNALS = [
+    "implement",
+    "uygula",
+    "ship",
+    "build",
+    "fix code",
+    "change service",
+    "open pr",
+    "deploy",
+    "canlıya al",
+    "canliya al",
+]
+
+
+def classify_task_route(text: str) -> dict[str, Any]:
+    lowered = (text or "").lower()
+    control_type = ""
+    for candidate, signals in CONTROL_SIGNAL_MAP:
+        if any(signal in lowered for signal in signals):
+            control_type = candidate
+            break
+    proposal_only = any(
+        signal in lowered
+        for signal in [
+            "proposal only",
+            "review only",
+            "do not deploy",
+            "do not modify main repo",
+            "production deploy yapma",
+            "ana repo dosyalarini dogrudan degistirme",
+            "ana repo dosyalarını doğrudan değiştirme",
+        ]
+    )
+    if control_type or proposal_only:
+        return {
+            "task_class": "control_task",
+            "control_type": control_type or "review_only",
+            "delivery_mode": "proposal_only",
+            "pipeline_lane": "Controls / Readiness",
+            "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+        }
+    return {
+        "task_class": "feature_task" if any(signal in lowered for signal in DELIVERY_SIGNALS) else "triage_task",
+        "control_type": "",
+        "delivery_mode": "feature_delivery",
+        "pipeline_lane": "Feature Delivery",
+        "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+    }
+
+
 def should_split(text: str) -> bool:
     if is_dashboard_cleanup_request(text):
+        return False
+    route = classify_task_route(text)
+    if route["task_class"] == "control_task":
         return False
     lowered = (text or "").lower()
     return any(
@@ -204,6 +265,7 @@ def submit_task(
     source = str(source or "local").strip().lower()
     effective_risk = classify_risk(f"{title}\n{message}", risk)
     stored_message = redact_sensitive_text(message)
+    route = classify_task_route(f"{title}\n{message}")
     if worker_eligible is None:
         worker_eligible = source != "telegram" and effective_risk not in {"high", "critical"}
     if effective_risk in {"high", "critical"}:
@@ -233,7 +295,15 @@ def submit_task(
             "staging_deployed": False,
             "production_deployed": False,
             "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
+            "task_class": route["task_class"],
+            "control_type": route["control_type"],
+            "delivery_mode": route["delivery_mode"],
+            "pipeline_lane": route["pipeline_lane"],
         }
+        if route["task_class"] == "control_task":
+            parent["repo_apply_allowed"] = False
+            parent["production_deployed"] = False
+            parent["proposal_only"] = True
         if worker_eligible:
             parent["assigned_worker"] = choose_worker(len(tasks))
         tasks.append(parent)
@@ -255,6 +325,8 @@ def submit_task(
             "last_risk": effective_risk,
             "last_worker_block_reason": worker_block_reason(parent),
             "last_subtask_count": len(created_subtasks),
+            "last_task_class": route["task_class"],
+            "last_control_type": route["control_type"],
             "queue_normalization_changes": len(changes),
             "updated_at": utc_now(),
         }

@@ -170,6 +170,14 @@ Read-only / dry-run write policy notu:
 - Sonuc payload'lari `mode`, `runtime_write_status`, `write_evidence`, `write_status`, `target`, `operation`, `write_attempted`, `write_status=skipped` ve `skip_reason` alanlariyla kanit dondurur.
 - `CHECK_MODE` verilmezse davranis `write_enabled` olarak geriye uyumludur.
 
+Observed issue completion notu:
+- Drift registry/settings eksikleri `classify_module_registry_settings_candidates()` ile candidate olarak siniflandirilir; tek drift alert sinyali otomatik registry/settings eklemek icin yeterli degildir.
+- Repo apply no-change sonucu `classify_repo_apply_outcome()` ile terminal `NO_CHANGE` veya `DONE` olur; terminal sonuclar retry/backlog enqueue etmez.
+- `cto_task_router.classify_task_route()` readiness, audit, risk review, test plan ve proposal-only isleri `Controls / Readiness` lane'ine tasir.
+- Worker workspace preflight `bootstrap_diagnostics.json` uretir; missing/invalid bootstrap ana isi baslatmadan acik tanı verir.
+- Timeout/usage-limit retry kararlari `retry_policy` idempotency key'i ile ayni task uzerinde tutulur.
+- `atomic_json_state_audit()` state JSON ve kalan tmp dosyalarini raporlar; tmp dosyasini otomatik guvenilir state saymaz.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:

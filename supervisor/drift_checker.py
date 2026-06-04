@@ -70,6 +70,65 @@ def log(msg):
     except OSError:
         pass
 
+def classify_module_registry_settings_candidates(registry, settings, catalog=None):
+    modules = registry.get("modules", []) if isinstance(registry, dict) else []
+    settings = settings if isinstance(settings, dict) else {}
+    catalog = catalog if isinstance(catalog, dict) else {"actions": []}
+    module_ids = {str(module.get("id")) for module in modules if module.get("id")}
+    setting_keys = {str(key) for key in settings if key not in {"global", "updated_at"}}
+    action_modules = {str(action.get("module")) for action in catalog.get("actions", []) if action.get("module")}
+    candidates = []
+
+    for module in modules:
+        module_id = str(module.get("id") or "").strip()
+        if not module_id:
+            continue
+        if module.get("settings_enabled") is True and module_id not in setting_keys:
+            active_signal = module.get("status") in {"active", "contract_ready", "framework_ready_locked"}
+            candidates.append(
+                {
+                    "candidate_id": f"missing-setting:{module_id}",
+                    "module_id": module_id,
+                    "setting_key": module_id,
+                    "registry_key": module_id,
+                    "classification": "missing_module_setting_candidate",
+                    "confidence": "medium" if active_signal else "low",
+                    "evidence_sources": ["module_registry"],
+                    "recommended_action": "settings_proposal",
+                    "reason": "settings_enabled module has no module_settings entry",
+                }
+            )
+        if module.get("actions_enabled") is True and module_id not in action_modules:
+            candidates.append(
+                {
+                    "candidate_id": f"missing-action-module:{module_id}",
+                    "module_id": module_id,
+                    "setting_key": "",
+                    "registry_key": module_id,
+                    "classification": "missing_registry_candidate",
+                    "confidence": "low",
+                    "evidence_sources": ["module_registry", "action_catalog"],
+                    "recommended_action": "needs_review",
+                    "reason": "actions_enabled module has no action_catalog module reference",
+                }
+            )
+
+    for setting_key in sorted(setting_keys - module_ids):
+        candidates.append(
+            {
+                "candidate_id": f"stale-setting:{setting_key}",
+                "module_id": setting_key,
+                "setting_key": setting_key,
+                "registry_key": "",
+                "classification": "stale_alert_noop",
+                "confidence": "low",
+                "evidence_sources": ["module_settings"],
+                "recommended_action": "no_op",
+                "reason": "module_settings entry is not backed by module_registry",
+            }
+        )
+    return candidates
+
 def run_check():
     issues = []
     warnings = []
@@ -81,6 +140,7 @@ def run_check():
     registry = read_json(STATE / "module_registry.json", {"modules": []})
     settings = read_json(STATE / "module_settings.json", {})
     catalog = read_json(STATE / "action_catalog.json", {"actions": []})
+    drift_candidates = classify_module_registry_settings_candidates(registry, settings, catalog)
 
     modules = registry.get("modules", [])
     actions = catalog.get("actions", [])
@@ -140,6 +200,8 @@ def run_check():
         "score": score,
         "issues": issues,
         "warnings": warnings,
+        "drift_candidates": drift_candidates,
+        "drift_candidate_count": len(drift_candidates),
         "checked_at": now(),
         "mode": current_execution_mode(),
     }

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T13:52:42+00:00",
+  "updated_at": "2026-06-04T14:18:45+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -278,6 +278,62 @@
       "command": "{python} -m unittest tests.test_safe_test_scratch_standard",
       "repo_local_scratch_rejected": true,
       "repo_write_guard_available": true
+    },
+    {
+      "id": "classify_drift_registry_candidates",
+      "label": "Drift Registry Adaylarını Sınıflandır",
+      "module": "drift_registry_sync",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true
+    },
+    {
+      "id": "classify_repo_apply_outcome",
+      "label": "Repo Apply Terminal Sonucunu Sınıflandır",
+      "module": "repo_apply_terminal_state",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true
+    },
+    {
+      "id": "classify_control_task_route",
+      "label": "Kontrol Görevini Router Lane Olarak Sınıflandır",
+      "module": "control_task_router",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true
+    },
+    {
+      "id": "run_worker_bootstrap_preflight",
+      "label": "Worker Workspace Bootstrap Preflight",
+      "module": "worker_workspace_bootstrap",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "diagnostic_only_on_degraded": true
+    },
+    {
+      "id": "decide_retry_policy",
+      "label": "Timeout / Usage-limit Retry Kararı Üret",
+      "module": "retry_policy",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "same_task_retry": true
+    },
+    {
+      "id": "audit_atomic_json_state",
+      "label": "Atomic JSON State/Tmp Denetimi",
+      "module": "atomic_json_state_audit",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true
     }
   ]
 }

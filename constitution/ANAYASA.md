@@ -110,3 +110,11 @@ Telegram asset sözleşmeleri gerçek Telegram API'ye fallback yapmadan, secret/
 Testler ana repo dizinine runtime state, cache, config, log veya output dosyası yazmamalıdır. Test scratch root önceliği `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` şeklindedir ve repo içine çözülen scratch root reddedilir.
 
 Her test benzersiz scratch dizini kullanmalı, temp/home/cache/config/output değişkenlerini scratch alanına yönlendirmeli ve allowlist dışı repo mutasyonlarını repo write guard ile fail etmelidir.
+
+## 12. Kontrol Görevleri, Retry ve State Güvenliği
+
+Readiness, audit, risk review, test plan ve proposal-only işler feature delivery gibi canlıya alma işi sayılamaz; `Controls / Readiness` hattında izlenir ve repo apply/canlı mutasyon yetkisi varsayılan olarak kapalıdır.
+
+Repo apply boş diff ürettiğinde hedef zaten sağlanmışsa terminal başarıdır; retry veya yeni backlog görevi açılmaz. Timeout ve usage-limit durumlarında retry kararı aynı task üzerinde idempotency key ile tutulmalıdır.
+
+State JSON yazımları atomik tmp+fsync+rename akışıyla yapılmalı, kalan tmp dosyaları otomatik doğru state kabul edilmemeli ve audit çıktısı secret değerleri loglamamalıdır.

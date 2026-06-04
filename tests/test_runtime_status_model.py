@@ -30,6 +30,8 @@ from supervisor import (  # noqa: E402
     production_environment_manager,
     production_readiness_suite,
     progress_aware_runner,
+    repo_apply_outcome,
+    retry_policy,
     direct_cto_async_job,
     direct_cto_progress_watcher,
     supervisor_cli,
@@ -40,6 +42,7 @@ from supervisor import (  # noqa: E402
     telegram_direct_cto,
     telegram_direct_cto_simulator,
     telegram_health_watcher,
+    worker_bootstrap,
     worker_runner,
 )
 from supervisor.task_status_constants import (  # noqa: E402
@@ -58,6 +61,8 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_VALIDATION_FAILED,
     normalize_queue_payload,
     normalize_status,
+    atomic_json_state_audit,
+    atomic_write_json,
 )
 
 WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
@@ -112,6 +117,103 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual([change["id"] for change in changes], ["TASK-READY", "TASK-DONE"])
         self.assertEqual(changes[0]["to_status"], TASK_STATUS_READY_FOR_VALIDATION)
         self.assertEqual(changes[1]["to_status"], TASK_STATUS_DONE)
+
+    def test_drift_registry_candidates_are_evidence_based(self):
+        registry = {
+            "modules": [
+                {"id": "demo", "status": "active", "settings_enabled": True, "actions_enabled": True},
+                {"id": "legacy", "status": "disabled", "settings_enabled": True, "actions_enabled": False},
+            ]
+        }
+        settings = {"global": {}, "orphan": {"enabled": True}}
+        catalog = {"actions": [{"id": "run_demo", "module": "demo"}]}
+
+        candidates = drift_checker.classify_module_registry_settings_candidates(registry, settings, catalog)
+
+        by_id = {item["candidate_id"]: item for item in candidates}
+        self.assertEqual(by_id["missing-setting:demo"]["classification"], "missing_module_setting_candidate")
+        self.assertEqual(by_id["missing-setting:demo"]["recommended_action"], "settings_proposal")
+        self.assertEqual(by_id["stale-setting:orphan"]["classification"], "stale_alert_noop")
+        self.assertEqual(by_id["stale-setting:orphan"]["recommended_action"], "no_op")
+
+    def test_repo_apply_no_change_outcome_is_terminal(self):
+        outcome = repo_apply_outcome.classify_repo_apply_outcome(
+            apply_status="SUCCESS",
+            changed_paths=[],
+            already_satisfied=True,
+        )
+
+        self.assertTrue(outcome["terminal"])
+        self.assertEqual(outcome["final_state"], "DONE")
+        self.assertIsNone(outcome["enqueue_target"])
+        self.assertEqual(outcome["reason"], "ALREADY_SATISFIED")
+
+    def test_control_readiness_request_routes_as_proposal_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Production Readiness Analizi",
+                message="production readiness analizi yap, do not deploy, review only",
+                requested_by="test",
+            )
+
+        task = result["task"]
+        self.assertEqual(task["task_class"], "control_task")
+        self.assertEqual(task["control_type"], "production_readiness")
+        self.assertEqual(task["delivery_mode"], "proposal_only")
+        self.assertEqual(task["pipeline_lane"], "Controls / Readiness")
+        self.assertFalse(task["repo_apply_allowed"])
+        self.assertEqual(result["subtasks"], [])
+
+    def test_worker_bootstrap_preflight_blocks_required_missing_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_codex_config=True)
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "blocked_bootstrap_missing")
+        self.assertIn("codex_config_missing", payload["issues"])
+        self.assertFalse(payload["secret_values_logged"])
+
+    def test_retry_policy_schedules_same_task_with_idempotency_key(self):
+        decision = retry_policy.decide_retry(
+            task_id="TASK-1",
+            failure_kind="timeout",
+            current_attempt=1,
+            max_attempts=3,
+            now=retry_policy.datetime(2026, 6, 4, 14, 0, tzinfo=retry_policy.timezone.utc),
+            jitter_seed="test",
+        )
+        event = retry_policy.format_retry_event("decision", "TASK-1", "RUN-1", decision)
+
+        self.assertFalse(decision["terminal"])
+        self.assertEqual(decision["attempt_no"], 2)
+        self.assertEqual(decision["idempotency_key"], "TASK-1:timeout:2")
+        self.assertIn("retry_policy event=decision", event)
+        self.assertIn("task_id=TASK-1", event)
+
+    def test_atomic_json_state_audit_detects_tmp_and_preserves_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            atomic_write_json(path, {"ok": True})
+            tmp_path = path.with_name(path.name + ".leftover.tmp")
+            tmp_path.write_text('{"candidate": true}\n', encoding="utf-8")
+
+            audit = atomic_json_state_audit(path)
+
+        self.assertTrue(audit["state_valid_json"])
+        self.assertEqual(audit["tmp_count"], 1)
+        self.assertEqual(audit["valid_tmp_count"], 1)
+        self.assertTrue(audit["safe_to_use_state"])
+
+    def test_readiness_command_json_payload_tolerates_prefixed_output(self):
+        payload, parse_error = production_readiness_suite.command_json_payload(
+            {"stdout": "log prefix\n{\"ok\": true, \"status\": \"PASS\", \"dry_run\": true}\n"}
+        )
+
+        self.assertIsNone(parse_error)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "PASS")
 
     def test_router_subtasks_get_dispatch_contract_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:

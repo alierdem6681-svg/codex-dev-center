@@ -82,8 +82,8 @@ def run_cmd(cmd: list[str], timeout: int = 120) -> dict[str, Any]:
         return {
             "ok": proc.returncode == 0,
             "returncode": proc.returncode,
-            "stdout": proc.stdout[-4000:],
-            "stderr": proc.stderr[-4000:],
+            "stdout": proc.stdout[-20000:],
+            "stderr": proc.stderr[-8000:],
             "cmd": " ".join(cmd),
         }
     except Exception as exc:
@@ -357,6 +357,10 @@ def command_json_payload(command_result: dict[str, Any]) -> tuple[dict[str, Any]
     stdout = str(command_result.get("stdout") or "").strip()
     if not stdout:
         return {}, "empty_stdout"
+    if not stdout.startswith("{"):
+        start = stdout.find("{")
+        if start >= 0:
+            stdout = stdout[start:]
     try:
         payload = json.loads(stdout)
     except Exception as exc:

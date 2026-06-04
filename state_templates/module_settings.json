@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T13:52:42+00:00",
+  "updated_at": "2026-06-04T14:18:45+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -81,7 +81,9 @@
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_report_checklist": true,
     "repo_apply_runtime_artifacts_ignored": true,
-    "worker_claim_writes_dispatch_metadata": true
+    "worker_claim_writes_dispatch_metadata": true,
+    "bootstrap_preflight_enabled": true,
+    "repo_apply_no_change_terminal_outcome": true
   },
   "telegram": {
     "enabled": false,
@@ -305,5 +307,63 @@
     "branch_sync_required": true,
     "push_after_tests_pass": true,
     "runtime_state_committed": false
+  },
+  "drift_registry_sync": {
+    "enabled": true,
+    "false_positive_guard": true,
+    "evidence_sources": [
+      "module_registry",
+      "module_settings",
+      "action_catalog"
+    ],
+    "auto_add_registry_entries": false,
+    "candidate_schema_version": 1
+  },
+  "repo_apply_terminal_state": {
+    "enabled": true,
+    "no_change_terminal": true,
+    "already_satisfied_terminal": true,
+    "retry_only_for_transient_failure": true,
+    "outcome_fields": [
+      "apply_status",
+      "changed_paths",
+      "terminal",
+      "final_state",
+      "reason",
+      "enqueue_target"
+    ]
+  },
+  "control_task_router": {
+    "enabled": true,
+    "control_lane": "Controls / Readiness",
+    "control_wins_over_feature_signal": true,
+    "proposal_only_default": true,
+    "repo_apply_allowed_for_control_tasks": false
+  },
+  "worker_workspace_bootstrap": {
+    "enabled": true,
+    "require_codex_config_by_default": false,
+    "diagnostics_file": "bootstrap_diagnostics.json",
+    "secret_values_logged": false
+  },
+  "retry_policy": {
+    "enabled": true,
+    "same_task_retry": true,
+    "failure_kinds": [
+      "timeout",
+      "usage_limit"
+    ],
+    "max_attempts_default": 3,
+    "idempotency_key_required": true
+  },
+  "atomic_json_state_audit": {
+    "enabled": true,
+    "state_must_parse": true,
+    "tmp_files_not_trusted_automatically": true,
+    "same_filesystem_tmp_required": true,
+    "fsync_before_replace": true
+  },
+  "drift_control": {
+    "registry_settings_candidate_classifier": true
   }
 }

@@ -347,3 +347,13 @@ Testlerin repo checkout'unu kirletmeden deterministik calismasi icin `tests/safe
 Davranis `tests/test_safe_test_scratch_standard.py` ile sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local `git add` `.git/index.lock` read-only filesystem hatasiyla durdu ve GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu tamamlanmadi; bu nedenle bu sandbox icinde commit/PR acilamadi.
+
+## 2026-06-04 Observed Issue Completion Pack Apply
+
+Orijinal 10 gozlem gorevinin apply asamasinda eksik kalan 4, 5, 7, 8, 9 ve 10 numarali kontratlari tek kucuk repo paketiyle tamamlandi.
+
+`supervisor/drift_checker.py` artik module registry/settings/action catalog farklarini false-positive uretmeden `candidate_id`, `classification`, `confidence`, `evidence_sources` ve `recommended_action` alanlariyla raporlar. `supervisor/repo_apply_outcome.py` repo apply sonucunda bos diff'i terminal `NO_CHANGE` veya `DONE` olarak siniflandirir ve retry/backlog hedefini acikca `None` yapar.
+
+`supervisor/cto_task_router.py` readiness, audit, risk review, test plan ve proposal-only isleri `Controls / Readiness` lane'ine alir. `supervisor/worker_bootstrap.py` worker workspace preflight ve `bootstrap_diagnostics.json` uretir. `supervisor/retry_policy.py` timeout/usage-limit icin ayni task uzerinde idempotency key'li backoff karari uretir. `supervisor/task_status_constants.py` atomic JSON state/tmp audit helper'i ile parse edilebilir state ve kalan tmp dosyalarini raporlar.
+
+Production readiness suite uzun dry-run JSON stdout'unu kesmeden saklayacak sekilde genisletildi ve prefixed JSON payload parsing regresyon testi eklendi. Davranis `tests/test_runtime_status_model.py` icindeki regresyon testleriyle sabitlendi; state_templates module registry/settings/action catalog kayitlari guncellendi. Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi bu commit icinde yapilmadi.

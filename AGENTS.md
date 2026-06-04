@@ -190,6 +190,14 @@ Ana ve legacy panel `/api/status` payload'lari `qualityGateView` alanini donduru
 
 Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## OBSERVED ISSUE COMPLETION CONTRACT V1
+
+Drift registry/settings farklari tek alert sinyaliyle otomatik eklenmez; `supervisor/drift_checker.py` adaylari kanit kaynaklari ve confidence ile siniflandirir.
+
+Repo apply no-change sonucu terminal basaridir. `supervisor/repo_apply_outcome.py` `NO_CHANGE`, `DONE`, `RETRY` ve `BACKLOG` kararlarini `enqueue_target` ile aciklar; terminal no-change retry/backlog uretmez.
+
+Readiness, audit, risk review, test plan ve proposal-only isler `Controls / Readiness` lane'ine gider. Worker workspace preflight tanisi secret degeri loglamadan `bootstrap_diagnostics.json` uretir. Timeout ve usage-limit retry kararlari ayni task uzerinde idempotency key ile raporlanir. Atomic JSON state audit tmp dosyalarini otomatik guvenilir saymadan state parse edilebilirligini raporlar.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.
