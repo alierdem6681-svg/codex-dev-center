@@ -255,3 +255,11 @@ Dashboard Pipeline Flow polling kontrati genisletildi. `/api/pipeline-flow` arti
 Frontend eski/ayni revision response'larini ayni reset token altinda full replace olarak uygulamaz. Reset token degismedikce veya `requiresUiReset=true` gelmedikce active stage ve ana gorev expand/collapse state'i client-owned overlay olarak korunur.
 
 Davranis `tests/test_runtime_status_model.py` icindeki backend kontrat ve frontend markup testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Dashboard Telegram Asset Inbox Backend Apply
+
+Dashboard Telegram Asset Inbox icin kucuk backend kontrati eklendi. `web_panel/telegram_asset_inbox.py` runtime `state/telegram_asset*` kaynaklarini read-only okur, liste/detay DTO allowlist uretir ve ham Telegram id, chat id, signed URL, storage path/bucket/object key veya secret-like alanlari payload disinda tutar.
+
+Ana panel ve legacy panel `GET /api/dashboard/telegram-assets` ile `GET /api/dashboard/telegram-assets/{asset_id}` endpointlerini ayni helper'a baglar; POST denemeleri read-only 405 dondurur. `tests/test_telegram_asset_inbox.py` redaction, filtre/cursor, single manifest ve panel server wrapper davranisini sabitler.
+
+Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime asset storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Runtime Telegram asset intake ve dashboard UI tablo/detay gorunumu sonraki kucuk paketlere birakildi.

@@ -7,13 +7,14 @@ import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 WEB_PANEL_DIR = Path(__file__).resolve().parent
 if str(WEB_PANEL_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_PANEL_DIR))
 
 from pipeline_flow import build_pipeline_flow
+from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -120,6 +121,14 @@ def pipeline_flow_payload():
     return build_pipeline_flow(ROOT)
 
 
+def telegram_asset_list_payload(query: str):
+    return build_telegram_asset_list(ROOT, query)
+
+
+def telegram_asset_detail_payload(asset_id: str):
+    return build_telegram_asset_detail(ROOT, asset_id)
+
+
 class PanelHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         return
@@ -164,6 +173,14 @@ class PanelHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/pipeline-flow":
             self.send_json(pipeline_flow_payload())
             return
+        if parsed.path == "/api/dashboard/telegram-assets":
+            self.send_json(telegram_asset_list_payload(parsed.query))
+            return
+        if parsed.path.startswith("/api/dashboard/telegram-assets/"):
+            asset_id = unquote(parsed.path.rsplit("/", 1)[-1])
+            payload, code = telegram_asset_detail_payload(asset_id)
+            self.send_json(payload, code)
+            return
         if parsed.path in ("/", "/index.html"):
             self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
@@ -171,6 +188,10 @@ class PanelHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         data = self.body()
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/dashboard/telegram-assets"):
+            self.send_json({"ok": False, "error": "method_not_allowed", "read_only": True}, 405)
+            return
         action = data.get("action")
         if action == "production_readiness_suite":
             self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))

@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 WEB_PANEL_DIR = Path(__file__).resolve().parent
 if str(WEB_PANEL_DIR) not in sys.path:
@@ -17,6 +17,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
 
 import auth as panel_auth
 from pipeline_flow import build_pipeline_flow
+from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -351,6 +352,14 @@ def pipeline_flow_payload():
     return build_pipeline_flow(ROOT)
 
 
+def telegram_asset_list_payload(query: str):
+    return build_telegram_asset_list(ROOT, query)
+
+
+def telegram_asset_detail_payload(asset_id: str):
+    return build_telegram_asset_detail(ROOT, asset_id)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         LOGS.mkdir(parents=True, exist_ok=True)
@@ -452,6 +461,14 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/pipeline-flow":
             self.send_json(pipeline_flow_payload())
             return
+        if parsed.path == "/api/dashboard/telegram-assets":
+            self.send_json(telegram_asset_list_payload(parsed.query))
+            return
+        if parsed.path.startswith("/api/dashboard/telegram-assets/"):
+            asset_id = unquote(parsed.path.rsplit("/", 1)[-1])
+            payload, code = telegram_asset_detail_payload(asset_id)
+            self.send_json(payload, code)
+            return
         if parsed.path.startswith("/assets/"):
             self.send_static_asset(parsed.path)
             return
@@ -489,6 +506,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not authorized(self):
             self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
+            return
+        if parsed.path.startswith("/api/dashboard/telegram-assets"):
+            self.send_json({"ok": False, "error": "method_not_allowed", "read_only": True}, 405)
             return
         action = data.get("action")
         if action == "production_readiness_suite":
