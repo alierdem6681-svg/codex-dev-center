@@ -31,6 +31,7 @@ try:
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         TASK_STATUS_VALIDATION_FAILED,
+        TERMINAL_TASK_STATUSES,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -56,6 +57,7 @@ except ImportError:
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         TASK_STATUS_VALIDATION_FAILED,
+        TERMINAL_TASK_STATUSES,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -402,10 +404,16 @@ def finish_task(
     report_path: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> None:
+    worker_note_status = status
     with state_file_lock(QUEUE_PATH):
         queue = read_json(QUEUE_PATH, {"tasks": []})
+        changed = False
         for task in queue.get("tasks", []):
             if task.get("id") == task_id:
+                current_status = normalize_status(task.get("status"))
+                if current_status in TERMINAL_TASK_STATUSES:
+                    worker_note_status = current_status
+                    break
                 task["status"] = status
                 task["result"] = result
                 task["finished_at"] = now()
@@ -414,10 +422,12 @@ def finish_task(
                     task["report_path"] = report_path
                 if metadata:
                     task.update(metadata)
+                changed = True
                 break
 
-        queue["updated_at"] = now()
-        write_json(QUEUE_PATH, queue)
+        if changed:
+            queue["updated_at"] = now()
+            write_json(QUEUE_PATH, queue)
 
     with state_file_lock(WORKERS_PATH):
         workers = read_json(WORKERS_PATH, {"workers": []})
@@ -429,10 +439,10 @@ def finish_task(
                 worker["status"] = "IDLE"
                 worker["current_task"] = None
                 worker["last_seen"] = now()
-                worker["note"] = f"Last task {task_id}: {status}"
+                worker["note"] = f"Last task {task_id}: {worker_note_status}"
         write_json(WORKERS_PATH, workers)
     if not found_executor:
-        update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {status}")
+        update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {worker_note_status}")
 
 def update_task_progress(task_id: str, worker_id: str, progress: dict[str, Any]) -> None:
     with state_file_lock(QUEUE_PATH):

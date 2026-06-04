@@ -88,6 +88,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` altında state/report yazmadan JSON sonucunda `write_evidence` ve `write_status=completed_with_write_skipped` döndürür
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
+- supervisor/production_readiness_suite.py içindeki `parallel_worker_regression` kapısı dört dummy/simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar

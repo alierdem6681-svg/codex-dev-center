@@ -22,6 +22,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Ön canlı ve geri alma dry-run non-mutating JSON sözleşmesi PASS
 - Restart simulation PASS
 - Failure injection simulation PASS
+- Parallel worker regression PASS
 
 ## Simülasyon Kanıtı
 
@@ -31,7 +32,8 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
-- Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
+- `parallel_worker_regression` dört dummy/simülasyon task için dispatch, wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular.
+- Restart/failure injection kapıları `static_non_mutating_contract`, paralel worker kapısı `parallel_worker_lifecycle_simulation` modunda çalışır; hepsi `production_deploy_performed=false` beyanını korur.
 
 ## Telegram Sonuç Raporu
 

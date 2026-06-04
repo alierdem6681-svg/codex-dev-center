@@ -36,6 +36,8 @@ Başlangıç rolleri:
 
 Worker dispatch sözleşmesi izlenebilir olmalıdır: queue task kayıtları `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını taşımalı; terminal task statusları yeniden worker kuyruğuna alınmamalıdır.
 
+Paralel worker regression kapısı dört düşük/orta riskli simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması davranışını production deploy yapmadan doğrulamalıdır.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.

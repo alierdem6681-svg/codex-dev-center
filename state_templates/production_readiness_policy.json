@@ -26,7 +26,8 @@
     "rollback_simulation",
     "telegram_result_report_flow",
     "restart_simulation",
-    "failure_injection_simulation"
+    "failure_injection_simulation",
+    "parallel_worker_regression"
   ],
   "telegram_result_report_flow": {
     "mode": "telegram_safe_summary_contract",
@@ -58,6 +59,18 @@
         "data_mutation_performed"
       ]
     }
+  },
+  "parallel_worker_regression": {
+    "mode": "parallel_worker_lifecycle_simulation",
+    "task_count": 4,
+    "required_dispatch_count": 4,
+    "required_wake_count": 4,
+    "required_claim_event_count": 4,
+    "required_terminal_event_count": 4,
+    "required_duplicate_claim_count": 0,
+    "required_duplicate_terminal_count": 0,
+    "production_deploy_performed": false,
+    "mutating_cloud_operations_performed": false
   },
   "real_deploy_sequence": [
     "git_clean_check",

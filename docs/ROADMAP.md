@@ -320,3 +320,10 @@ Faz 19B-10A Model Policy
 - [x] Quality gate retry simulation dry-run safety alanlari eklendi.
 - [x] Stale dispatch claim repair ayni task uzerinde retry/timeout statüsüyle sabitlendi.
 - [x] PR #103, #104 ve #105 conflict nedeniyle current main uzerine elle entegre edildi.
+
+## Faz 51 - Parallel Worker Regression Gates
+
+- [x] Production readiness suite `parallel_worker_regression` kapisi eklendi.
+- [x] Dort dummy/simulasyon task icin dispatch, wake, tek claim ve tek terminal status metriği dogrulandi.
+- [x] Duplicate claim ve duplicate terminal transition sayimlari sifir olarak unit test ve readiness gate ile sabitlendi.
+- [x] Standard quality report simulation dry-run grubu yeni gate'i zorunlu kabul eder.
