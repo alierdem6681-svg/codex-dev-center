@@ -291,6 +291,38 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(simulation["status"], "fail")
         self.assertIn("mutating_flags_not_false:staging_deploy_performed", simulation["reason"])
 
+    def test_standard_quality_report_fails_when_simulation_safety_flags_are_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir()
+            gates = [
+                "python_compile_check",
+                "json_validation",
+                "yaml_validation",
+                "secret_leakage_scan",
+                "forbidden_operation_scan",
+                "unit_test",
+                "integration_test",
+                "staging_smoke_test",
+                "rollback_simulation",
+                "restart_simulation",
+                "failure_injection_simulation",
+            ]
+            (state / "production_readiness_status.json").write_text(
+                json.dumps({"tests": {gate: {"ok": True, "status": "PASS"} for gate in gates}}),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+
+        self.assertEqual(report["status"], "fail")
+        simulation = next(check for check in report["checks"] if check["name"] == "simulation_dry_run")
+        self.assertEqual(simulation["status"], "fail")
+        self.assertIn("mutating_flags_not_false:", simulation["reason"])
+        for flag in codex_quality_gate.NON_MUTATING_FLAGS:
+            self.assertIn(flag, simulation["required_false_flags"])
+
     def test_worker_restart_reconciles_own_stale_running_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"

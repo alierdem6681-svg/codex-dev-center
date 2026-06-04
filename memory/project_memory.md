@@ -197,3 +197,13 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Quality Gate / Test / Simulation Recovery Apply
+
+Recovery kalite kapısı apply paketi standart kalite raporunun simülasyon safety bayraklarını açık zorunluluk olarak korur. `production_deploy_performed`, `staging_deploy_performed` ve `mutating_cloud_operations_performed` alanlarından biri eksikse veya `false` değilse `simulation_dry_run` sonucu `fail` kalmalıdır.
+
+Davranış `tests/test_runtime_status_model.py` içinde eksik bayrak regresyon testiyle sabitlendi. `docs/PRODUCTION_READINESS_GATE.md`, onboarding notu, action catalog, module registry, module settings ve production readiness policy template kayıtları aynı sözleşmeye hizalandı.
+
+JSON doğrulama, compile, `tests.test_runtime_status_model`, geçici `/tmp` git repo kopyasında production readiness suite, geçici kopyada `standard-report`, `git diff --check` ve değişen dosyalarda secret pattern scan PASS oldu.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.

@@ -32,6 +32,18 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
 
+## Recovery Kalite Raporu Sözleşmesi
+
+Recovery kalite kapısı, test ve simülasyon apply işleri için standart rapor `supervisor/codex_quality_gate.py standard-report` komutuyla üretilir.
+
+PASS kararı için `state/production_readiness_status.json` artefact'i şu koşulları birlikte sağlamalıdır:
+
+- `lint`, `unit_test`, `integration_test` ve `simulation_dry_run` gruplarındaki zorunlu gate kayıtları eksiksizdir.
+- Her zorunlu gate `ok=true` sonucuna sahiptir.
+- `production_deploy_performed=false`, `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` alanları açıkça bulunur.
+
+Eksik artefact, geçersiz JSON, eksik gate, başarısız gate veya eksik/non-false simülasyon güvenlik bayrağı sonucu `fail` olmalıdır. Repo apply worker'ı bu rapor çıktısını üretmek için production deploy, staging deploy, cloud mutate veya runtime `state/`, `logs/`, `reports/` dosyalarını commit kapsamına alamaz.
+
 ## Otomatik Yayına Alma Kuralı
 
 `production_requires_explicit_approval=false` normal Codex Dev Center app deploy'u için hedef kuraldır. Bu, kontrolsüz yayına alma anlamına gelmez.

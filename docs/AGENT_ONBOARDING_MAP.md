@@ -83,6 +83,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
 - supervisor/codex_quality_gate.py içindeki `standard-report` komutu readiness artefact'inden standart kalite raporu üretir
+- `standard-report` eksik/non-false simulation safety bayraklarında `fail` üretmelidir
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
@@ -94,6 +95,7 @@ Ajan şu klasörleri inceler:
 - web_panel/panel_server.py
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
+- docs/PRODUCTION_READINESS_GATE.md içindeki recovery kalite raporu sözleşmesi
 - docs/worker_queue_production_sync_repair_20260604_054726.md
 
 Dashboard status API notu:

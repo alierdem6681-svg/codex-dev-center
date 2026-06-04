@@ -60,7 +60,8 @@
       "command": "{python} supervisor/codex_quality_gate.py standard-report",
       "output_json": "reports/quality-gate-report.json",
       "output_summary": "reports/quality-gate-summary.md",
-      "missing_artifact_fails_gate": true
+      "missing_artifact_fails_gate": true,
+      "missing_simulation_safety_flag_fails_gate": true
     },
     {
       "id": "staging_deploy",

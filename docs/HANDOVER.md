@@ -462,3 +462,31 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Quality Gate / Test / Simulation Recovery Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-062542 / RECOVERY-20260604-062212-CTO-ACTION-20260604-062153-02-QUALITY-GATE-TEST-SIMULATION-R1
+
+Eklenenler:
+- Standart kalite raporu için eksik simülasyon safety bayrağı regresyon testi eklendi.
+- `docs/PRODUCTION_READINESS_GATE.md` recovery kalite raporu sözleşmesini açıkça anlatır.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json` ve `state_templates/production_readiness_policy.json` eksik safety flag fail davranışını görünür kılar.
+
+Yeni davranış:
+- `supervisor/codex_quality_gate.py standard-report`, readiness gate'leri PASS olsa bile `production_deploy_performed`, `staging_deploy_performed` veya `mutating_cloud_operations_performed` alanlarından biri eksikse `simulation_dry_run` sonucunu `fail` saymalıdır.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+Test:
+- `python3 -m json.tool` ile güncellenen state template JSON dosyaları PASS.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 92 test.
+- Geçici `/tmp` git repo kopyasında `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- Geçici `/tmp` git repo kopyasında `python3 supervisor/codex_quality_gate.py standard-report` PASS.
+- `git diff --check` PASS.
+- Değişen dosyalarda secret/token/private key pattern scan PASS.

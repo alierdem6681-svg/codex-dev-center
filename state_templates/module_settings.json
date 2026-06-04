@@ -109,7 +109,8 @@
       "simulation_dry_run"
     ],
     "missing_artifact_fails_gate": true,
-    "simulation_requires_non_mutating_flags": true
+    "simulation_requires_non_mutating_flags": true,
+    "missing_simulation_safety_flag_fails_gate": true
   },
   "production_environment_manager": {
     "enabled": true,
