@@ -317,3 +317,9 @@ Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` 
 Dispatch artik `PENDING/QUEUED` ve henuz claim edilmemis task'larda tercih edilen worker mesgulse bosta duran worker'a atama yapabilir. `ASSIGNED/RUNNING` task'lar korunur; calisan is baska workera ezilmez.
 
 Bu guard, repo apply child task'larinin tek worker uzerine yigilip diger workerlarin bos kalmasini engeller. Davranis `tests/test_runtime_status_model.py` icindeki busy preassigned worker regresyon testiyle sabitlendi.
+
+## 2026-06-04 Pipeline Failed Root Cause Reporting Apply
+
+`PIPELINE_FAILED` apply child tasklari artik yeni kok backlog task'i acmadan okunabilir kok neden raporu uretebilir. `cto_autonomous_delivery.pipeline_failed_root_cause_report()` task id, parent id, `root_cause`, `last_error`, retry edilebilirlik ve onerilen duzeltme alanlarini dondurur.
+
+`workspace_missing` kok nedeni workspace/repo clone bootstrap kontrolu olarak raporlanir ve unit test ile sabitlenmistir. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

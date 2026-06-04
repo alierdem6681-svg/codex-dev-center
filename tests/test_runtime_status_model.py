@@ -3001,6 +3001,35 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "pipeline_failed_requires_root_cause_mode")
 
+    def test_pipeline_failed_root_cause_report_describes_workspace_missing(self):
+        queue = {
+            "tasks": [
+                {
+                    "id": "CTO-APPLY-1",
+                    "status": TASK_STATUS_PIPELINE_FAILED,
+                    "risk": "medium",
+                    "parent_task_id": "PARENT",
+                    "result": "repo_apply_pipeline_failed",
+                    "failure_class": "workspace_missing",
+                    "last_error_code": "workspace_missing",
+                }
+            ]
+        }
+
+        report = cto_autonomous_delivery.pipeline_failed_root_cause_report(queue)
+        failure = report["failures"][0]
+
+        self.assertEqual(report["status"], "ROOT_CAUSE_REPORT")
+        self.assertEqual(report["pipeline_failed_count"], 1)
+        self.assertFalse(report["new_root_task_required"])
+        self.assertEqual(failure["task_id"], "CTO-APPLY-1")
+        self.assertEqual(failure["parent_task_id"], "PARENT")
+        self.assertEqual(failure["root_cause"], "workspace_missing")
+        self.assertEqual(failure["last_error"], "workspace_missing")
+        self.assertTrue(failure["retryable"])
+        self.assertFalse(failure["new_root_task_required"])
+        self.assertIn("workspace", failure["recommended_fix"].lower())
+
     def test_done_task_is_not_backlog_candidate(self):
         task = {"id": "DONE-PARENT", "status": TASK_STATUS_DONE, "risk": "low", "title": "safe completed work"}
 

@@ -255,3 +255,10 @@ Faz 19B-10A Model Policy
 - [x] Pending/queued task tercih edilen worker mesgulse bosta duran worker'a dengelenebilir.
 - [x] Assigned/running task'lar reassign edilmez; aktif claim korunur.
 - [x] Dispatch rebalance kontrati unit test ile sabitlendi.
+
+## Faz 43 - Pipeline Failed Root Cause Reporting
+
+- [x] `PIPELINE_FAILED` apply child tasklari icin yeni kok gorev acmadan root cause raporu uretilir.
+- [x] Rapor `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini ayrastirir.
+- [x] `workspace_missing` senaryosu unit test ile sabitlendi.
+- [x] Production deploy ve runtime state/log/report mutasyonu yapilmadan repo sozlesmesi guncellendi.

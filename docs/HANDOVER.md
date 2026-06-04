@@ -797,3 +797,21 @@ Eklenenler:
 
 Test:
 - `tests/test_runtime_status_model.py` busy preassigned worker senaryosunda pending task'in idle worker'a dengelenmesini sabitler.
+
+---
+
+## Pipeline Failed Root Cause Reporting Apply
+
+Tarih: 2026-06-04
+
+Görev: RECOVERY-20260604-132001-CTO-ACTION-20260604-131808-06-PIPELINE-FAILED-ROOT-CAUSE-REPORTING-R1
+
+Eklenenler:
+- `supervisor/cto_autonomous_delivery.py` `PIPELINE_FAILED` apply child tasklari icin `pipeline_failed_root_cause_report()` raporu uretir.
+- CLI komutu `root-cause-report`, yeni kok task acmadan `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini dondurur.
+- `workspace_missing` kok nedeni, workspace/repo clone bootstrap kontrolu onerisiyle ayrastirilir.
+- `state_templates/cto_delivery_policy.json` root cause reporting sozlesmesini kaydeder.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; repo template karsiliklari okundu/guncellendi.
