@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 try:
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
+        TASK_STATUS_DEPLOYED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
@@ -21,6 +22,7 @@ try:
 except ImportError:
     from state_file_lock import state_file_lock
     from task_status_constants import (
+        TASK_STATUS_DEPLOYED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
@@ -108,6 +110,17 @@ def run_key(task_id):
     m = re.match(r"^(CTO-ACTION-\d{8}-\d{6})-", task_id or "")
     return m.group(1) if m else None
 
+def is_deployed_record(task):
+    status = normalize_status(task.get("status"))
+    delivery_level = normalize_status(task.get("delivery_level"))
+    deployment_status = str(task.get("deployment_status") or "").upper()
+    return (
+        status == TASK_STATUS_DEPLOYED
+        or delivery_level == TASK_STATUS_DEPLOYED
+        or deployment_status in {"DEPLOYED", "LIVE"}
+        or task.get("production_deployed") is True
+    )
+
 def main():
     LOGS.mkdir(parents=True, exist_ok=True)
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -116,6 +129,7 @@ def main():
     ready_for_validation = 0
     failed_no_proposal = 0
     running = 0
+    deployed_preserved = 0
     details = []
     with state_file_lock(qpath):
         q = read_json(qpath, {"tasks": []})
@@ -145,6 +159,11 @@ def main():
                 created = sum(1 for x in EXPECTED if (Path(ws) / x).exists())
 
             status = normalize_status(t.get("status"))
+
+            if is_deployed_record(t):
+                deployed_preserved += 1
+                details.append(f"{tid}: DEPLOYED_PRESERVED")
+                continue
 
             if created >= 4:
                 t["status"] = TASK_STATUS_READY_FOR_VALIDATION
@@ -214,9 +233,7 @@ def main():
         "latest_action_ready_for_validation": ready_for_validation,
         "latest_action_failed_no_proposal": failed_no_proposal,
         "latest_action_running": running,
-        "production_deployed": False,
-        "repo_changes_applied": False,
-        "staging_deployed": False,
+        "latest_action_deployed_preserved": deployed_preserved,
         "production_deploy_requires_explicit_approval": False,
         "production_deploy_allowed_when_all_gates_pass": True,
         "updated_at": now(),
@@ -230,7 +247,8 @@ def main():
         f"Ready for validation: {ready_for_validation}\n"
         f"Failed no proposal: {failed_no_proposal}\n"
         f"Running: {running}\n"
-        "Production deployed: false\n\n"
+        f"Deployed preserved: {deployed_preserved}\n"
+        "Production state: unchanged\n\n"
         + "\n".join(details) + "\n",
         encoding="utf-8"
     )
@@ -240,7 +258,7 @@ def main():
     previous = notify_marker.read_text().strip() if notify_marker.exists() else ""
     signature = f"{latest_key}|{ready_for_validation}|{failed_no_proposal}|{running}"
 
-    if running == 0 and previous != signature:
+    if running == 0 and (ready_for_validation or failed_no_proposal) and previous != signature:
         text = (
             "CTO Action görev özeti:\n\n"
             f"Run: {latest_key}\n"

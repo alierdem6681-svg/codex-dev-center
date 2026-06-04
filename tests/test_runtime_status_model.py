@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "web_panel"))
 
 from supervisor import (  # noqa: E402
+    action_result_watcher,
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
@@ -3675,6 +3676,69 @@ class SupervisorCliCompletionTest(unittest.TestCase):
 
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
         self.assertEqual(queue["tasks"][0]["result"], "manual")
+
+
+class ActionResultWatcherTest(unittest.TestCase):
+    def test_deployed_action_task_is_not_downgraded_by_existing_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            workspace = runtime / "workspaces" / "worker_worker-1_CTO-ACTION-20260604-120000-01-EXAMPLE_20260604_120001"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            workspace.mkdir(parents=True)
+            for name in action_result_watcher.EXPECTED[:4]:
+                (workspace / name).write_text("ok\n", encoding="utf-8")
+
+            task = {
+                "id": "CTO-ACTION-20260604-120000-01-EXAMPLE",
+                "status": TASK_STATUS_DEPLOYED,
+                "delivery_level": TASK_STATUS_DEPLOYED,
+                "deployment_status": TASK_STATUS_DEPLOYED,
+                "production_deployed": True,
+                "assigned_worker": "worker-1",
+                "workspace": str(workspace),
+            }
+            (state / "task_queue.json").write_text(json.dumps({"tasks": [task]}), encoding="utf-8")
+            (state / "workers.json").write_text(json.dumps({"workers": []}), encoding="utf-8")
+            (state / "system_state.json").write_text(json.dumps({"production_deployed": True}), encoding="utf-8")
+
+            calls = []
+            originals = (
+                action_result_watcher.APP,
+                action_result_watcher.STATE,
+                action_result_watcher.LOGS,
+                action_result_watcher.REPORTS,
+                action_result_watcher.send_message,
+            )
+            action_result_watcher.APP = runtime
+            action_result_watcher.STATE = state
+            action_result_watcher.LOGS = logs
+            action_result_watcher.REPORTS = reports
+            action_result_watcher.send_message = lambda text: calls.append(text) or True
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    action_result_watcher.main()
+            finally:
+                (
+                    action_result_watcher.APP,
+                    action_result_watcher.STATE,
+                    action_result_watcher.LOGS,
+                    action_result_watcher.REPORTS,
+                    action_result_watcher.send_message,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            system_state = json.loads((state / "system_state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DEPLOYED)
+        self.assertEqual(queue["tasks"][0]["delivery_level"], TASK_STATUS_DEPLOYED)
+        self.assertTrue(queue["tasks"][0]["production_deployed"])
+        self.assertTrue(system_state["production_deployed"])
+        self.assertEqual(calls, [])
 
 
 class SystemRepairControlsTest(unittest.TestCase):
