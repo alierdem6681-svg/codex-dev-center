@@ -1548,6 +1548,81 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertEqual(flow["summary"]["failed_count"], 2)
         self.assertEqual(flow["summary"]["blocked_count"], 2)
 
+    def test_pipeline_flow_groups_main_tasks_and_legacy_records(self):
+        root_id = "CTO-TASK-20260604-091747-621734-TELEGRAM-ACTION-COMMAND"
+        backlog_id = "CTO-BACKLOG-20260604-091751-464617-TELEGRAM-ACTION-COMMAND"
+        apply_id = "CTO-APPLY-20260604-092448-CTO-BACKLOG-20260604-091751-464617-TELEGRAM-ACTION-COMMAND"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(
+                root,
+                [
+                    {
+                        "id": root_id,
+                        "status": TASK_STATUS_PROPOSAL_READY,
+                        "risk": "medium",
+                        "updated_at": "2026-06-04T09:00:00+00:00",
+                    },
+                    {
+                        "id": backlog_id,
+                        "status": TASK_STATUS_PROPOSAL_DONE,
+                        "root_task_id": root_id,
+                        "risk": "medium",
+                        "assigned_worker": "worker-1",
+                        "updated_at": "2026-06-04T09:10:00+00:00",
+                    },
+                    {
+                        "id": apply_id,
+                        "status": TASK_STATUS_RUNNING,
+                        "root_task_id": backlog_id,
+                        "pull_request_url": "https://github.com/example/repo/pull/1",
+                        "merge_blocked_reason": "waiting_for_checks",
+                        "risk": "medium",
+                        "assigned_worker": "worker-1",
+                        "updated_at": "2026-06-04T09:20:00+00:00",
+                    },
+                    {
+                        "id": "CTO-DISPATCH-CHILD",
+                        "status": TASK_STATUS_READY_FOR_VALIDATION,
+                        "parent_task_id": backlog_id,
+                        "deploy_run_id": "100",
+                        "smoke_run_id": "101",
+                        "risk": "medium",
+                        "assigned_worker": "worker-2",
+                        "updated_at": "2026-06-04T09:15:00+00:00",
+                    },
+                    {
+                        "id": "TASK-OLD",
+                        "status": TASK_STATUS_DONE,
+                        "risk": "low",
+                        "updated_at": "2026-06-04T08:00:00+00:00",
+                    },
+                ],
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        self.assertEqual(flow["summary"]["main_task_count"], 2)
+        groups = {item["main_task_code"]: item for item in flow["main_tasks"]}
+        main = groups[root_id]
+        legacy = groups["LEGACY"]
+
+        self.assertEqual(main["main_task_title"], "Telegram Action Command")
+        self.assertEqual(main["root_task_id"], root_id)
+        self.assertEqual(main["overall_status"], TASK_STATUS_RUNNING)
+        self.assertEqual(main["counts"]["tasks"], 4)
+        self.assertEqual(main["counts"]["children"], 3)
+        self.assertEqual(main["counts_by_status"][TASK_STATUS_RUNNING], 1)
+        self.assertEqual(main["progress_percent"], main["progress"]["percent"])
+        self.assertEqual(main["latest_pr"]["url"], "https://github.com/example/repo/pull/1")
+        self.assertEqual(main["latest_deploy_run"]["run_id"], "100")
+        self.assertEqual(main["latest_smoke_run"]["run_id"], "101")
+        self.assertEqual(main["blocked_reason"], "waiting_for_checks")
+        self.assertEqual({child["id"] for child in main["children"]}, {backlog_id, apply_id, "CTO-DISPATCH-CHILD"})
+        self.assertEqual(legacy["main_task_title"], "Gruplanmamış Eski Görevler")
+        self.assertEqual(legacy["counts"]["tasks"], 1)
+        self.assertEqual(legacy["children"][0]["id"], "TASK-OLD")
+
     def test_pipeline_flow_reads_safe_markers_without_raw_task_or_terminal_fields(self):
         secret_text = "raw-secret-value-should-not-leak"
         with tempfile.TemporaryDirectory() as tmp:
@@ -1591,6 +1666,7 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertNotIn("stdout", encoded)
         self.assertNotIn("stderr", encoded)
         self.assertNotIn("description", encoded)
+        self.assertNotIn("title", flow["stages"][2]["tasks"][0])
         self.assertEqual(flow["markers"]["pipeline_status"]["task_to_deploy_test"], "PASS")
         self.assertEqual(flow["markers"]["github_actions"]["runner_name"], "codex-dev-center-01")
         self.assertEqual(flow["markers"]["last_smoke_test"]["status"], "PASS")
@@ -1630,6 +1706,13 @@ class DashboardPipelineFlowUiTest(unittest.TestCase):
         self.assertIn("document.hidden", html)
         self.assertIn("pipelineFlowFailureCount", html)
         self.assertIn("renderPipelineFlow", html)
+        self.assertIn("flowDateTime", html)
+        self.assertIn("flowMainTasks", html)
+        self.assertIn("renderFlowMainTasks", html)
+        self.assertIn('class="flow-main-task"', html)
+        self.assertIn("latestFlow.main_tasks", html)
+        self.assertIn("day: '2-digit'", html)
+        self.assertIn("month: '2-digit'", html)
         self.assertIn("<strong>${esc(task.id || '-')}</strong>", html)
         self.assertIn("${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}", html)
         self.assertNotIn("task.description", html)

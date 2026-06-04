@@ -231,8 +231,45 @@
         padding: 9px 0;
       }
       .flow-marker-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
+      .flow-main-tasks {
+        border-top: 1px solid var(--line);
+        margin-top: 8px;
+        padding-top: 8px;
+      }
+      .flow-main-task {
+        border-top: 1px solid var(--line);
+        padding: 8px 0;
+      }
+      .flow-main-task:first-of-type { border-top: 0; }
+      .flow-main-task summary {
+        cursor: pointer;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(180px, 1.2fr) minmax(150px, .7fr) minmax(160px, .8fr);
+        align-items: center;
+        list-style: none;
+      }
+      .flow-main-task summary::-webkit-details-marker { display: none; }
+      .flow-progress {
+        height: 7px;
+        border-radius: 999px;
+        background: var(--soft);
+        overflow: hidden;
+      }
+      .flow-progress span {
+        display: block;
+        height: 100%;
+        background: #2f5f73;
+      }
+      .flow-child {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.2fr) minmax(140px, .7fr) minmax(130px, .7fr);
+        gap: 8px;
+        border-top: 1px solid var(--line);
+        padding: 7px 0;
+      }
       @media (max-width: 980px) {
-        .grid, .wide, .three, .controls, .flow-summary, .flow-task { grid-template-columns: 1fr; }
+        .grid, .wide, .three, .controls, .flow-summary, .flow-task, .flow-main-task summary, .flow-child { grid-template-columns: 1fr; }
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
@@ -246,7 +283,7 @@
     <header>
       <div>
         <h1>Codex Dev Center Yönetim Paneli</h1>
-        <div class="muted">Canlıya alma, görevler, çalışanlar, toparlama ve güvenli GitHub akışı</div>
+        <div class="muted">Görevler, pipeline flow ve güvenli panel yönetimi</div>
       </div>
       <div class="actions header-actions">
         <span id="clock" class="badge">Yükleniyor</span>
@@ -266,7 +303,6 @@
                 <span id="accountPanelMode" class="account-role">Oturum açık</span>
               </div>
             </div>
-            <button class="menu-item" type="button" role="menuitem" onclick="scrollToProfile()">Profil</button>
             <button class="menu-item" type="button" role="menuitem" onclick="scrollToAccountSettings()">Hesap ayarları</button>
             <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
           </div>
@@ -275,53 +311,6 @@
     </header>
 
     <main class="stack">
-      <div class="grid">
-        <section><div class="muted">Canlıya Alma Durumu</div><div id="deployMetric" class="metric">-</div></section>
-        <section><div class="muted">Ön Canlı Sonucu</div><div id="stagingMetric" class="metric">-</div></section>
-        <section><div class="muted">Geri Alma Sonucu</div><div id="rollbackMetric" class="metric">-</div></section>
-        <section><div class="muted">Görev Kuyruğu</div><div id="queueMetric" class="metric">-</div></section>
-      </div>
-
-      <section>
-        <h2>Operasyonel Akış</h2>
-        <div id="opsBox"></div>
-      </section>
-
-      <section>
-        <h2>Production Pipeline</h2>
-        <div class="actions">
-          <button class="primary" onclick="runAction('production_readiness_suite')">Kalite Kapılarını Çalıştır</button>
-          <button onclick="runAction('staging_deploy')">Ön Canlıya Al</button>
-          <button onclick="runAction('health_check')">Sağlık Kontrolü</button>
-          <button onclick="runAction('smoke_test')">Duman Testi</button>
-          <button onclick="runAction('rollback_simulation')">Geri Alma Simülasyonu</button>
-          <button onclick="runAction('production_deploy_start')">Otomatik Yayına Alma</button>
-          <button onclick="runAction('github_safe_flow_dry_run')">GitHub Güvenli Akış</button>
-          <button onclick="runAction('cto_doctor_check')">CTO Doktor</button>
-          <button onclick="runAction('cto_doctor_fix')">Kuyruk Normalize</button>
-        </div>
-        <div id="pipelineBadges"></div>
-      </section>
-
-      <div class="three">
-        <section>
-          <h2>Pipeline Gözlemi</h2>
-          <div id="pipelineStatusBox"></div>
-        </section>
-        <section>
-          <h2>Deploy Komutları</h2>
-          <div id="commandBox"></div>
-        </section>
-        <section>
-          <h2>Kalite Kapıları</h2>
-          <div id="gateBox"></div>
-        </section>
-        <section>
-          <h2>Son Kontroller</h2>
-          <div id="lastChecksBox"></div>
-        </section>
-      </div>
-
       <section>
         <div class="section-title-row">
           <h2>Pipeline Flow</h2>
@@ -358,40 +347,10 @@
         </section>
 
         <section id="accountSettings">
-          <h2 id="profileHeading">Profil</h2>
-          <div id="profileBox" class="profile-box">
-            <span id="profileAvatar" class="account-avatar">P</span>
-            <div class="account-copy">
-              <strong id="profileUsername">Panel kullanıcısı</strong>
-              <div id="profileMeta" class="muted">Oturum açık</div>
-            </div>
-          </div>
           <h2>Ayarlar</h2>
           <div id="settingsBadges"></div>
           <h2 style="margin-top:14px">Son İşlem</h2>
           <pre id="actionResult">Henüz işlem yok.</pre>
-        </section>
-      </div>
-
-      <div class="wide">
-        <section>
-          <h2>Çalışan / Görev Kuyruğu / Toparlama</h2>
-          <div id="workersTable"></div>
-        </section>
-        <section>
-          <h2>GitHub Senkronizasyonu</h2>
-          <div id="githubBox"></div>
-        </section>
-      </div>
-
-      <div class="wide">
-        <section>
-          <h2>Son Hata ve Çözüm Önerisi</h2>
-          <div id="riskBox"></div>
-        </section>
-        <section>
-          <h2>Raporlar</h2>
-          <div id="reportsBox"></div>
         </section>
       </div>
     </main>
@@ -467,6 +426,18 @@
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
+      function flowDateTime(value){
+        const time = Date.parse(value || '');
+        if (Number.isNaN(time)) return '-';
+        return new Intl.DateTimeFormat('tr-TR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(new Date(time)).replace(',', '');
+      }
       function taskStatus(t){
         const status = foldedText(t.status);
         if (status === 'CALISIYOR' || status === 'IN_PROGRESS') return 'RUNNING';
@@ -543,10 +514,6 @@
         setAccountMenuOpen(false);
         if (refocus) accountMenuButton.focus();
       }
-      function scrollToProfile(){
-        closeAccountMenu();
-        profileHeading.scrollIntoView({behavior:'smooth', block:'start'});
-      }
       function scrollToAccountSettings(){
         closeAccountMenu();
         accountSettings.scrollIntoView({behavior:'smooth', block:'start'});
@@ -560,9 +527,6 @@
         accountPanelUsername.textContent = name;
         accountPanelAvatar.textContent = initials;
         accountPanelMode.textContent = mode;
-        profileUsername.textContent = name;
-        profileAvatar.textContent = initials;
-        profileMeta.textContent = mode;
       }
       function setFilterOptions(selectEl, defaultLabel, values){
         const current = selectEl.value;
@@ -607,8 +571,58 @@
       function flowStages(){
         return latestFlow && Array.isArray(latestFlow.stages) ? latestFlow.stages : [];
       }
+      function flowMainTasks(){
+        return latestFlow && Array.isArray(latestFlow.main_tasks) ? latestFlow.main_tasks : [];
+      }
       function flowStateBadge(state){
         return badge(flowStateLabels[String(state || '').toLowerCase()] || state || '-');
+      }
+      function flowProgressBar(progress){
+        const percent = Math.max(0, Math.min(100, Number(progress?.percent ?? progress ?? 0)));
+        return `<div class="flow-progress" aria-label="${esc(percent)}%"><span style="width:${esc(percent)}%"></span></div>`;
+      }
+      function compactFlowRun(run){
+        if (!run) return '-';
+        if (run.run_id) return `#${run.run_id}`;
+        if (run.url) return 'var';
+        if (run.commit) return String(run.commit).slice(0, 8);
+        return run.status || run.conclusion || '-';
+      }
+      function renderFlowMainTasks(){
+        const mainTasks = flowMainTasks();
+        if (!mainTasks.length) return '<div class="flow-main-tasks"><div class="muted">Ana görev grubu yok.</div></div>';
+        return `<div class="flow-main-tasks"><div class="muted">Ana görevler</div>${mainTasks.map((mainTask, index) => {
+          const counts = mainTask.counts || {};
+          const countsByStatus = mainTask.counts_by_status || mainTask.status_counts || {};
+          const progress = mainTask.progress || {percent: mainTask.progress_percent || 0, current_stage: mainTask.stage};
+          const children = Array.isArray(mainTask.children) ? mainTask.children : [];
+          const pr = mainTask.latest_pr || null;
+          const deployRun = mainTask.latest_deploy_run || null;
+          const smokeRun = mainTask.latest_smoke_run || null;
+          const childRows = children.map(child => {
+            return `<div class="flow-child"><div><strong>${esc(child.id || '-')}</strong><br><span class="muted">${esc(child.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(child.status)} ${badge(child.pipeline_status || child.risk || child.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(child.updated_at || child.finished_at || child.created_at))}</div></div>`;
+          }).join('') || '<div class="muted">Alt görev yok.</div>';
+          const statusRows = Object.entries(countsByStatus).map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') || badge('Boş');
+          return `<details class="flow-main-task" ${index === 0 ? 'open' : ''}>
+            <summary>
+              <div><strong>${esc(mainTask.main_task_title || mainTask.title || mainTask.main_task_code || '-')}</strong><br><span class="muted">${esc(mainTask.main_task_code || mainTask.code || mainTask.root_task_id || '-')}</span></div>
+              <div>${badge(mainTask.overall_status || mainTask.status)} ${flowStateBadge(mainTask.state)}<br><span class="muted">${esc(counts.tasks ?? 0)} görev, ${esc(counts.children ?? 0)} alt görev</span></div>
+              <div>${flowProgressBar(progress)}<span class="muted">${esc(mainTask.progress_percent ?? progress.percent ?? 0)}% - ${esc(flowStageLabels[progress.current_stage] || progress.current_stage_label || '-')}</span></div>
+            </summary>
+            <div class="flow-marker-row">
+              ${badge(`Aktif: ${counts.active ?? 0}`)}
+              ${badge(`Bloklu: ${counts.blocked ?? 0}`)}
+              ${badge(`Hatalı: ${counts.failed ?? 0}`)}
+              ${badge(`Kapalı: ${counts.closed ?? 0}`)}
+              ${badge(`PR: ${compactFlowRun(pr)}`)}
+              ${badge(`Deploy: ${compactFlowRun(deployRun)}`)}
+              ${badge(`Smoke: ${compactFlowRun(smokeRun)}`)}
+              ${mainTask.blocked_reason ? badge(`Blok: ${mainTask.blocked_reason}`) : ''}
+            </div>
+            <div class="flow-marker-row">${statusRows}</div>
+            <div>${childRows}</div>
+          </details>`;
+        }).join('')}</div>`;
       }
       function selectedFlowStage(){
         const stages = flowStages();
@@ -638,7 +652,7 @@
         const stages = flowStages();
         const selected = selectedFlowStage();
         if (selected && activeFlowStage !== selected.id) activeFlowStage = selected.id;
-        const generatedAt = latestFlow?.generated_at ? new Date(latestFlow.generated_at).toLocaleTimeString() : '-';
+        const generatedAt = flowDateTime(latestFlow?.generated_at);
         const stale = pipelineFlowError && latestFlow ? 'Son veri korunuyor' : '';
         pipelineFlowUpdated.textContent = pipelineFlowError ? `Hata: ${pipelineFlowError}` : `Güncellendi ${generatedAt}`;
         pipelineFlowMode.textContent = stale || (latestFlow?.non_mutating ? 'Salt okunur' : 'Kontrol ediliyor');
@@ -661,7 +675,7 @@
         const githubMarker = markers.github_actions || {};
         const smokeMarker = markers.last_smoke_test || {};
         const tasksHtml = (selected.tasks || []).map(task => {
-          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(task.updated_at || task.finished_at || task.created_at || '-')}</div></div>`;
+          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(task.updated_at || task.finished_at || task.created_at))}</div></div>`;
         }).join('') || '<div class="muted">Bu stage içinde görev yok.</div>';
         pipelineFlowPanel.innerHTML = `
           <div class="flow-summary">
@@ -675,6 +689,7 @@
             ${badge(`GitHub: ${githubMarker.last_deploy_status || githubMarker.status || '-'}`)}
             ${badge(`Smoke: ${smokeMarker.status || smokeMarker.ok || '-'}`)}
           </div>
+          ${renderFlowMainTasks()}
           <div class="muted">Status dağılımı</div>
           <div class="flow-marker-row">${statusCounts.length ? statusCounts.map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') : badge('Boş')}</div>
           <div>${tasksHtml}</div>
@@ -722,116 +737,19 @@
       }
       function render(data){
         latest = data;
-        const readiness = data.production_readiness || {};
-        const deploy = data.production_deploy || {};
-        const actionsState = data.github_actions || {};
-        const pipelineState = data.pipeline_status || {};
-        const staging = data.staging_deploy || {};
-        const runtime = data.production_runtime || {};
-        const rollback = data.rollback || {};
-        const health = data.last_health_check || {};
-        const smoke = data.last_smoke_test || {};
-        const github = data.github_safe_flow || {};
-        const router = data.cto_router || {};
-        const doctor = data.cto_doctor || {};
-        const delivery = data.cto_delivery || {};
         const controlled = data.controlled_execution || {};
-        const ops = data.operations || {};
-        const directJobs = data.direct_cto_jobs || {};
+        const dashboardSettings = data.dashboard_settings?.dashboard || {};
         clock.textContent = new Date().toLocaleTimeString();
         renderAccount(data);
-        deployMetric.textContent = actionsState.last_deploy_status || runtime.status || deploy.status || 'Bekliyor';
-        stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
-        rollbackMetric.textContent = rollback.status || (deploy.rollback_performed ? 'PASS' : 'Bekliyor');
-        queueMetric.textContent = tasks().length;
-        pipelineBadges.innerHTML = [
-          `Hazırlık: ${readiness.status || '-'}`,
-          `Skor: ${readiness.score_percent ?? '-'}`,
-          `Ön canlı: ${staging.status || '-'}`,
-          `Canlı: ${runtime.status || deploy.status || '-'}`,
-          `Sağlık: ${health.status || (health.ok === undefined ? '-' : health.ok)}`,
-          `Duman: ${smoke.status || actionsState.last_smoke_status || (smoke.ok === undefined ? '-' : smoke.ok)}`
-        ].map(badge).join('');
-        pipelineStatusBox.innerHTML = [
-          `Runner: ${actionsState.runner_name || '-'}`,
-          `VM: ${actionsState.vm_target || '-'}`,
-          `Son deploy: ${actionsState.last_deploy_status || '-'}`,
-          `Run ID: ${actionsState.last_deploy_run_id || '-'}`,
-          `Commit: ${(actionsState.last_deploy_commit || '').slice(0, 8) || '-'}`,
-          `Zaman: ${actionsState.last_deploy_at || '-'}`,
-          `Son smoke: ${actionsState.last_smoke_status || '-'}`,
-          `Backup: ${actionsState.last_backup_path ? 'var' : '-'}`,
-          `Zincir testi: ${pipelineState.task_to_deploy_test || '-'}`,
-          `CTO router: ${router.enabled ? 'active' : '-'}`,
-          `CTO doctor: ${doctor.ok === undefined ? '-' : doctor.ok}`,
-          `Delivery stable: ${delivery.stable === undefined ? '-' : delivery.stable}`,
-          `Max paralel: ${delivery.policy?.max_parallel_tasks || delivery.max_parallel_tasks || '-'}`
-        ].map(badge).join('<br>');
-        const commands = data.deploy_commands || {};
-        commandBox.innerHTML = Object.entries(commands).map(([key, value]) => {
-          const label = key.replace('CODEX_', '').replaceAll('_', ' ');
-          return `<div>${esc(label)}: ${badge(value.configured)}</div>`;
-        }).join('') || 'Komut yok';
-        const gateEntries = Object.entries((readiness.tests || {}));
-        gateBox.innerHTML = gateEntries.length ? gateEntries.map(([name, item]) => `<div>${esc(name)}: ${badge(item.status || item.ok)}</div>`).join('') : 'Kapı sonucu yok';
-        lastChecksBox.innerHTML = [
-          `Son sağlık: ${health.status || health.ok || '-'}`,
-          `Son duman testi: ${smoke.status || smoke.ok || '-'}`,
-          `Rollback noktası: ${data.rollback_point?.commit ? data.rollback_point.commit.slice(0, 8) : '-'}`,
-          `Otomatik production: ${data.production_policy?.automatic_production_enabled}`,
-          `Gate PASS deploy: ${delivery.policy?.production_deploy_allowed_when_all_gates_pass ?? data.production_policy?.normal_app_deploy_allowed_when_all_gates_pass ?? '-'}`
-        ].map(badge).join('');
-        const dispatcher = ops.dispatcher || {};
-        const blocked = (ops.blocked_active_examples || []).map(t => `${t.id || '-'}: ${t.reason || '-'}`).join('<br>') || '-';
-        const recoverable = (ops.recoverable_examples || []).map(t => `${t.id || '-'}: ${t.status || '-'}`).join('<br>') || '-';
-        opsBox.innerHTML = [
-          `Worker uygun aktif: ${ops.worker_eligible_active_count ?? '-'}`,
-          `Bloklu aktif: ${ops.blocked_active_count ?? '-'}`,
-          `Toparlanabilir: ${ops.recoverable_task_count ?? '-'}`,
-          `Uyuyan worker: ${ops.workers_sleeping_count ?? '-'}`,
-          `Uyku nedeni: ${ops.worker_sleep_reason || '-'}`,
-          `Dispatcher: ${dispatcher.last_result || '-'}`,
-          `Son child: ${dispatcher.last_child || '-'}`,
-          `Deploy state: ${ops.deploy_reconciliation || '-'}`
-        ].map(badge).join(' ');
-        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Blok örnekleri</div><div>${blocked}</div>`;
-        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Toparlanabilir örnekler</div><div>${recoverable}</div>`;
-        const jobRows = (directJobs.jobs || []).slice(0, 4).map(j => {
-          const p = j.progress || {};
-          return `<div>${badge(j.status)} ${esc(j.generic_task_name || j.id)} <span class="muted">süre ${p.elapsed_seconds ?? '-'}s, anlamlı ilerleme ${p.meaningful_event_count ?? 0}</span></div>`;
-        }).join('') || '-';
-        opsBox.innerHTML += `<div class="muted" style="margin-top:8px">Telegram CTO işleri (${directJobs.active_count ?? 0} aktif)</div><div>${jobRows}</div>`;
-        const s = data.dashboard_settings?.production || {};
         settingsBadges.innerHTML = Object.entries({
-          'Otomatik production': s.automatic_production_enabled,
-          'Hazırlık zorunlu': s.readiness_required,
-          'Ön canlı zorunlu': s.staging_required,
-          'Geri alma zorunlu': s.rollback_required,
-          'Secret scan': s.secret_scan_required,
-          'Git temizliği': s.git_clean_required,
-          'GitHub senkron': s.github_remote_sync_required,
-          'Health check': s.post_deploy_health_check_required,
-          'Duman testi': s.post_deploy_smoke_test_required,
+          'Panel modu': dashboardSettings.auth_mode || data.auth?.auth_mode || '-',
+          'Dil': dashboardSettings.language || 'tr',
+          'Kompakt mod': dashboardSettings.compact_mode,
           'Kontrollü öneri': controlled.status || '-',
           'Kontrollü görev': controlled.last_task || '-',
           'Kontrollü rapor': controlled.latest_report || '-',
-          'Öneri repo değişikliği': controlled.proposal_mode_repo_mutation_allowed ? 'Açık' : 'Kapalı',
-          'Öneri deploy': controlled.proposal_mode_production_deploy_allowed ? 'Açık' : 'Kapalı'
+          'Öneri repo değişikliği': controlled.proposal_mode_repo_mutation_allowed ? 'Açık' : 'Kapalı'
         }).map(([k,v]) => `${esc(k)}: ${badge(v)}`).join('<br>');
-        workersTable.innerHTML = `<table><thead><tr><th>Çalışan</th><th>Durum</th><th>Görev</th></tr></thead><tbody>${
-          workers().map(w => `<tr><td>${esc(w.id)}</td><td>${badge(w.status)}</td><td>${esc(w.current_task || '-')}</td></tr>`).join('')
-        }</tbody></table>`;
-        githubBox.innerHTML = [
-          `Branch: ${github.current_branch || github.branch || '-'}`,
-          `Git: ${github.git_available ?? data.production_environment?.git?.git_available ?? '-'}`,
-          `Remote sync: ${runtime.remote_sync?.ok ?? data.production_environment?.remote_sync?.ok ?? '-'}`,
-          `Değişen dosya: ${(github.diff_files || data.production_environment?.git?.dirty_files || []).length}`
-        ].map(badge).join('');
-        const blockers = runtime.blockers || deploy.blockers || [];
-        const lastError = blockers.length ? blockers.join(', ') : 'Yok';
-        const suggestion = blockers.length ? 'İlgili gate çıktısını aç, kök nedeni düzelt ve aynı kapıyı tekrar çalıştır.' : 'Ek aksiyon gerekmiyor.';
-        riskBox.innerHTML = `<div>Son hata: ${esc(lastError)}</div><div>Çözüm önerisi: ${esc(suggestion)}</div>`;
-        reportsBox.innerHTML = (data.reports || []).map(r => `<div>${esc(r)}</div>`).join('') || 'Rapor yok';
         fillFilters();
         renderTasks();
       }
