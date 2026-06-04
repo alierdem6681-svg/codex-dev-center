@@ -3170,6 +3170,23 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
         self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
 
+    def test_rotate_procedure_reference_does_not_require_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = self.write_ready_runtime(tmp, pipeline_status="FAIL")
+            workspace = next((runtime / "workspaces").glob("worker_worker-1_TASK-VAL_*"))
+            (workspace / "LIVING_DOCS_CHECKLIST.md").write_text(
+                "# Living Docs\n\n"
+                "- [ ] Token sızıntısı şüphesi için rotate prosedürü linklendi.\n"
+                "- [ ] Gerçek token/env değeri okunmadı veya yazılmadı.\n",
+                encoding="utf-8",
+            )
+            result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
+        self.assertEqual(queue["tasks"][0]["critical_operation_findings"], [])
+
 
 class SupervisorCliCompletionTest(unittest.TestCase):
     def run_complete_task(self, tmp, task):
@@ -3239,6 +3256,7 @@ class SystemRepairControlsTest(unittest.TestCase):
                 "Secret okuma ve token/private key gosterme.",
                 "IAM, billing, DNS ve firewall degistirme.",
                 "Production deploy yapma; mutate kapali.",
+                "Token sızıntısı şüphesi için rotate prosedürü linklendi.",
             ]
         )
         self.assertEqual(critical_operation_policy.critical_operation_findings(safe_text), [])

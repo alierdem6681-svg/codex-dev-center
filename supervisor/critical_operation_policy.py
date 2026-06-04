@@ -70,6 +70,12 @@ SAFE_CRITICAL_CONTEXT_PATTERNS: list[re.Pattern[str]] = [
         rf"[^\n]*\b({CRITICAL_CONTEXT_TERMS})\b",
         re.I,
     ),
+    re.compile(
+        rf"\b({CRITICAL_CONTEXT_TERMS})\b[^\n]*\b(rotate|rotation)\b[^\n]*\b"
+        r"(procedure|prosedür|proseduru|prosedürü|runbook|playbook|link|linklendi|"
+        r"documented|dokumante|dokümante)\b",
+        re.I,
+    ),
 ]
 
 CRITICAL_OPERATION_PATTERNS: dict[str, list[re.Pattern[str]]] = {
