@@ -323,3 +323,9 @@ Bu guard, repo apply child task'larinin tek worker uzerine yigilip diger workerl
 `PIPELINE_FAILED` apply child tasklari artik yeni kok backlog task'i acmadan okunabilir kok neden raporu uretebilir. `cto_autonomous_delivery.pipeline_failed_root_cause_report()` task id, parent id, `root_cause`, `last_error`, retry edilebilirlik ve onerilen duzeltme alanlarini dondurur.
 
 `workspace_missing` kok nedeni workspace/repo clone bootstrap kontrolu olarak raporlanir ve unit test ile sabitlenmistir. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-04 Read-Only / Dry-Run Test Mode Apply
+
+Readiness, drift ve smoke kontrol yazımları ortak `supervisor/read_only_execution.py` helper'ına bağlandı. `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` olduğunda state/report dosyası oluşturulmaz; sonuç payload'ı `write_evidence` ve `write_status=completed_with_write_skipped` ile hedef, operasyon ve skip nedenini döndürür.
+
+Varsayılan mod `write_enabled` kaldığı için mevcut write-enabled ortam davranışı geriye uyumludur. Davranış `tests/test_runtime_status_model.py` içinde read-only, dry-run ve smoke write-skip regresyon testleriyle sabitlendi. Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yapılmadı.

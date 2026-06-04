@@ -1784,8 +1784,30 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
 
         self.assertFalse(text_result["ok"])
         self.assertTrue(text_result["read_only"])
+        self.assertEqual(text_result["write_status"], "skipped")
+        self.assertEqual(text_result["skip_reason"], "read_only_workspace")
         self.assertFalse(json_result["ok"])
         self.assertTrue(json_result["read_only"])
+        self.assertEqual(json_result["write_status"], "skipped")
+        self.assertEqual(json_result["skip_reason"], "read_only_workspace")
+
+    def test_readiness_writes_are_skipped_in_dry_run_check_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state" / "payload.json"
+            with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}):
+                text_result = production_readiness_suite.write_text_best_effort(path, "payload\n")
+                json_result = production_readiness_suite.atomic_write_json(path, {"ok": True})
+
+            self.assertFalse(path.exists())
+
+        for result in (text_result, json_result):
+            self.assertFalse(result["ok"])
+            self.assertFalse(result["read_only"])
+            self.assertTrue(result["dry_run"])
+            self.assertEqual(result["mode"], "dry_run")
+            self.assertEqual(result["write_status"], "skipped")
+            self.assertEqual(result["skip_reason"], "dry_run_mode")
+            self.assertEqual(result["event"], "write-skipped")
 
     def test_drift_checker_writes_are_best_effort_in_read_only_runtime(self):
         exc = OSError(errno.EROFS, "Read-only file system")
@@ -1799,8 +1821,75 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
 
         self.assertFalse(text_result["ok"])
         self.assertTrue(text_result["read_only"])
+        self.assertEqual(text_result["write_status"], "skipped")
+        self.assertEqual(text_result["skip_reason"], "read_only_workspace")
         self.assertFalse(json_result["ok"])
         self.assertTrue(json_result["read_only"])
+        self.assertEqual(json_result["write_status"], "skipped")
+        self.assertEqual(json_result["skip_reason"], "read_only_workspace")
+
+    def test_drift_checker_writes_are_skipped_in_dry_run_check_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state" / "drift_report.json"
+            with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}):
+                text_result = drift_checker.write_text_best_effort(path, "payload\n")
+                json_result = drift_checker.write_json(path, {"ok": True})
+
+            self.assertFalse(path.exists())
+
+        for result in (text_result, json_result):
+            self.assertEqual(result["mode"], "dry_run")
+            self.assertEqual(result["write_status"], "skipped")
+            self.assertEqual(result["skip_reason"], "dry_run_mode")
+
+    def test_smoke_test_writes_are_skipped_in_dry_run_check_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel in [
+                "web_panel/panel_server.py",
+                "web_panel/static/index.html",
+                "supervisor/production_environment_manager.py",
+                "supervisor/production_deploy_controller.py",
+            ]:
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("ok\n", encoding="utf-8")
+
+            def fake_http_json(_port, path, timeout=5):
+                if path == "/health":
+                    return {"ok": True, "status": 200, "body": {"ok": True}}
+                return {
+                    "ok": True,
+                    "status": 200,
+                    "body": {
+                        "production_environment": {},
+                        "deploy_commands": {},
+                    },
+                }
+
+            def fake_http_text(_port, _path, timeout=5):
+                return {
+                    "ok": True,
+                    "status": 200,
+                    "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
+                }
+
+            with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}), \
+                mock.patch.object(production_environment_manager, "ROOT", root), \
+                mock.patch.object(production_environment_manager, "STATE", root / "state"), \
+                mock.patch.object(production_environment_manager, "REPORTS", root / "reports"), \
+                mock.patch.object(production_environment_manager, "http_json", fake_http_json), \
+                mock.patch.object(production_environment_manager, "http_text", fake_http_text), \
+                mock.patch.object(production_environment_manager, "service_discovery", lambda: {}):
+                payload = production_environment_manager.smoke_test("production")
+
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["write_status"], "completed_with_write_skipped")
+            self.assertFalse((root / "state").exists())
+            self.assertFalse((root / "reports").exists())
+            self.assertTrue(payload["write_evidence"])
+            self.assertTrue(all(item["write_status"] == "skipped" for item in payload["write_evidence"]))
+            self.assertTrue(all(item["skip_reason"] == "dry_run_mode" for item in payload["write_evidence"]))
 
 
 class DirectCtoJobRecoveryTest(unittest.TestCase):

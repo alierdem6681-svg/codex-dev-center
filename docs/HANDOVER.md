@@ -815,3 +815,28 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; repo template karsiliklari okundu/guncellendi.
+
+---
+
+## Read-Only / Dry-Run Test Mode Apply
+
+Tarih: 2026-06-04
+Görev: CTO-APPLY-20260604-134408 / CTO-ACTION-20260604-131808-01-READ-ONLY-DRY-RUN-TEST-MODE
+
+Eklenenler:
+- `supervisor/read_only_execution.py` ortak write policy/evidence helper'i eklendi.
+- `CHECK_MODE=read_only` ve `CHECK_MODE=dry_run` modları state/report dosyası yazmadan `write-skipped` kanıtı döndürür.
+- `supervisor/production_readiness_suite.py`, `supervisor/drift_checker.py` ve `supervisor/production_environment_manager.py` ilgili write noktalarında helper'a bağlandı.
+- Readiness, drift ve smoke sonuçları `mode`, `runtime_write_status`, `write_evidence` ve `write_status` alanlarını döndürür.
+- Write-enabled ortamda varsayılan davranış geriye uyumlu bırakıldı.
+
+Test:
+- `python3 -m py_compile supervisor/read_only_execution.py supervisor/drift_checker.py supervisor/production_readiness_suite.py supervisor/production_environment_manager.py tests/test_runtime_status_model.py` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.ProductionReadinessSuiteScanTest` PASS.
+- `CHECK_MODE=dry_run python3 supervisor/production_readiness_suite.py --json` PASS; final state/report yazımları `completed_with_write_skipped`.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu izole clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` kayıtları güncellendi.
+- Local `git add` `.git/index.lock` read-only filesystem hatasıyla bloklandı; bu sandbox içinde commit/PR oluşturulamadı.

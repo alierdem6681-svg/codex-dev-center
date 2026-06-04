@@ -289,7 +289,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, dry-run non-mutating ve simülasyon sözleşmesi kapılarını çalıştırır.",
+      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, dry-run non-mutating, read-only/dry-run write evidence ve simülasyon sözleşmesi kapılarını çalıştırır.",
       "actions": [
         "production_readiness_suite"
       ]
@@ -302,7 +302,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Staging, production, health check, smoke test, rollback point and safe local panel swap flow.",
+      "description": "Staging, production, health check, smoke test, rollback point, read-only/dry-run write evidence and safe local panel swap flow.",
       "actions": [
         "staging_deploy",
         "health_check",

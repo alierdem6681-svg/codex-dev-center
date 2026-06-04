@@ -262,3 +262,11 @@ Faz 19B-10A Model Policy
 - [x] Rapor `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini ayrastirir.
 - [x] `workspace_missing` senaryosu unit test ile sabitlendi.
 - [x] Production deploy ve runtime state/log/report mutasyonu yapilmadan repo sozlesmesi guncellendi.
+
+## Faz 44 - Read-Only / Dry-Run Write Policy
+
+- [x] Ortak read-only/dry-run write evidence helper'i eklendi.
+- [x] Readiness suite `CHECK_MODE=read_only|dry_run` altında state/report yazmadan `write-skipped` kanıtı döndürür.
+- [x] Drift checker aynı write evidence sözleşmesine bağlandı.
+- [x] Health/smoke test status ve report yazımları dry-run/read-only modda atlanır.
+- [x] Read-only, dry-run ve smoke write-skip davranışı unit testlerle sabitlendi.
