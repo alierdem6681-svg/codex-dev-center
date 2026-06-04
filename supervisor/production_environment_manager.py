@@ -231,6 +231,7 @@ def sync_source_to_runtime() -> dict[str, Any]:
     head = git_status().get("head", "")
     if result.get("ok") and head:
         (ROOT / ".production_commit").write_text(head + "\n", encoding="utf-8")
+        update_runtime_commit_markers(head)
     return {
         "ok": bool(result.get("ok")),
         "source": str(SOURCE_ROOT),
@@ -239,6 +240,35 @@ def sync_source_to_runtime() -> dict[str, Any]:
         "head": head,
         "result": result,
     }
+
+
+def git_origin_main_head() -> str:
+    git = git_bin()
+    if not git:
+        return ""
+    result = run([git, "rev-parse", "origin/main"], 30, cwd=command_root())
+    if result.get("ok"):
+        return result.get("stdout", "").strip()
+    return ""
+
+
+def update_runtime_commit_markers(head: str, origin_head: str | None = None) -> None:
+    head = str(head or "").strip()
+    if not head:
+        return
+    origin = str(origin_head or git_origin_main_head() or head).strip()
+    state_path = STATE / "system_state.json"
+    state = read_json(state_path, {})
+    if not isinstance(state, dict):
+        state = {}
+    state.update(
+        {
+            "production_running_commit": head,
+            "github_origin_main_commit": origin,
+            "production_github_sync": bool(origin and origin == head),
+        }
+    )
+    atomic_write_json(state_path, state)
 
 
 def configured_commands() -> dict[str, Any]:

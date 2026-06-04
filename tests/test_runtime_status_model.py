@@ -3058,6 +3058,38 @@ class SystemRepairControlsTest(unittest.TestCase):
             os.environ.clear()
             os.environ.update(original_env)
 
+    def test_environment_manager_updates_runtime_commit_markers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            state_path = state / "system_state.json"
+            state_path.write_text(json.dumps({"system_state": "READY_FOR_NEW_TASKS"}), encoding="utf-8")
+
+            originals = (
+                production_environment_manager.ROOT,
+                production_environment_manager.STATE,
+                production_environment_manager.git_origin_main_head,
+            )
+            production_environment_manager.ROOT = runtime
+            production_environment_manager.STATE = state
+            production_environment_manager.git_origin_main_head = lambda: "new-head"
+            try:
+                production_environment_manager.update_runtime_commit_markers("new-head")
+            finally:
+                (
+                    production_environment_manager.ROOT,
+                    production_environment_manager.STATE,
+                    production_environment_manager.git_origin_main_head,
+                ) = originals
+
+            updated = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(updated["system_state"], "READY_FOR_NEW_TASKS")
+        self.assertEqual(updated["production_running_commit"], "new-head")
+        self.assertEqual(updated["github_origin_main_commit"], "new-head")
+        self.assertTrue(updated["production_github_sync"])
+
     def test_telegram_health_watcher_suppresses_auto_report_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
