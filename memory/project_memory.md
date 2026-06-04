@@ -197,3 +197,11 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Staging / Rollback Readiness Report Integrity Apply
+
+Rollback simülasyonu rapor bütünlüğü güçlendirildi. Production readiness suite içinde `rollback_simulation` dry-run non-mutating kontratı FAIL olursa insan raporu artık yanıltıcı `PASS` yazmaz; `Sonuc: FAIL`, parse error ve flag mismatch özetini üretir.
+
+Bu davranış `tests/test_runtime_status_model.py` içinde mutating rollback dry-run fixture'ı ile sabitlendi. Staging/rollback readiness planı, production readiness gate, onboarding map, roadmap ve state template kayıtları güncellendi.
+
+Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.

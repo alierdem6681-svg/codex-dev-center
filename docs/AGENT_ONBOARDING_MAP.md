@@ -86,6 +86,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
+- supervisor/production_readiness_suite.py içindeki rollback simülasyon insan raporu dry-run kontratı FAIL ise `FAIL` yazmalıdır
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py

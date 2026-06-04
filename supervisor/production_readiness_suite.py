@@ -380,20 +380,27 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
         {"mode": "dry_run", "result": staging, "contract": staging_contract},
     )
 
+    rollback_ok = bool(rollback_contract["ok"])
+    rollback_status = "PASS" if rollback_ok else "FAIL"
+    flag_mismatches = rollback_contract.get("flag_mismatches") or []
+    parse_error = rollback_contract.get("parse_error") or "none"
     report = REPORTS / "rollback_simulation_last_report.md"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
         "# Geri Alma Simulasyonu\n\n"
         f"Tarih: {now()}\n\n"
-        "- Sonuc: PASS\n"
+        f"- Sonuc: {rollback_status}\n"
         "- Mod: dry-run\n"
-        "- Canli komut calistirilmadi.\n",
+        "- Canli komut calistirilmadi.\n"
+        "- Contract mode: dry_run_non_mutating_contract\n"
+        f"- Parse error: {parse_error}\n"
+        f"- Flag mismatches: {', '.join(flag_mismatches) if flag_mismatches else 'none'}\n",
         encoding="utf-8",
     )
     record(
         results,
         "rollback_simulation",
-        report.exists() and rollback_contract["ok"],
+        report.exists() and rollback_ok,
         {"report": str(report.relative_to(ROOT)), "result": rollback, "contract": rollback_contract},
     )
 

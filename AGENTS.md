@@ -122,6 +122,7 @@ Canliya alma sadece su kosullarda calisabilir:
 - `supervisor/production_readiness_suite.py --json` PASS olmali.
 - On canli kapisi PASS olmali.
 - Geri alma simulasyonu PASS olmali.
+- Geri alma simulasyonu insan raporu dry-run JSON kontrati FAIL ise `FAIL` yazmali; kontrat sapmasi varken `PASS` raporu kabul edilmez.
 - Secret leakage ve forbidden operation scan PASS olmali.
 - `CODEX_STAGING_DEPLOY_COMMAND`, `CODEX_PRODUCTION_DEPLOY_COMMAND`, `CODEX_ROLLBACK_COMMAND` tanimli olmali.
 - `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` olmali.
