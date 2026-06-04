@@ -293,3 +293,9 @@ Direct CTO handler yetkili chat'ten gelen fotoğraf/doküman mesajlarını dosya
 Bu paket dosya indirme, kalıcı saklama, checksum, malware scan, production deploy, staging deploy, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı. Davranış `tests/test_runtime_status_model.py` içindeki Telegram asset intake ve direct CTO routing testleriyle sabitlendi.
 
 Local `git add` git metadata dizini read-only olduğu için çalışmadı. GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` sonucu tamamlanmadığı için bu sandbox içinde commit/PR açılamadı.
+
+## 2026-06-04 Direct CTO Observed Issue Backlog Routing
+
+Direct CTO Telegram hattı artık `görev olarak aç`, `görevleri aç`, `kendine görev` ve `görevlendir` gibi açık görev üretme ifadelerini action-command olarak ele alır. “10 hata/eksik/sorunu görev olarak aç” sınıfındaki istekler read-only raporla kalmaz; `direct_cto_action_mode` üzerinden 10 parçalı gözlem backlog paketi üretir.
+
+Bu paket read-only/dry-run test modu, güvenli scratch standardı, dashboard quality gate kontratı, drift registry, repo-apply no-change, pipeline failed kök neden raporu, production readiness misroute, worker workspace bootstrap, timeout/backoff ve atomic JSON state audit görevlerini worker'lara dağıtacak şekilde sabitlendi. Davranış `tests/test_runtime_status_model.py` regresyon testleriyle korunur.

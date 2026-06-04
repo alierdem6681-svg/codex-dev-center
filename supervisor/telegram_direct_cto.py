@@ -431,6 +431,9 @@ def is_action_command(text):
         "başlat", "baslat", "uygula", "workerlara dağıt", "workerlara dagit",
         "pipeline kur", "pipeline'ı kur", "pipeline’i kur", "pipeline başlat",
         "görevleri başlat", "gorevleri baslat", "tüm görevleri", "tum gorevleri",
+        "görev olarak aç", "gorev olarak ac", "görevleri aç", "gorevleri ac",
+        "görev aç", "gorev ac", "kendine görev", "kendine gorev",
+        "görevlendir", "gorevlendir",
         "geliştirmeye başla", "gelistirmeye basla", "geliştirmeye başlayalım",
         "gelistirmeye baslayalim", "düzeltelim", "duzeltelim", "bunu düzelt",
         "bunu duzelt", "bunu çözelim", "bunu cozelim", "çözelim", "cozelim"

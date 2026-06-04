@@ -63,9 +63,92 @@ def make_task(run_id, seq, slug, title, description, worker, risk="medium"):
         "delivery_level": "BACKLOG"
     }
 
+def wants_observed_issue_backlog(text):
+    lowered = (text or "").lower()
+    creation = any(x in lowered for x in [
+        "görev olarak aç", "gorev olarak ac", "görevleri aç", "gorevleri ac",
+        "görev aç", "gorev ac", "kendine görev", "kendine gorev",
+    ])
+    issue_terms = any(x in lowered for x in [
+        "hata", "eksik", "sorun", "aksaklık", "aksaklik", "logları incele", "loglari incele",
+    ])
+    count_requested = "10" in lowered or "on " in lowered or "on adet" in lowered
+    return creation and issue_terms and count_requested
+
+def observed_issue_backlog(run_id):
+    items = [
+        (
+            "read-only-dry-run-test-mode",
+            "Read-only / Dry-run Test Mode",
+            "Read-only Codex/CTO analizlerinde readiness, drift ve smoke kontrollerinin state/report yazmadan güvenli çalışmasını standartlaştıran öneriyi üret. Salt okunur ortamda crash yerine write-skipped kanıtı dönmeli.",
+            "worker-1",
+        ),
+        (
+            "safe-test-scratch-standard",
+            "Safe Test Scratch Standard",
+            "Unit/integration testleri için runtime state ve repo dosyalarını kirletmeyen güvenli temp/scratch alanı standardını çıkar. Testler read-only veya izole temp dizininde deterministik çalışmalı.",
+            "worker-2",
+        ),
+        (
+            "dashboard-quality-gate-status-contract",
+            "Dashboard Quality Gate Status Contract",
+            "Eski quality_gate_status alanı ile yeni readiness/health kaynakları arasındaki dashboard tutarsızlığını incele ve tek kaynaklı görünüm sözleşmesi öner.",
+            "worker-3",
+        ),
+        (
+            "drift-module-settings-registry",
+            "Drift Module Settings Registry",
+            "Drift uyarılarında eksik görünen module settings ve registry kayıtlarını belirle; false-positive üretmeden living docs/state template senkron planı çıkar.",
+            "worker-4",
+        ),
+        (
+            "repo-apply-no-change-terminal-state",
+            "Repo Apply No-change Terminal State",
+            "Repo apply aşamasında değişiklik yoksa retry/backlog döngüsüne girmeden terminal NO_CHANGE/DONE sınıflandırmasına gidecek akışı doğrula ve eksik kalan kontratı öner.",
+            "worker-1",
+        ),
+        (
+            "pipeline-failed-root-cause-reporting",
+            "Pipeline Failed Root Cause Reporting",
+            "PIPELINE_FAILED durumlarında kullanıcıya yeni kök görev açmak yerine kök neden, son hata, retry edilebilirlik ve önerilen düzeltmeyi ayrıştıran rapor akışını tasarla.",
+            "worker-2",
+        ),
+        (
+            "production-readiness-misroute-fix",
+            "Production Readiness Misroute Fix",
+            "Production readiness analizi gibi kontrol işlerinin yanlışlıkla feature delivery/root task gibi sınıflandırılmasını önleyecek router ve pipeline görünürlük kuralını öner.",
+            "worker-3",
+        ),
+        (
+            "worker-workspace-codex-bootstrap",
+            "Worker Workspace Codex Bootstrap",
+            "Worker workspace içinde .codex/config veya gerekli bootstrap eksik olduğunda işi sessizce kaybetmeden erken teşhis eden kontrol ve fallback davranışını planla.",
+            "worker-4",
+        ),
+        (
+            "timeout-usage-limit-retry-backoff",
+            "Timeout / Usage-limit Retry Backoff",
+            "Worker, Direct CTO ve async watchdog timeout/usage-limit durumlarında görev çoğaltmadan kontrollü retry/backoff ve terminal raporlama politikasını çıkar.",
+            "worker-1",
+        ),
+        (
+            "atomic-json-tmp-state-audit",
+            "Atomic JSON Tmp And State Audit",
+            "Atomic JSON yazımları sonrası tmp kalıntıları, state lock kullanımı ve audit kayıtlarını denetle; bozuk/yarım state yazımına karşı temizlik ve gözlemleme planı üret.",
+            "worker-2",
+        ),
+    ]
+    return [
+        make_task(run_id, idx, slug, title, description, worker)
+        for idx, (slug, title, description, worker) in enumerate(items, 1)
+    ]
+
 def build_backlog(raw_text, run_id):
     text = (raw_text or "").lower()
     tasks = []
+
+    if wants_observed_issue_backlog(raw_text):
+        return observed_issue_backlog(run_id)
 
     telegram_asset_requested = "telegram" in text and any(x in text for x in [
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",

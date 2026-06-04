@@ -1150,6 +1150,16 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(result["route"], "async_job")
         self.assertEqual(result["ack_deadline_seconds"], 3)
 
+    def test_task_creation_phrase_routes_to_action_async_job(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "observed_issue_backlog",
+            "Terminal ile testler yap, logları incele ve sık karşılaşılan 10 hata eksik veya sorunu kendine görev olarak aç.",
+        )
+
+        self.assertTrue(result["action_command"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertEqual(result["ack_deadline_seconds"], 3)
+
     def test_development_followup_routes_to_action_async_job(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "development_followup",
@@ -1169,6 +1179,23 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertTrue(result["action_command"])
         self.assertEqual(result["route"], "async_job")
         self.assertEqual(result["ack_deadline_seconds"], 3)
+
+    def test_observed_issue_action_mode_builds_ten_backlog_tasks(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "Terminal ile testler yap, logları incele ve sık karşılaşılan 10 hata eksik veya sorunu kendine görev olarak aç.",
+            "20260604-TEST",
+        )
+
+        self.assertEqual(len(tasks), 10)
+        self.assertEqual(tasks[0]["title"], "Read-only / Dry-run Test Mode")
+        self.assertEqual(tasks[-1]["title"], "Atomic JSON Tmp And State Audit")
+        self.assertEqual(
+            [task["assigned_worker"] for task in tasks],
+            [
+                "worker-1", "worker-2", "worker-3", "worker-4", "worker-1",
+                "worker-2", "worker-3", "worker-4", "worker-1", "worker-2",
+            ],
+        )
 
     def test_telegram_asset_action_mode_builds_specific_backlog(self):
         tasks = direct_cto_action_mode.build_backlog(

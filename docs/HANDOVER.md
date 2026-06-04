@@ -736,3 +736,17 @@ Not:
 - Dosya indirme, kalıcı saklama, checksum ve malware scan bu pakette yapılmadı; sonraki Telegram Asset Storage And Manifest paketine bırakıldı.
 - Bu apply worktree içinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları güncellendi.
 - Local `git add` git metadata dizini read-only olduğu için çalışmadı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` sonucu tamamlanmadı. Bu nedenle commit/PR bu sandbox içinde açılamadı.
+
+---
+
+## Direct CTO Observed Issue Backlog Routing
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- Direct CTO Telegram sınıflandırması `görev olarak aç`, `görevleri aç`, `kendine görev` ve `görevlendir` gibi açık görev üretme ifadelerini action-command olarak kabul eder.
+- `direct_cto_action_mode` sık görülen 10 hata/eksik/sorun için özel gözlem backlog paketi üretir.
+- Paket; read-only/dry-run test modu, güvenli test scratch standardı, dashboard quality gate kontratı, drift registry, repo-apply no-change, pipeline failed kök neden raporu, production readiness misroute, worker workspace bootstrap, timeout/backoff ve atomic JSON state audit görevlerini worker'lara dağıtır.
+
+Test:
+- `tests/test_runtime_status_model.py` action routing ve 10 görev backlog üretimini regresyon testiyle sabitler.
