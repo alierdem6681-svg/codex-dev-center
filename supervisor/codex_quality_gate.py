@@ -41,6 +41,33 @@ NON_MUTATING_FLAGS = [
     "mutating_cloud_operations_performed",
 ]
 
+SIMULATION_CONTRACTS = {
+    "staging_smoke_test": {
+        "mode": "dry_run_non_mutating_contract",
+        "contract_path": ("details", "contract"),
+        "required_dry_run": True,
+        "required_false_flags": ["mutating_cloud_operations_performed"],
+    },
+    "rollback_simulation": {
+        "mode": "dry_run_non_mutating_contract",
+        "contract_path": ("details", "contract"),
+        "required_dry_run": True,
+        "required_false_flags": ["git_reset_performed", "data_mutation_performed"],
+    },
+    "restart_simulation": {
+        "mode": "static_non_mutating_contract",
+        "contract_path": ("details",),
+        "required_dry_run": False,
+        "required_false_flags": [],
+    },
+    "failure_injection_simulation": {
+        "mode": "static_non_mutating_contract",
+        "contract_path": ("details",),
+        "required_dry_run": False,
+        "required_false_flags": [],
+    },
+}
+
 REQUIRED_FILES = [
     "AGENTS.md",
     "constitution/ANAYASA.md",
@@ -323,6 +350,54 @@ def _summarize_gate_group(payload, check_name, gate_names):
         "gates": gate_names,
     }
 
+def _nested_dict(payload, path):
+    current = payload
+    for key in path:
+        if not isinstance(current, dict):
+            return {}
+        current = current.get(key)
+    return current if isinstance(current, dict) else {}
+
+def _simulation_contract_detail_issues(payload):
+    tests = payload.get("tests")
+    if not isinstance(tests, dict):
+        return ["missing_tests_object"]
+
+    issues = []
+    for gate_name, expected in SIMULATION_CONTRACTS.items():
+        gate_payload = tests.get(gate_name)
+        if not isinstance(gate_payload, dict):
+            issues.append(f"{gate_name}:missing_gate_payload")
+            continue
+
+        contract = _nested_dict(gate_payload, expected["contract_path"])
+        if not contract:
+            issues.append(f"{gate_name}:missing_contract_detail")
+            continue
+
+        if contract.get("mode") != expected["mode"]:
+            issues.append(f"{gate_name}:mode_not_{expected['mode']}")
+
+        if contract.get("ok") is not True:
+            issues.append(f"{gate_name}:contract_not_ok")
+
+        if expected["required_dry_run"] and contract.get("dry_run") is not True:
+            issues.append(f"{gate_name}:dry_run_not_true")
+
+        required_false_flags = contract.get("required_false_flags")
+        if expected["required_false_flags"] and not isinstance(required_false_flags, dict):
+            issues.append(f"{gate_name}:missing_required_false_flags")
+            continue
+
+        for flag in expected["required_false_flags"]:
+            if required_false_flags.get(flag) is not False:
+                issues.append(f"{gate_name}:{flag}_not_false")
+
+        if contract.get("flag_mismatches"):
+            issues.append(f"{gate_name}:flag_mismatches_present")
+
+    return issues
+
 def _summarize_simulation_group(payload):
     check = _summarize_gate_group(payload, "simulation_dry_run", STANDARD_REPORT_GATES["simulation_dry_run"])
     if check["status"] != "pass":
@@ -332,6 +407,14 @@ def _summarize_simulation_group(payload):
     if unsafe_flags:
         check["status"] = "fail"
         check["reason"] = "mutating_flags_not_false:" + ",".join(unsafe_flags)
+        check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
+        return check
+
+    detail_issues = _simulation_contract_detail_issues(payload)
+    if detail_issues:
+        check["status"] = "fail"
+        check["reason"] = "simulation_contract_detail_invalid:" + ",".join(detail_issues)
+        check["contract_issues"] = detail_issues
         check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
         return check
 
