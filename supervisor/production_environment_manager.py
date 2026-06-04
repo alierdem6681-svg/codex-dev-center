@@ -690,6 +690,8 @@ def production_deploy(dry_run: bool = False) -> dict[str, Any]:
     result["ok"] = bool(result["panel"].get("ok") and result["health"].get("ok") and result["smoke"].get("ok"))
     result["status"] = "PASS" if result["ok"] else "FAIL"
     result["blockers"] = [] if result["ok"] else ["production_health_or_smoke_failed"]
+    if result["ok"]:
+        update_runtime_commit_markers(git.get("head", ""), remote.get("origin_head") or remote.get("head"))
     update_system_flags(result["ok"])
     write_production_outputs(result)
     return result

@@ -89,6 +89,39 @@ def read_text(path: Path, default: str = "") -> str:
     return default
 
 
+def first_text(*values) -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def production_commit_summary(system_state: dict) -> dict:
+    production_deploy = read_json(STATE / "production_deploy_status.json", {})
+    production_runtime = read_json(STATE / "production_runtime_status.json", {})
+    github_actions = read_json(STATE / "github_actions_status.json", {})
+    pipeline_status = read_json(STATE / "pipeline_status.json", {})
+    running = first_text(
+        production_runtime.get("commit"),
+        production_deploy.get("commit"),
+        github_actions.get("last_deploy_commit"),
+        pipeline_status.get("commit"),
+        system_state.get("production_running_commit"),
+    )
+    origin = first_text(
+        github_actions.get("last_deploy_commit"),
+        pipeline_status.get("commit"),
+        production_deploy.get("commit"),
+        system_state.get("github_origin_main_commit"),
+    )
+    return {
+        "production_running_commit": running,
+        "github_origin_main_commit": origin,
+        "production_github_sync": bool(running and origin and running == origin),
+    }
+
+
 def is_loopback(handler: BaseHTTPRequestHandler) -> bool:
     host = handler.client_address[0]
     return host in {"127.0.0.1", "::1", "localhost"}
@@ -427,6 +460,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/health":
             system_state = read_json(STATE / "system_state.json", {})
+            commit_summary = production_commit_summary(system_state)
             self.send_json({
                 "ok": True,
                 "service": "codex-panel",
@@ -438,9 +472,7 @@ class Handler(BaseHTTPRequestHandler):
                 "version": "production-environment-v1",
                 "system_state": system_state.get("system_state") or system_state.get("state") or system_state.get("phase"),
                 "active_queue_remaining": system_state.get("active_queue_remaining"),
-                "production_running_commit": system_state.get("production_running_commit"),
-                "github_origin_main_commit": system_state.get("github_origin_main_commit"),
-                "production_github_sync": system_state.get("production_github_sync"),
+                **commit_summary,
             })
             return
         if parsed.path in ("/login", "/login.html"):

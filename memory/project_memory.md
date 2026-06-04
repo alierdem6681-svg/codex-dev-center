@@ -238,7 +238,9 @@ Davranis `tests/test_runtime_status_model.py` icindeki frontend markup sozlesmes
 
 Pipeline Flow ana gorev ac/kapat tercihi artik `details` `toggle` event'inden degil, kullanicinin `summary` click niyetinden senkron kaydedilir. Bu, live polling DOM'u yenilerken acik/kapat state'inin render kaynakli olaylarla yanlis ezilmesini engeller.
 
-Davranis `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` markup sozlesmesiyle sabitlendi.
+Panel `/health` commit ozeti de deploy marker dosyalarini `system_state.json` commit alanlarindan once okur; GitHub Actions deploy'u sonrasi health eski commit raporlamaz.
+
+Davranis `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ve health commit summary regresyon testiyle sabitlendi.
 
 ## 2026-06-04 Telegram Asset Manifest Contract Apply
 

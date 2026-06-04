@@ -1888,6 +1888,49 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                 for module, original_state in originals.items():
                     module.STATE = original_state
 
+    def test_health_commit_summary_prefers_deploy_markers_over_stale_system_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+            (state / "system_state.json").write_text(
+                json.dumps(
+                    {
+                        "production_running_commit": "old-head",
+                        "github_origin_main_commit": "old-head",
+                        "production_github_sync": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "production_deploy_status.json").write_text(
+                json.dumps({"status": "PASS", "commit": "new-head"}),
+                encoding="utf-8",
+            )
+            (state / "production_runtime_status.json").write_text(
+                json.dumps({"status": "PASS", "commit": "new-head"}),
+                encoding="utf-8",
+            )
+            (state / "github_actions_status.json").write_text(
+                json.dumps({"last_deploy_status": "PASS", "last_deploy_commit": "new-head"}),
+                encoding="utf-8",
+            )
+
+            originals = {
+                panel_server: panel_server.STATE,
+                legacy_panel_server: legacy_panel_server.STATE,
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    system_state = module.read_json(state / "system_state.json", {})
+                    summary = module.production_commit_summary(system_state)
+                    self.assertEqual(summary["production_running_commit"], "new-head")
+                    self.assertEqual(summary["github_origin_main_commit"], "new-head")
+                    self.assertTrue(summary["production_github_sync"])
+            finally:
+                for module, original_state in originals.items():
+                    module.STATE = original_state
+
     def test_status_payload_exposes_pipeline_tracking_for_all_panel_servers(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "state"

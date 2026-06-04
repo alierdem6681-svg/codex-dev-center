@@ -566,6 +566,7 @@ Tarih: 2026-06-04
 Eklenenler:
 - Pipeline Flow ana gorev expand/collapse tercihi artik DOM `toggle` event'i yerine kullanici `summary` click niyetinden senkron kaydedilir.
 - Live polling ayni anda yeniden render yapsa bile kullanicinin actigi veya kapattigi ana gorev state'i `pipelineMainTaskExpanded` icinde korunur.
+- Panel `/health` commit ozeti, sik guncellenen `system_state.json` eski commit tasisa bile deploy/runtime/GitHub Actions marker dosyalarindaki son deploy commit'ini oncelikli kullanir.
 - Frontend markup regresyon testi click-intent handler sozlesmesini kontrol edecek sekilde guncellendi.
 
 ---
