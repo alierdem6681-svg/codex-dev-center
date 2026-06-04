@@ -462,3 +462,21 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Staging / Rollback Readiness Report Integrity Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-065859 / CTO-DISPATCH-20260604-065325-CTO-ACTION-20260604-062153-05-STAGING-ROLLBACK-READINESS
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` rollback simülasyon insan raporu sonucunu dry-run non-mutating kontrat sonucundan üretir.
+- Rollback dry-run kontratı FAIL olursa `reports/rollback_simulation_last_report.md` artık `Sonuc: FAIL` ve flag mismatch özetini yazar.
+- `tests/test_runtime_status_model.py` mutating rollback dry-run senaryosunda hem kapı sonucunun hem insan raporunun FAIL kaldığını doğrular.
+- Readiness gate, staging/rollback planı, onboarding, roadmap, memory ve state template kayıtları bu davranışla hizalandı.
+
+Not:
+- Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Repo içi runtime `state/` dosyası oluşturulmadı veya değiştirilmedi.

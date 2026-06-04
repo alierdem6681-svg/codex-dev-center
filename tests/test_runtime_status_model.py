@@ -851,6 +851,8 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
             try:
                 results = {}
                 production_readiness_suite.staging_and_rollback(results)
+                report = Path(tmp) / "reports" / "rollback_simulation_last_report.md"
+                report_text = report.read_text(encoding="utf-8")
             finally:
                 production_readiness_suite.run_cmd = original_run_cmd
                 production_readiness_suite.REPORTS = original_reports
@@ -861,6 +863,8 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
             results["rollback_simulation"]["details"]["contract"]["flag_mismatches"],
             ["git_reset_performed"],
         )
+        self.assertIn("- Sonuc: FAIL", report_text)
+        self.assertIn("- Flag mismatches: git_reset_performed", report_text)
 
 
 class DirectCtoJobRecoveryTest(unittest.TestCase):

@@ -28,6 +28,7 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 
 - `staging_smoke_test` dry-run sonucunda `dry_run=true` ve `mutating_cloud_operations_performed=false` alanlarını doğrular.
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
+- `rollback_simulation` insan raporu dry-run sözleşmesi FAIL ise `FAIL` yazmalıdır; kontrat sapması varken rapor `PASS` kabul edilmez.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
