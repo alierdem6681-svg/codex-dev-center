@@ -140,6 +140,8 @@ Queue/status normalizer notu:
 - Status aliaslari case farki ve yaygin ayirici varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED TIMEOUT` ve `FAILED.TIMEOUT` gibi girdiler standart enumlara cevrilir.
 - Queue normalizasyonu dispatch contract alanlarını da tamamlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
 - Worker claim akışı `worker_id` ve `claimed_at` yazar; bu görünürlük production deploy veya runtime state dışı mutasyon yetkisi vermez.
+- Worker claim/finish akışında `task_queue.json` ve `workers.json` ortak worker state transaction lock altında güncellenir; queue `RUNNING/finished_at` alanları ile worker `current_task` birbirinden ayrı yazılmamalıdır.
+- Worker aktif `current_task` taşıyorsa aynı worker ikinci task claim etmemelidir; stale aktif sahiplik onarımı dispatch/recovery kapısında yapılır.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
 - 2026-06-04 owner repair sonrasinda runtime queue bilincli olarak bosaltildi. Snapshot `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup` altindadir; yeni gorevler temiz queue uzerinden alinmalidir.
 

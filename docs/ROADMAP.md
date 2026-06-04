@@ -327,3 +327,11 @@ Faz 19B-10A Model Policy
 - [x] Dort dummy/simulasyon task icin dispatch, wake, tek claim ve tek terminal status metriği dogrulandi.
 - [x] Duplicate claim ve duplicate terminal transition sayimlari sifir olarak unit test ve readiness gate ile sabitlendi.
 - [x] Standard quality report simulation dry-run grubu yeni gate'i zorunlu kabul eder.
+
+## Faz 52 - Parallel Worker State Safety
+
+- [x] Worker claim akisi `task_queue.json` ve `workers.json` icin ortak transaction lock altina alindi.
+- [x] Claim sirasinda `workers.json.current_task`, worker status ve queue `RUNNING/claimed_at` alanlari birlikte guncellenir.
+- [x] Worker finish akisi queue terminal status ve worker `current_task=None` temizligini ayni transaction altinda yapar.
+- [x] Dispatch de ayni transaction lock sirasi altina alinarak claim/assign yaris riski azaltildi.
+- [x] Worker current_task varken ayni worker'in ikinci task claim etmemesi unit test ile sabitlendi.

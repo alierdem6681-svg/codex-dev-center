@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:48:58+00:00",
+  "updated_at": "2026-06-04T16:40:00+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -272,6 +272,19 @@
       "requires_secret_scan": true,
       "requires_control_report": true,
       "requires_stage_plan_report": true
+    },
+    {
+      "id": "validate_worker_state_transaction",
+      "label": "Worker State Transaction Doğrulaması",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_claim_records_dispatch_claim_metadata tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_claim_respects_existing_active_current_task",
+      "queue_workers_transaction_lock": true,
+      "current_task_consistency_required": true,
+      "production_deploy": false
     },
     {
       "id": "validate_telegram_asset_safety_contract",

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:48:58+00:00",
+  "updated_at": "2026-06-04T16:40:00+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -83,6 +83,9 @@
     "repo_apply_stage_plan_report": true,
     "repo_apply_runtime_artifacts_ignored": true,
     "worker_claim_writes_dispatch_metadata": true,
+    "worker_state_transaction_lock": true,
+    "worker_claim_updates_current_task_transactionally": true,
+    "worker_finish_clears_current_task_transactionally": true,
     "stale_claim_retry_dispatch_enabled": true,
     "stale_claim_timeout_seconds": 1800,
     "stale_claim_requires_no_active_worker_ownership": true,

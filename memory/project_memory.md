@@ -383,3 +383,9 @@ Production readiness suite artik `parallel_worker_regression` kapisiyla dort dum
 `worker_runner.finish_task()` terminal status almis task uzerinde ikinci terminal yazimini status/result/finished_at degistirmeden no-op kabul eder. Standard quality gate `simulation_dry_run` grubu `parallel_worker_regression` gate'ini zorunlu sayar.
 
 Bu paket production deploy, staging deploy, gercek worker servisi restart, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-04 Parallel Worker State Safety Apply
+
+Worker claim ve finish akislari queue/worker state tutarliligi icin ortak transaction lock altina alindi. `worker_runner.claim_task()` artik queue task'ini `RUNNING` yaparken ayni kritik bolumde `workers.json.current_task`, worker status ve `last_seen` alanlarini yazar; worker zaten aktif `current_task` tasiyorsa ikinci task claim etmez.
+
+`worker_runner.finish_task()` queue terminal statusu ve worker `current_task=None` temizligini birlikte yazar. `supervisor_cli.dispatch()` ayni transaction lock sirasi altina alindi. Davranis `tests/test_runtime_status_model.py` claim/current_task regresyon testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

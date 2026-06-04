@@ -170,6 +170,9 @@ def read_json(path: Path, default: Any) -> Any:
 def write_json(path, data) -> None:
     atomic_write_json(Path(path), data)
 
+def worker_state_transaction_lock_path() -> Path:
+    return Path(QUEUE_PATH).parent / "worker_state_transaction"
+
 def append_log(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
@@ -319,6 +322,44 @@ def update_worker(worker_id: str, status: str, current_task: str | None = None, 
         data["updated_at"] = now()
         write_json(WORKERS_PATH, data)
 
+def active_worker_current_task(workers: dict[str, Any], worker_id: str) -> str | None:
+    for worker in workers.get("workers", []):
+        if worker.get("id") != worker_id:
+            continue
+        status = str(worker.get("status") or "").strip().upper()
+        current_task = worker.get("current_task")
+        if status in {"ASSIGNED", "RUNNING", "REVIEWING"} and current_task:
+            return str(current_task)
+        return None
+    return None
+
+def upsert_worker_claim(
+    workers: dict[str, Any],
+    worker_id: str,
+    task_id: str,
+    claim_time: str,
+    note: str = "claim_transaction",
+) -> None:
+    for worker in workers.get("workers", []):
+        if worker.get("id") == worker_id:
+            worker["status"] = "RUNNING"
+            worker["current_task"] = task_id
+            worker["last_seen"] = claim_time
+            worker["note"] = note
+            workers["updated_at"] = claim_time
+            return
+    workers.setdefault("workers", []).append(
+        {
+            "id": worker_id,
+            "role": "Auto worker",
+            "status": "RUNNING",
+            "current_task": task_id,
+            "last_seen": claim_time,
+            "note": note,
+        }
+    )
+    workers["updated_at"] = claim_time
+
 def reconcile_stale_running_tasks_for_worker(worker_id: str) -> list[str]:
     with state_file_lock(QUEUE_PATH):
         queue = read_json(QUEUE_PATH, {"tasks": []})
@@ -347,54 +388,66 @@ def reconcile_stale_running_tasks_for_worker(worker_id: str) -> list[str]:
         return recovered
 
 def claim_task(worker_id: str) -> dict[str, Any] | None:
-    with state_file_lock(QUEUE_PATH):
-        queue = read_json(QUEUE_PATH, {"tasks": []})
-        queue, _changes = normalize_queue_payload(queue)
-        tasks = queue.get("tasks", [])
+    with state_file_lock(worker_state_transaction_lock_path()):
+        with state_file_lock(QUEUE_PATH):
+            with state_file_lock(WORKERS_PATH):
+                queue = read_json(QUEUE_PATH, {"tasks": []})
+                workers = read_json(WORKERS_PATH, {"workers": []})
+                queue, _changes = normalize_queue_payload(queue)
+                tasks = queue.get("tasks", [])
 
-        for task in tasks:
-            if not is_worker_eligible_task(task):
-                continue
-            if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) == TASK_STATUS_RUNNING:
-                return None
+                if active_worker_current_task(workers, worker_id):
+                    return None
 
-        claimed = None
+                for task in tasks:
+                    if not is_worker_eligible_task(task):
+                        continue
+                    if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) == TASK_STATUS_RUNNING:
+                        claim_time = now()
+                        upsert_worker_claim(workers, worker_id, str(task.get("id") or ""), claim_time, "claim_transaction_existing_running")
+                        write_json(WORKERS_PATH, workers)
+                        return None
 
-        # Telegram ana görevleri sadece CTO tarafından işlenir.
-        # Workerlar ancak router'ın ürettiği source=cto alt görevleri alır.
-        for task in tasks:
-            if not is_worker_eligible_task(task):
-                continue
-            if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) in ("ASSIGNED", "QUEUED", "PENDING"):
-                claim_time = now()
-                task["status"] = TASK_STATUS_RUNNING
-                task["worker_id"] = worker_id
-                task["claimed_at"] = claim_time
-                task["started_at"] = claim_time
-                task["updated_at"] = claim_time
-                claimed = task
-                break
+                claimed = None
 
-        if claimed is None:
-            for task in tasks:
-                if not is_worker_eligible_task(task):
-                    continue
-                if task.get("assigned_worker") in (None, "", worker_id) and normalize_status(task.get("status")) in ("PENDING", "QUEUED"):
-                    claim_time = now()
-                    task["assigned_worker"] = worker_id
-                    task["status"] = TASK_STATUS_RUNNING
-                    task["worker_id"] = worker_id
-                    task["claimed_at"] = claim_time
-                    task["started_at"] = claim_time
-                    task["updated_at"] = claim_time
-                    claimed = task
-                    break
+                # Telegram ana görevleri sadece CTO tarafından işlenir.
+                # Workerlar ancak router'ın ürettiği source=cto alt görevleri alır.
+                for task in tasks:
+                    if not is_worker_eligible_task(task):
+                        continue
+                    if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) in ("ASSIGNED", "QUEUED", "PENDING"):
+                        claim_time = now()
+                        task["status"] = TASK_STATUS_RUNNING
+                        task["worker_id"] = worker_id
+                        task["claimed_at"] = claim_time
+                        task["started_at"] = claim_time
+                        task["updated_at"] = claim_time
+                        claimed = task
+                        upsert_worker_claim(workers, worker_id, str(task.get("id") or ""), claim_time)
+                        break
 
-        if claimed is not None:
-            queue["updated_at"] = now()
-            write_json(QUEUE_PATH, queue)
+                if claimed is None:
+                    for task in tasks:
+                        if not is_worker_eligible_task(task):
+                            continue
+                        if task.get("assigned_worker") in (None, "", worker_id) and normalize_status(task.get("status")) in ("PENDING", "QUEUED"):
+                            claim_time = now()
+                            task["assigned_worker"] = worker_id
+                            task["status"] = TASK_STATUS_RUNNING
+                            task["worker_id"] = worker_id
+                            task["claimed_at"] = claim_time
+                            task["started_at"] = claim_time
+                            task["updated_at"] = claim_time
+                            claimed = task
+                            upsert_worker_claim(workers, worker_id, str(task.get("id") or ""), claim_time)
+                            break
 
-        return dict(claimed) if claimed is not None else None
+                if claimed is not None:
+                    queue["updated_at"] = now()
+                    write_json(QUEUE_PATH, queue)
+                    write_json(WORKERS_PATH, workers)
+
+                return dict(claimed) if claimed is not None else None
 
 def finish_task(
     task_id: str,
@@ -405,42 +458,45 @@ def finish_task(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     worker_note_status = status
-    with state_file_lock(QUEUE_PATH):
-        queue = read_json(QUEUE_PATH, {"tasks": []})
-        changed = False
-        for task in queue.get("tasks", []):
-            if task.get("id") == task_id:
-                current_status = normalize_status(task.get("status"))
-                if current_status in TERMINAL_TASK_STATUSES:
-                    worker_note_status = current_status
-                    break
-                task["status"] = status
-                task["result"] = result
-                task["finished_at"] = now()
-                task["updated_at"] = now()
-                if report_path:
-                    task["report_path"] = report_path
-                if metadata:
-                    task.update(metadata)
-                changed = True
-                break
+    found_executor = False
+    with state_file_lock(worker_state_transaction_lock_path()):
+        with state_file_lock(QUEUE_PATH):
+            with state_file_lock(WORKERS_PATH):
+                queue = read_json(QUEUE_PATH, {"tasks": []})
+                finish_time = now()
+                changed = False
+                for task in queue.get("tasks", []):
+                    if task.get("id") == task_id:
+                        current_status = normalize_status(task.get("status"))
+                        if current_status in TERMINAL_TASK_STATUSES:
+                            worker_note_status = current_status
+                            break
+                        task["status"] = status
+                        task["result"] = result
+                        task["finished_at"] = finish_time
+                        task["updated_at"] = finish_time
+                        if report_path:
+                            task["report_path"] = report_path
+                        if metadata:
+                            task.update(metadata)
+                        changed = True
+                        break
 
-        if changed:
-            queue["updated_at"] = now()
-            write_json(QUEUE_PATH, queue)
+                if changed:
+                    queue["updated_at"] = finish_time
+                    write_json(QUEUE_PATH, queue)
 
-    with state_file_lock(WORKERS_PATH):
-        workers = read_json(WORKERS_PATH, {"workers": []})
-        found_executor = False
-        for worker in workers.get("workers", []):
-            if worker.get("id") == worker_id:
-                found_executor = True
-            if worker.get("id") == worker_id or worker.get("current_task") == task_id:
-                worker["status"] = "IDLE"
-                worker["current_task"] = None
-                worker["last_seen"] = now()
-                worker["note"] = f"Last task {task_id}: {worker_note_status}"
-        write_json(WORKERS_PATH, workers)
+                workers = read_json(WORKERS_PATH, {"workers": []})
+                for worker in workers.get("workers", []):
+                    if worker.get("id") == worker_id:
+                        found_executor = True
+                    if worker.get("id") == worker_id or worker.get("current_task") == task_id:
+                        worker["status"] = "IDLE"
+                        worker["current_task"] = None
+                        worker["last_seen"] = finish_time
+                        worker["note"] = f"Last task {task_id}: {worker_note_status}"
+                workers["updated_at"] = finish_time
+                write_json(WORKERS_PATH, workers)
     if not found_executor:
         update_worker(worker_id, "IDLE", None, f"Last task {task_id}: {worker_note_status}")
 
