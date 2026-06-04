@@ -1,8 +1,26 @@
 #!/usr/bin/env python3
-import errno
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from .read_only_execution import (
+        current_execution_mode,
+        read_only_write_error,
+        summarize_write_status,
+        write_evidence_items,
+        write_json_best_effort,
+        write_text_best_effort as _write_text_best_effort,
+    )
+except ImportError:
+    from read_only_execution import (
+        current_execution_mode,
+        read_only_write_error,
+        summarize_write_status,
+        write_evidence_items,
+        write_json_best_effort,
+        write_text_best_effort as _write_text_best_effort,
+    )
 
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -38,26 +56,11 @@ def read_json(path, default):
         pass
     return default
 
-def read_only_write_error(exc):
-    return isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.EROFS
-
 def write_text_best_effort(path, text, encoding="utf-8"):
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding=encoding)
-        return {"ok": True, "path": str(path)}
-    except OSError as exc:
-        return {
-            "ok": False,
-            "path": str(path),
-            "error": type(exc).__name__,
-            "errno": getattr(exc, "errno", None),
-            "read_only": read_only_write_error(exc),
-        }
+    return _write_text_best_effort(path, text, encoding=encoding, root=APP, operation="write_report")
 
 def write_json(path, data):
-    data["updated_at"] = now()
-    return write_text_best_effort(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    return write_json_best_effort(path, data, root=APP, operation="write_state")
 
 def log(msg):
     try:
@@ -138,6 +141,7 @@ def run_check():
         "issues": issues,
         "warnings": warnings,
         "checked_at": now(),
+        "mode": current_execution_mode(),
     }
 
     result["runtime_write_status"] = {
@@ -159,6 +163,8 @@ def run_check():
     system_state["last_drift_check_status"] = status
     system_state["last_drift_check_score"] = score
     result["runtime_write_status"]["system_state"] = write_json(STATE / "system_state.json", system_state)
+    result["write_evidence"] = write_evidence_items(result["runtime_write_status"])
+    result["write_status"] = summarize_write_status(result["write_evidence"])
 
     log(f"DRIFT_CHECK status={status} score={score} issues={len(issues)} warnings={len(warnings)}")
     print(json.dumps(result, indent=2, ensure_ascii=False))

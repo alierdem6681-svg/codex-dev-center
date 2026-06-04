@@ -311,3 +311,9 @@ Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task ç
 Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
 
 Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
+
+## 2026-06-04 Read-Only / Dry-Run Test Mode Apply
+
+Readiness, drift ve smoke kontrol yazımları ortak `supervisor/read_only_execution.py` helper'ına bağlandı. `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` olduğunda state/report dosyası oluşturulmaz; sonuç payload'ı `write_evidence` ve `write_status=completed_with_write_skipped` ile hedef, operasyon ve skip nedenini döndürür.
+
+Varsayılan mod `write_enabled` kaldığı için mevcut write-enabled ortam davranışı geriye uyumludur. Davranış `tests/test_runtime_status_model.py` içinde read-only, dry-run ve smoke write-skip regresyon testleriyle sabitlendi. Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yapılmadı.

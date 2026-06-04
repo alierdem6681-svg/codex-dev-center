@@ -190,7 +190,14 @@
     "git_clean_required_for_production": true,
     "github_remote_sync_required": true,
     "rollback_point_required": true,
-    "replace_mismatched_panel_root": true
+    "replace_mismatched_panel_root": true,
+    "check_mode_env": "CHECK_MODE",
+    "write_policy_modes": [
+      "read_only",
+      "dry_run",
+      "write_enabled"
+    ],
+    "health_smoke_write_skipped_evidence": true
   },
   "production_readiness": {
     "enabled": true,
@@ -198,7 +205,10 @@
     "restart_simulation_mode": "static_non_mutating_contract",
     "failure_injection_mode": "static_non_mutating_contract",
     "staging_dry_run_non_mutating_required": true,
-    "rollback_dry_run_non_mutating_required": true
+    "rollback_dry_run_non_mutating_required": true,
+    "check_mode_env": "CHECK_MODE",
+    "write_skipped_evidence": true,
+    "write_status_completed_with_write_skipped": true
   },
   "deploy_pipeline": {
     "staging_enabled": true,

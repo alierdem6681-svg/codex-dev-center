@@ -78,6 +78,8 @@ Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `
 
 Kalite kapısı retry simülasyonu ilk deneme ve en fazla bir retry sonucunu non-blocking raporlar; bu rapor production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
 
+Read-only ve dry-run analiz modlarında kontrol runner'ları state/report yazamıyorsa crash üretmemeli; yazma niyetini `write-skipped` kanıtı olarak raporlamalıdır. `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:
