@@ -259,6 +259,12 @@ def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> boo
     for task in tasks:
         if task.get("id") != child_id:
             continue
+        if (
+            task.get("pull_request_url")
+            or task.get("merge_blocked")
+            or str(task.get("result") or "") == "repo_apply_pr_ready_pipeline_passed"
+        ):
+            return False
         return normalize_status(task.get("status")) in retryable
     return True
 

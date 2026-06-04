@@ -2357,6 +2357,29 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
         self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
 
+    def test_pr_ready_merge_blocked_child_does_not_create_repo_apply_retry(self):
+        tasks = [
+            {
+                "id": "PARENT",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "risk": "medium",
+                "repo_apply_child": "CHILD",
+                "repo_apply_attempts": 1,
+            },
+            {
+                "id": "CHILD",
+                "status": TASK_STATUS_FAILED_RETRYABLE,
+                "risk": "medium",
+                "result": "repo_apply_pr_ready_pipeline_passed",
+                "pull_request_url": "https://example.invalid/pull/1",
+                "merge_blocked": True,
+            },
+        ]
+
+        self.assertFalse(lifecycle_manager.child_allows_retry(tasks, "CHILD"))
+        self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
+        self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
+
     def test_idle_worker_state_clears_current_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "workers.json"
