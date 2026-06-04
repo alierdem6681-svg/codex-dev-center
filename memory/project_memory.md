@@ -159,6 +159,12 @@ Validated proposal apply worker akışı için repo path doğrulaması güçlend
 
 Davranış `tests/test_runtime_status_model.py` içinde Windows path, `./` prefix, exact file allowlist ve traversal örnekleriyle sabitlendi. Bu paket production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
 
+## 2026-06-04 Controlled Apply Pipeline Report Checklist
+
+Apply worker raporu artık repo apply PR öncesinde `Controlled Apply Checklist` ve `Rollback Note` bölümlerini üretir. Rapor risk, patch scope dosya sayısı, diff review, secret scan, validation status, local pipeline, production deploy yapılmadı kanıtı ve branch/merge rollback yolunu açıkça yazar.
+
+Davranış `tests/test_runtime_status_model.py` içinde doğrudan rapor bölümü unit testiyle sabitlendi. Bu küçük kapsamlı retry production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
 ## 2026-06-03 Staging / Rollback Readiness Apply Validation
 
 Production readiness suite staging ve rollback dry-run sonuçlarını artık non-mutating JSON sözleşmesiyle doğrular. Staging için `dry_run=true` ve `mutating_cloud_operations_performed=false`; rollback için `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` zorunludur.
