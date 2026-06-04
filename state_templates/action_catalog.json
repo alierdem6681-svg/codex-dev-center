@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:30:51+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -152,7 +152,8 @@
       "requires_approval": false,
       "command": "{python} supervisor/cto_doctor.py --json",
       "status_alias_space_hyphen_normalization": true,
-      "status_alias_separator_normalization": true
+      "status_alias_separator_normalization": true,
+      "dispatch_contract_metadata_required": true
     },
     {
       "id": "cto_doctor_fix",
@@ -163,7 +164,8 @@
       "requires_approval": false,
       "command": "{python} supervisor/cto_doctor.py --fix --json",
       "status_alias_space_hyphen_normalization": true,
-      "status_alias_separator_normalization": true
+      "status_alias_separator_normalization": true,
+      "dispatch_contract_metadata_required": true
     },
     {
       "id": "queue_owner_cleanup",

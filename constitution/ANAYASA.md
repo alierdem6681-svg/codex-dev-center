@@ -34,6 +34,8 @@ Başlangıç rolleri:
 - worker-3: DevOps, yayına alma ve servisler
 - worker-4: Test, kalite ve denetim
 
+Worker dispatch sözleşmesi izlenebilir olmalıdır: queue task kayıtları `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını taşımalı; terminal task statusları yeniden worker kuyruğuna alınmamalıdır.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.

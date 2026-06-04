@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:30:51+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -67,7 +67,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "worker-1..4 servisleri, görev işleme, controlled repo apply path validation, control report ve log üretimi.",
+      "description": "worker-1..4 servisleri, görev işleme, dispatch claim metadata, controlled repo apply path validation, control report ve log üretimi.",
       "actions": [
         "start_worker",
         "stop_worker",
@@ -304,7 +304,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini case ve yaygin ayirici aliaslariyla normalize eder.",
+      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini ve dispatch contract metadata alanlarini normalize eder.",
       "actions": [
         "cto_doctor_check",
         "cto_doctor_fix"
