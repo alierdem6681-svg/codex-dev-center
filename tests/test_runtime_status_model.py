@@ -164,6 +164,18 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(meta["name"], "Dashboard Alan Temizliği")
         self.assertNotEqual(meta["name"], "Production Readiness Analizi")
 
+    def test_telegram_task_list_ui_metadata_is_not_production_readiness(self):
+        message = (
+            "Görevler menüsündeki görevler sürekli yer değiştiriyor. Çalışıyor durumları üstte olmalı. "
+            "Canlıda olanlar ana listede gösterilmemeli ve checkbox ile açılmalı. "
+            "Filtreler seçildiğinde sayfa yenilenip filtre kapanıyor."
+        )
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Dashboard Görev Listesi Düzeni")
+        self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
             [

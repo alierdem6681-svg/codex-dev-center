@@ -353,9 +353,19 @@ def classify_job_metadata(text):
         any(x in lowered for x in ["dashboard", "navbar", "panel", "menü", "menu", "ui"])
         and any(x in lowered for x in ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"])
     )
+    task_list_ui = (
+        any(x in lowered for x in ["görevler menüsü", "gorevler menusu", "görev list", "gorev list", "görev kuyruğu", "gorev kuyrugu"])
+        or ("filtre" in lowered and "checkbox" in lowered)
+    )
 
     if dashboard_cleanup:
         name = "Dashboard Alan Temizliği"
+        eta = "5-10 dakika"
+        first_update = "yaklaşık 1 dakika içinde"
+        interval = 180
+        risk = "düşük/orta"
+    elif task_list_ui:
+        name = "Dashboard Görev Listesi Düzeni"
         eta = "5-10 dakika"
         first_update = "yaklaşık 1 dakika içinde"
         interval = 180
