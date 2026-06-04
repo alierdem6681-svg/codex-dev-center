@@ -167,6 +167,7 @@ Faz 19B-10A Model Policy
 - [x] Repo apply path normalizasyonu exact file allowlist davranışıyla güçlendirildi.
 - [x] Runtime/secret path blokajı ve traversal koruması unit test ile sabitlendi.
 - [x] Controlled apply validation davranışı handover, onboarding, memory ve state template kayıtlarına işlendi.
+- [x] Apply raporu patch scope, diff review, secret scan, local pipeline ve rollback notu içeren controlled checklist üretir.
 
 ## Faz 32 - Queue / Status Normalizer Retry
 

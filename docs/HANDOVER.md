@@ -338,6 +338,23 @@ Yeni davranış:
 
 ---
 
+## Controlled Apply Pipeline v1 Report Checklist
+
+Tarih: 2026-06-04
+
+Görev: CTO-DISPATCH-20260604-064526-CTO-ACTION-20260604-062153-01-CONTROLLED-APPLY-PIPELINE
+
+Eklenenler:
+- `supervisor/worker_runner.py` repo apply raporuna `Controlled Apply Checklist` ve `Rollback Note` bölümleri ekler.
+- `tests/test_runtime_status_model.py` patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı ve branch rollback notunu doğrular.
+- Onboarding, roadmap, memory ve state template kayıtları küçük kapsamlı rapor davranışına hizalandı.
+
+Yeni davranış:
+- Apply raporu PR öncesinde risk, değişen commit dosyası sayısı, diff review, secret scan, validation status, local pipeline ve rollback yolunu açıkça yazar.
+- Production deploy, runtime state mutation, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
 ## Staging / Rollback Readiness Apply Validation
 
 Tarih: 2026-06-03

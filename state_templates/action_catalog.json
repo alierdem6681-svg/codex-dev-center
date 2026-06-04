@@ -186,7 +186,8 @@
       "non_mutating": true,
       "requires_isolated_worktree": true,
       "requires_exact_path_allowlist": true,
-      "requires_secret_scan": true
+      "requires_secret_scan": true,
+      "requires_control_report": true
     }
   ]
 }

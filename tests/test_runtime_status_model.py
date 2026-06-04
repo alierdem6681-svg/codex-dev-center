@@ -194,6 +194,28 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
 
+    def test_repo_apply_report_sections_include_controlled_apply_notes(self):
+        sections = worker_runner.repo_apply_control_report_sections(
+            risk="medium",
+            branch="worker/test-controlled-apply",
+            commit_files=["supervisor/worker_runner.py"],
+            unsafe_files=[],
+            secret_findings=[],
+            validation_status="PASS",
+            pipeline_status="PASS",
+        )
+        text = "\n".join(sections)
+
+        self.assertIn("## Controlled Apply Checklist", text)
+        self.assertIn("- Patch scope files: 1", text)
+        self.assertIn("- Diff review: PASS", text)
+        self.assertIn("- Secret scan: PASS", text)
+        self.assertIn("- Local pipeline: PASS", text)
+        self.assertIn("- Production deploy: NOT_RUN", text)
+        self.assertIn("- Critical operations: blocked_by_policy", text)
+        self.assertIn("## Rollback Note", text)
+        self.assertIn("delete branch `worker/test-controlled-apply`", text)
+
     def test_production_readiness_simulation_contracts_are_non_mutating(self):
         contracts = production_readiness_suite.readiness_simulation_contracts()
 

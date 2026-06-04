@@ -107,6 +107,7 @@ Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
+- Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.
