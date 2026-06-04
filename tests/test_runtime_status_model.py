@@ -902,6 +902,97 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("yeni görev açmayacağım", calls[1][2])
 
+    def test_archive_review_continuation_is_idempotent(self):
+        calls = []
+
+        def fake_submit_task(root, source, title, message, **kwargs):
+            calls.append(("submit_task", title, kwargs))
+            return {"task": {"id": "TASK-" + str(len(calls)), "title": title}}
+
+        def fake_trigger_lifecycle(root):
+            calls.append(("trigger_lifecycle", str(root)))
+            return {"ok": True}
+
+        originals = (
+            telegram_direct_cto.CONTINUATION_STATE,
+            telegram_direct_cto.submit_task,
+            telegram_direct_cto.trigger_lifecycle,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.CONTINUATION_STATE = Path(tmp) / "continuations.json"
+            telegram_direct_cto.submit_task = fake_submit_task
+            telegram_direct_cto.trigger_lifecycle = fake_trigger_lifecycle
+            try:
+                first = telegram_direct_cto.queue_archive_review_continuation("tester")
+                second = telegram_direct_cto.queue_archive_review_continuation("tester")
+            finally:
+                (
+                    telegram_direct_cto.CONTINUATION_STATE,
+                    telegram_direct_cto.submit_task,
+                    telegram_direct_cto.trigger_lifecycle,
+                ) = originals
+
+        submit_calls = [call for call in calls if call[0] == "submit_task"]
+        lifecycle_calls = [call for call in calls if call[0] == "trigger_lifecycle"]
+        self.assertTrue(first["ok"])
+        self.assertFalse(first["already_queued"])
+        self.assertTrue(second["already_queued"])
+        self.assertEqual(len(submit_calls), 3)
+        self.assertEqual(len(lifecycle_calls), 1)
+
+    def test_handle_message_routes_archive_review_continue_without_async_job(self):
+        calls = []
+
+        def fail_start_async_job(*_args, **_kwargs):
+            raise AssertionError("continue command must route tasks instead of starting a short analysis job")
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fake_queue_archive_review_continuation(from_user):
+            calls.append(("queue_archive_review_continuation", from_user))
+            return {"ok": True, "already_queued": False, "task_titles": ["Task A", "Task B"]}
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.latest_archive_review_summary_available,
+            telegram_direct_cto.queue_archive_review_continuation,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fail_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.latest_archive_review_summary_available = lambda: True
+            telegram_direct_cto.queue_archive_review_continuation = fake_queue_archive_review_continuation
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "Job ID: CTO-ARCHIVE-REVIEW-20260604-0753 devam",
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.latest_archive_review_summary_available,
+                    telegram_direct_cto.queue_archive_review_continuation,
+                ) = originals
+
+        self.assertEqual(calls[0], ("queue_archive_review_continuation", "tester"))
+        self.assertEqual(calls[1][0], "send_message")
+        self.assertIn("Devamı başlattım", calls[1][2])
+
     def test_handle_message_blocks_critical_operation_before_async_job(self):
         calls = []
 

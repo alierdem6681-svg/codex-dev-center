@@ -42,6 +42,36 @@ LOGS = APP / "logs"
 OFFSET_FILE = STATE / "telegram_direct_cto_offset.txt"
 PASSTHROUGH_AUDIT = LOGS / "direct_cto_passthrough.ndjson"
 FAILURE_LOG = LOGS / "direct_cto_failures.log"
+CONTINUATION_STATE = STATE / "direct_cto_continuations.json"
+ARCHIVE_REVIEW_JOB_ID = "CTO-ARCHIVE-REVIEW-20260604-0753"
+ARCHIVE_REVIEW_CONTINUATION_KEY = "archive_review_20260604_0753"
+ARCHIVE_REVIEW_TASKS = [
+    {
+        "title": "Dashboard Pipeline Flow UI Tabs",
+        "message": (
+            "Arşiv özeti devamı: Pipeline Flow backend canlı görünüyor. Güncel main üzerinden "
+            "dashboard pipeline flow yatay tab UI, canlı polling, responsive görünüm, güvenli panel "
+            "testleri ve living-docs etkisini tek root task olarak uygula. Aynı işi çoğaltma; hata "
+            "olursa kök nedeni aynı task üzerinde çöz."
+        ),
+    },
+    {
+        "title": "Dashboard Profile / Account Menu",
+        "message": (
+            "Arşiv özeti devamı: Eski profile/account menu PR branch'i main'e girmemiş görünüyor. "
+            "Güncel main üzerinden küçük kapsamlı profile/account menu task'ı aç, test/risk/dashboard "
+            "etkisini doğrula ve aynı işi çoğaltmadan ilerle."
+        ),
+    },
+    {
+        "title": "Worker Dispatch v2",
+        "message": (
+            "Arşiv özeti devamı: Eski Worker Dispatch v2 branch'i conflict'te kalmış ve roadmap'te açık. "
+            "Güncel main üzerinden dispatcher/worker root cause yaklaşımıyla tek root task olarak ele al; "
+            "hata olursa yeni root task açmadan aynı task üzerinde kök nedeni düzelt."
+        ),
+    },
+]
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -384,6 +414,92 @@ def wants_summary_before_new_tasks(text):
     )
 
 
+def is_continue_command(text):
+    compact = " ".join((text or "").lower().split())
+    if compact in {
+        "devam",
+        "tamam devam",
+        "onaylıyorum devam",
+        "onayliyorum devam",
+        "başla",
+        "basla",
+        "başlat",
+        "baslat",
+    }:
+        return True
+    return "devam" in compact and ("job id" in compact or ARCHIVE_REVIEW_JOB_ID.lower() in compact)
+
+
+def latest_archive_review_summary_available(log_dir=None):
+    log_dir = Path(log_dir) if log_dir is not None else LOGS
+    try:
+        candidates = sorted(log_dir.glob("async_cto_out_*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        return False
+    for path in candidates[:12]:
+        try:
+            text = path.read_text(errors="replace")
+        except Exception:
+            continue
+        if ARCHIVE_REVIEW_JOB_ID in text and all(item["title"] in text for item in ARCHIVE_REVIEW_TASKS):
+            return True
+    return False
+
+
+def write_state_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = now()
+    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(path)
+
+
+def queue_archive_review_continuation(requested_by):
+    if submit_task is None:
+        return {"ok": False, "error": "router_unavailable", "created": []}
+
+    state = read_json(CONTINUATION_STATE, {})
+    existing = state.get(ARCHIVE_REVIEW_CONTINUATION_KEY, {})
+    if existing.get("status") == "QUEUED":
+        return {
+            "ok": True,
+            "already_queued": True,
+            "created": existing.get("task_ids", []),
+            "task_titles": existing.get("task_titles", []),
+        }
+
+    created = []
+    task_titles = []
+    for item in ARCHIVE_REVIEW_TASKS:
+        routed = submit_task(
+            APP,
+            source="cto",
+            title=item["title"],
+            message=item["message"],
+            priority="high",
+            risk="medium",
+            requested_by=requested_by,
+            split=False,
+            worker_eligible=True,
+        )
+        task = routed.get("task", {})
+        created.append(task.get("id"))
+        task_titles.append(item["title"])
+
+    lifecycle = trigger_lifecycle(APP) if trigger_lifecycle is not None else {"ok": False, "error": "lifecycle_unavailable"}
+    state[ARCHIVE_REVIEW_CONTINUATION_KEY] = {
+        "status": "QUEUED",
+        "source_job_id": ARCHIVE_REVIEW_JOB_ID,
+        "task_ids": created,
+        "task_titles": task_titles,
+        "requested_by": requested_by,
+        "lifecycle": lifecycle,
+        "created_at": now(),
+    }
+    write_state_json(CONTINUATION_STATE, state)
+    return {"ok": True, "already_queued": False, "created": created, "task_titles": task_titles, "lifecycle": lifecycle}
+
+
 def run_direct_action(text):
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -630,6 +746,20 @@ def handle_message(token, expected_chat_id, msg):
             chat_id,
             f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
         )
+        return
+
+    if is_continue_command(safe_text) and latest_archive_review_summary_available():
+        result = queue_archive_review_continuation(from_user)
+        audit_passthrough(chat_id, from_user, text, safe_text, "archive_review_continuation")
+        if result.get("ok"):
+            prefix = "Devamı zaten başlatılmış; task çoğaltmadım." if result.get("already_queued") else "Devamı başlattım."
+            send_message(
+                token,
+                chat_id,
+                prefix + "\nTemiz root tasklar:\n- " + "\n- ".join(result.get("task_titles", [])),
+            )
+        else:
+            send_message(token, chat_id, "Devam komutunu aldım ama router şu an hazır değil; teknik hata olarak ele alıyorum.")
         return
 
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
