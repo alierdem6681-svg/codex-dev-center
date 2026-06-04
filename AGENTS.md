@@ -160,6 +160,12 @@ Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline st
 
 `supervisor/telegram_asset_safety.py` Telegram asset kabulu icin manifest, limit, checksum, MIME/uzanti, secret redaction, simulator ve dashboard-safe snapshot sozlesmesini test eder. Bu kontrat gercek Telegram API'ye fallback yapmaz, asset indirmez, runtime state/log/report mutate etmez ve production deploy yetkisi vermez.
 
+## TELEGRAM ASSET INTAKE BACKEND V1
+
+Telegram CTO hattına gelen fotoğraf ve doküman mesajları backend tarafında raw dosya indirmeden güvenli metadata event'ine sınıflandırılır. Caption sanitize edilir, dosya adı normalize edilir, MIME allowlist ve boyut limiti uygulanır; unsupported medya controlled reject alır.
+
+Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi Telegram'a, task mesajına, log'a veya rapora yazılmaz. Dosya indirme, kalıcı saklama, checksum ve malware scan ayrı asset processing aşamasına bırakılır.
+
 ## WORKER DISPATCH CONTRACT V1
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.

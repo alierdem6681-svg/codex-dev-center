@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:23:30+00:00",
+  "updated_at": "2026-06-04T11:40:00+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -170,6 +170,23 @@
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
       "dispatch_contract_metadata_required": true
+    },
+    {
+      "id": "classify_telegram_asset_intake",
+      "label": "Telegram Asset Intake Sınıflandır",
+      "module": "telegram",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "download_deferred": true,
+      "raw_file_id_logged": false,
+      "raw_payload_logged": false,
+      "supported_asset_types": [
+        "photo",
+        "document",
+        "media_with_caption"
+      ]
     },
     {
       "id": "queue_owner_cleanup",

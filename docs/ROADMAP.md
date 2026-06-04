@@ -232,3 +232,12 @@ Faz 19B-10A Model Policy
 - [x] Module registry, settings ve action template kayitlari eklendi.
 - [ ] Gercek Telegram asset intake backend sonraki kucuk pakette bu sozlesmeye baglanacak.
 - [ ] Dashboard asset inbox UI sonraki kucuk pakette stub veriden runtime veriye genisletilecek.
+
+## Faz 40 - Telegram Asset Intake Backend
+
+- [x] Telegram `photo`, `document`, caption ve unsupported medya payload'lari guvenli metadata event'ine siniflandirilir.
+- [x] Direct CTO handler medya mesajlarini `Telegram Asset Intake` routed task'ina cevirir.
+- [x] Raw `file_id`, raw payload, token, secret veya header bilgisi intake task/log mesajina yazilmaz.
+- [x] Dokuman MIME allowlist, dosya boyutu limiti, caption uzunluk limiti ve dosya adi sanitization davranisi unit test ile sabitlendi.
+- [x] Dosya indirme, kalici saklama, checksum ve malware scan sonraki asset processing asamasina birakildi.
+- [ ] Telegram Asset Storage And Manifest paketi sonraki kucuk kapsam olarak uygulanacak.

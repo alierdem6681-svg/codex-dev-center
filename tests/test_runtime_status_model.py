@@ -31,6 +31,7 @@ from supervisor import (  # noqa: E402
     supervisor_cli,
     task_recovery_engine,
     task_validation_engine,
+    telegram_asset_intake,
     telegram_bridge,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
@@ -826,6 +827,241 @@ class ProgressAwareRunnerTest(unittest.TestCase):
 
 
 class TelegramAsyncRoutingTest(unittest.TestCase):
+    def test_asset_intake_classifies_photo_caption_without_raw_file_id(self):
+        caption_value = "<script>alert(1)</script> " + "token" + "=sample"
+        update = {
+            "update_id": 101,
+            "message": {
+                "message_id": 7,
+                "chat": {"id": 12345},
+                "from": {"id": 67890, "username": "tester"},
+                "caption": caption_value,
+                "photo": [
+                    {
+                        "file_id": "SMALL_PHOTO_FILE_ID",
+                        "file_unique_id": "SMALL_UNIQUE",
+                        "file_size": 128,
+                        "width": 90,
+                        "height": 90,
+                    },
+                    {
+                        "file_id": "RAW_PHOTO_FILE_ID_MUST_NOT_LEAK",
+                        "file_unique_id": "PHOTO_UNIQUE",
+                        "file_size": 2048,
+                        "width": 1280,
+                        "height": 720,
+                    },
+                ],
+            },
+        }
+
+        event = telegram_asset_intake.classify_telegram_update(update)
+        serialized = json.dumps(event, ensure_ascii=False)
+
+        self.assertEqual(event["status"], "classified")
+        self.assertEqual(event["message_type"], "media_with_caption")
+        self.assertEqual(event["asset_type"], "photo")
+        self.assertTrue(event["should_enqueue_asset"])
+        self.assertEqual(event["file_unique_id"], "PHOTO_UNIQUE")
+        self.assertEqual(event["idempotency_key"], "101:PHOTO_UNIQUE")
+        self.assertIn("&lt;script&gt;", event["caption_sanitized"])
+        self.assertIn("[REDACTED_SECRET]", event["caption_sanitized"])
+        self.assertNotIn("sample", event["caption_sanitized"])
+        self.assertNotIn("RAW_PHOTO_FILE_ID_MUST_NOT_LEAK", serialized)
+        self.assertTrue(event["file_id_ref"].startswith("tg_file_"))
+
+    def test_asset_intake_sanitizes_document_file_name_and_supports_edited_message(self):
+        update = {
+            "update_id": 102,
+            "edited_message": {
+                "message_id": 8,
+                "chat": {"id": 12345},
+                "document": {
+                    "file_id": "RAW_DOCUMENT_FILE_ID_MUST_NOT_LEAK",
+                    "file_unique_id": "DOC_UNIQUE",
+                    "file_name": "../unsafe\x00/path.pdf",
+                    "mime_type": "application/pdf",
+                    "file_size": 4096,
+                },
+            },
+        }
+
+        event = telegram_asset_intake.classify_telegram_update(update)
+        serialized = json.dumps(event, ensure_ascii=False)
+
+        self.assertEqual(event["status"], "classified")
+        self.assertEqual(event["update_key"], "edited_message")
+        self.assertEqual(event["message_type"], "document")
+        self.assertEqual(event["asset_type"], "document")
+        self.assertEqual(event["file_name_sanitized"], "path.pdf")
+        self.assertNotIn("RAW_DOCUMENT_FILE_ID_MUST_NOT_LEAK", serialized)
+
+    def test_asset_intake_rejects_missing_file_id_and_disallowed_mime(self):
+        missing_file = telegram_asset_intake.classify_telegram_update(
+            {
+                "update_id": 103,
+                "message": {
+                    "message_id": 9,
+                    "chat": {"id": 12345},
+                    "photo": [{"file_unique_id": "PHOTO_UNIQUE"}],
+                },
+            }
+        )
+        disallowed_mime = telegram_asset_intake.classify_telegram_update(
+            {
+                "update_id": 104,
+                "message": {
+                    "message_id": 10,
+                    "chat": {"id": 12345},
+                    "document": {
+                        "file_id": "RAW_EXE_FILE_ID_MUST_NOT_LEAK",
+                        "file_unique_id": "EXE_UNIQUE",
+                        "file_name": "tool.exe",
+                        "mime_type": "application/x-msdownload",
+                    },
+                },
+            }
+        )
+
+        self.assertEqual(missing_file["status"], "rejected")
+        self.assertEqual(missing_file["reject_reason"], "missing_file_id")
+        self.assertFalse(missing_file["should_enqueue_asset"])
+        self.assertEqual(disallowed_mime["status"], "rejected")
+        self.assertEqual(disallowed_mime["reject_reason"], "mime_type_not_allowed")
+        self.assertNotIn("RAW_EXE_FILE_ID_MUST_NOT_LEAK", json.dumps(disallowed_mime, ensure_ascii=False))
+
+    def test_asset_intake_rejects_unsupported_media_type(self):
+        event = telegram_asset_intake.classify_telegram_update(
+            {
+                "update_id": 105,
+                "message": {
+                    "message_id": 11,
+                    "chat": {"id": 12345},
+                    "video": {
+                        "file_id": "RAW_VIDEO_FILE_ID",
+                        "file_unique_id": "VIDEO_UNIQUE",
+                    },
+                },
+            }
+        )
+
+        self.assertEqual(event["status"], "rejected")
+        self.assertEqual(event["message_type"], "unsupported")
+        self.assertEqual(event["unsupported_media_type"], "video")
+        self.assertFalse(event["should_enqueue_asset"])
+
+    def test_direct_cto_routes_photo_to_asset_intake_task(self):
+        calls = []
+
+        def fake_submit_task(root, source, title, message, **kwargs):
+            calls.append(("submit_task", source, title, message, kwargs))
+            return {"task": {"id": "TASK-ASSET"}}
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fail_start_async_job(*_args, **_kwargs):
+            raise AssertionError("asset intake should not start a Codex async job")
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.submit_task,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.start_async_job,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.submit_task = fake_submit_task
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.start_async_job = fail_start_async_job
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "message_id": 12,
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "caption": "lütfen incele",
+                        "photo": [
+                            {
+                                "file_id": "RAW_HANDLER_PHOTO_FILE_ID_MUST_NOT_LEAK",
+                                "file_unique_id": "HANDLER_PHOTO_UNIQUE",
+                                "file_size": 1024,
+                            }
+                        ],
+                    },
+                    update_id=106,
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.submit_task,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.start_async_job,
+                ) = originals
+
+        submit = next(call for call in calls if call[0] == "submit_task")
+        sent = next(call for call in calls if call[0] == "send_message")
+        self.assertEqual(submit[1], "telegram")
+        self.assertEqual(submit[2], "Telegram Asset Intake")
+        self.assertEqual(submit[4]["risk"], "medium")
+        self.assertFalse(submit[4]["worker_eligible"])
+        self.assertIn("HANDLER_PHOTO_UNIQUE", submit[3])
+        self.assertIn("106:HANDLER_PHOTO_UNIQUE", submit[3])
+        self.assertNotIn("RAW_HANDLER_PHOTO_FILE_ID_MUST_NOT_LEAK", submit[3])
+        self.assertIn("Medya alındı", sent[2])
+
+    def test_direct_cto_rejects_unsupported_media_without_task(self):
+        calls = []
+
+        def fail_submit_task(*_args, **_kwargs):
+            raise AssertionError("unsupported media must not create an intake task")
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.submit_task,
+            telegram_direct_cto.send_message,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.submit_task = fail_submit_task
+            telegram_direct_cto.send_message = fake_send_message
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "message_id": 13,
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "video": {
+                            "file_id": "RAW_VIDEO_FILE_ID",
+                            "file_unique_id": "VIDEO_UNIQUE",
+                        },
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.submit_task,
+                    telegram_direct_cto.send_message,
+                ) = originals
+
+        self.assertEqual(calls[0][0], "send_message")
+        self.assertIn("reddedildi", calls[0][2])
+
     def test_legacy_telegram_bridge_polling_disabled_when_direct_cto_owns_bot(self):
         config = {"direct_cto_mode": True, "old_bridge_disabled": True}
 

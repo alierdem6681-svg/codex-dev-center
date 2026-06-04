@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:23:30+00:00",
+  "updated_at": "2026-06-04T11:40:00+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -73,6 +73,19 @@
     "enabled": false,
     "raw_input_passthrough": true,
     "non_mutating_output_guard": true,
+    "asset_intake_backend_enabled": true,
+    "asset_intake_download_deferred": true,
+    "asset_intake_raw_file_id_logged": false,
+    "asset_intake_raw_payload_logged": false,
+    "asset_intake_max_file_bytes": 20971520,
+    "asset_intake_caption_max_chars": 1024,
+    "asset_intake_allowed_document_mime_types": [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "text/plain"
+    ],
     "health_auto_report_enabled": false,
     "health_report_manual_only": true,
     "send_long_code_outputs": false,
