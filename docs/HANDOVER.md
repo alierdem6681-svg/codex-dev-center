@@ -462,3 +462,36 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Worker Dispatch v2 Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-063431 / CTO-ACTION-20260604-062153-03-WORKER-DISPATCH-V2
+
+Eklenenler:
+- `supervisor/worker_dispatch.py` profil tabanli worker secim yardimcisi eklendi.
+- Worker secimi `role`, `capabilities`/`skills`, `risk_limit`, mevcut aktif yuk ve worker state sinirlarini birlikte degerlendirir.
+- `supervisor/cto_task_router.py` split edilen worker gorevlerine required role/capability metadata ekler ve profil tabanli secim yapar.
+- `supervisor/supervisor_cli.py dispatch` idle durumdaki mevcut `assigned_worker` atamasini ezmeden korur.
+- `state_templates/worker_profiles.json` geriye uyumlu `skills` alanini koruyarak `capabilities` alanlariyla hizalandi.
+- Module registry, module settings, action catalog, onboarding, roadmap ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- Guncellenen state template JSON dosyalari `python3 -m json.tool` ile PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 96 test.
+- Gecici `/tmp` repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- `git diff --check` PASS.
+- Readiness suite secret leakage ve forbidden operation scan PASS.
+
+Not:
+- Production deploy calistirilmadi.
+- Runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Lease timeout, retry backoff ve hata siniflandirma event modeli sonraki kucuk Worker Dispatch v2 paketine birakildi.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.

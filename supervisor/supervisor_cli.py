@@ -19,6 +19,7 @@ try:
         normalize_risk,
         normalize_status,
     )
+    from .worker_dispatch import assign_tasks_to_idle_workers, load_worker_profiles
 except ImportError:
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
@@ -33,6 +34,7 @@ except ImportError:
         normalize_risk,
         normalize_status,
     )
+    from worker_dispatch import assign_tasks_to_idle_workers, load_worker_profiles
 
 APP_DIR = Path("/opt/codex-dev-center")
 STATE_DIR = APP_DIR / "state"
@@ -133,7 +135,6 @@ def dispatch(_args):
     workers = read_json(workers_path, {"workers": []})
     queue = read_json(queue_path, {"tasks": []})
 
-    idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
     queue, _changes = normalize_queue_payload(queue)
     dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
     pending_tasks = [
@@ -143,7 +144,8 @@ def dispatch(_args):
     ]
 
     assignments = []
-    for worker, task in zip(idle_workers, pending_tasks):
+    profiles = load_worker_profiles(STATE_DIR.parent)
+    for worker, task in assign_tasks_to_idle_workers(workers.get("workers", []), pending_tasks, profiles):
         worker["status"] = TASK_STATUS_ASSIGNED
         worker["current_task"] = task["id"]
         worker["last_seen"] = now()

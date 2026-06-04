@@ -197,3 +197,11 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Worker Dispatch v2 Apply
+
+Worker dispatch v2 icin ilk kucuk repo/app uygulamasi yapildi. `supervisor/worker_dispatch.py` worker profilinden `role`, `capabilities`/`skills` ve `risk_limit` okuyarak task metadata ile eslestiren saf secim yardimcisi saglar. Router split gorevleri artik required role/capability metadata tasir; QA/pipeline gate isi worker-4'e, backend/router/queue isi worker-1'e gider.
+
+`supervisor/supervisor_cli.py dispatch`, task uzerindeki `assigned_worker` idle ise bu atamayi korur ve siradaki idle worker ile ezmez. `state_templates/worker_profiles.json` icinde `skills` korunarak `capabilities` alanlari eklendi. Risk limiti medium olan profiller high/critical gorev secimini kabul etmez.
+
+Bu paket production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Lease timeout, retry backoff ve hata siniflandirma event modeli henuz uygulanmadi.

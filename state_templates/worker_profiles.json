@@ -13,6 +13,13 @@
         "backend_services",
         "infrastructure_files"
       ],
+      "capabilities": [
+        "python",
+        "api",
+        "database_schema",
+        "backend_services",
+        "infrastructure_files"
+      ],
       "risk_limit": "medium",
       "can_use_codex_cli": false,
       "can_modify_production": false
@@ -23,6 +30,13 @@
       "enabled": true,
       "role": "Frontend ve panel",
       "skills": [
+        "html",
+        "css",
+        "javascript",
+        "dashboard",
+        "ux"
+      ],
+      "capabilities": [
         "html",
         "css",
         "javascript",
@@ -45,6 +59,13 @@
         "backup",
         "staging"
       ],
+      "capabilities": [
+        "systemd",
+        "docker",
+        "logs",
+        "backup",
+        "staging"
+      ],
       "risk_limit": "medium",
       "can_use_codex_cli": false,
       "can_modify_production": false
@@ -55,6 +76,13 @@
       "enabled": true,
       "role": "Test, kalite ve güvenlik denetimi",
       "skills": [
+        "testing",
+        "lint",
+        "audit",
+        "risk_review",
+        "output_guard"
+      ],
+      "capabilities": [
         "testing",
         "lint",
         "audit",

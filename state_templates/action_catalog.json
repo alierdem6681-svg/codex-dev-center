@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:41:49+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -121,6 +121,18 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false
+    },
+    {
+      "id": "worker_dispatch_v2_match",
+      "label": "Worker Dispatch v2 Eşleştirme",
+      "module": "supervisor",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "uses_worker_profiles": true,
+      "matches_role_capabilities_and_risk": true,
+      "preserves_preassigned_worker": true
     },
     {
       "id": "cto_doctor_check",

@@ -26,6 +26,7 @@ try:
         utc_now,
         worker_block_reason,
     )
+    from .worker_dispatch import WORKER_IDS, load_worker_profiles, select_worker_for_task
 except ImportError:
     from critical_operation_policy import critical_operation_findings
     from state_file_lock import state_file_lock
@@ -44,9 +45,10 @@ except ImportError:
         utc_now,
         worker_block_reason,
     )
+    from worker_dispatch import WORKER_IDS, load_worker_profiles, select_worker_for_task
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
-WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
+WORKERS = WORKER_IDS
 
 
 def runtime_root(value: str | None = None) -> Path:
@@ -110,11 +112,38 @@ def should_split(text: str) -> bool:
     )
 
 
-def choose_worker(index: int) -> str:
-    return WORKERS[index % len(WORKERS)]
+def rotated_workers(index: int) -> list[str]:
+    offset = index % len(WORKERS)
+    return [*WORKERS[offset:], *WORKERS[:offset]]
 
 
-def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, Any]]:
+def choose_worker(
+    index: int = 0,
+    task: dict[str, Any] | None = None,
+    root: Path | None = None,
+    queued_tasks: list[dict[str, Any]] | None = None,
+) -> str:
+    order = rotated_workers(index)
+    task = task or {}
+    selected = select_worker_for_task(
+        task,
+        profiles=load_worker_profiles(root or DEFAULT_ROOT),
+        queue={"tasks": queued_tasks or []},
+        fallback_order=order,
+    )
+    if selected:
+        return selected
+    if task.get("required_role") or task.get("required_capabilities") or task.get("required_skills"):
+        return ""
+    return order[0]
+
+
+def planning_subtasks(
+    parent: dict[str, Any],
+    message: str,
+    root: Path | None = None,
+    queued_tasks: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     if not should_split(message):
         return []
     parent_id = parent["id"]
@@ -123,41 +152,50 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
         (
             "Runtime Queue And Status Normalization",
             "Queue status enumlarini normalize et, stale veya case mismatch durumlarini raporla. Ana repo dosyalarini dogrudan degistirme; proposal ve test plani uret.",
+            "Backend ve altyapı",
+            ["python", "backend_services"],
         ),
         (
             "CTO Router And Worker Dispatch Review",
             "Telegram, SSH ve dashboard kaynakli gorevlerin merkezi router uzerinden worker-eligible alt gorevlere ayrilmasini denetle. Production deploy yapma.",
+            "Backend ve altyapı",
+            ["python", "backend_services"],
         ),
         (
             "Pipeline Gate And Rollback Readiness Review",
             "Quality gate, smoke test, health check ve rollback zinciri icin kontrollu proposal uret. Canli deploy yapma.",
+            "Test, kalite ve güvenlik denetimi",
+            ["testing", "risk_review"],
         ),
     ]
     tasks: list[dict[str, Any]] = []
-    for idx, (title, description) in enumerate(base, 1):
-        tasks.append(
-            {
-                "id": f"{parent_id}-SUB{idx}",
-                "parent_task_id": parent_id,
-                "parent_source": parent.get("source"),
-                "title": title,
-                "description": description,
-                "raw_message": stored_message,
-                "source": "cto",
-                "priority": parent.get("priority", "normal"),
-                "status": TASK_STATUS_QUEUED,
-                "risk": "medium",
-                "risk_level": "medium",
-                "assigned_worker": choose_worker(idx - 1),
-                "worker_eligible": True,
-                "created_at": utc_now(),
-                "updated_at": utc_now(),
-                "repo_applied": False,
-                "staging_deployed": False,
-                "production_deployed": False,
-                "delivery_level": "PLAN_REQUESTED",
-            }
-        )
+    existing_tasks = queued_tasks or []
+    for idx, (title, description, required_role, required_capabilities) in enumerate(base, 1):
+        subtask = {
+            "id": f"{parent_id}-SUB{idx}",
+            "parent_task_id": parent_id,
+            "parent_source": parent.get("source"),
+            "title": title,
+            "description": description,
+            "raw_message": stored_message,
+            "source": "cto",
+            "priority": parent.get("priority", "normal"),
+            "status": TASK_STATUS_QUEUED,
+            "risk": "medium",
+            "risk_level": "medium",
+            "assigned_worker": None,
+            "worker_eligible": True,
+            "required_role": required_role,
+            "required_capabilities": required_capabilities,
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
+            "repo_applied": False,
+            "staging_deployed": False,
+            "production_deployed": False,
+            "delivery_level": "PLAN_REQUESTED",
+        }
+        subtask["assigned_worker"] = choose_worker(idx - 1, subtask, root, [*existing_tasks, *tasks])
+        tasks.append(subtask)
     return tasks
 
 
@@ -225,12 +263,12 @@ def submit_task(
             "production_deployed": False,
             "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
         }
-        if worker_eligible:
-            parent["assigned_worker"] = choose_worker(len(tasks))
         tasks.append(parent)
+        if worker_eligible:
+            parent["assigned_worker"] = choose_worker(len(tasks) - 1, parent, root, tasks)
 
         should_create_subtasks = should_split(message) if split is None else split
-        created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+        created_subtasks = planning_subtasks(parent, message, root, tasks) if should_create_subtasks else []
         tasks.extend(created_subtasks)
 
         normalized, changes = normalize_queue_payload(queue)
