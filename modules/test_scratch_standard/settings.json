@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "scratch_root_priority": [
+    "TEST_SCRATCH_ROOT",
+    "RUNNER_TEMP/test-scratch",
+    "TMPDIR/test-scratch"
+  ],
+  "reject_repo_local_scratch_root": true,
+  "per_test_directory_format": "{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}",
+  "runtime_env_redirects": [
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "HOME",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+    "CODEX_TEST_OUTPUT_DIR",
+    "TEST_SCRATCH_ACTIVE_DIR"
+  ],
+  "repo_write_guard_available": true,
+  "debug_keep_env": [
+    "TEST_SCRATCH_KEEP",
+    "KEEP_TEST_SCRATCH"
+  ],
+  "updated_at": "2026-06-04T13:52:42+00:00"
+}

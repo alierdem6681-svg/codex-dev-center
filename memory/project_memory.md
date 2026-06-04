@@ -311,3 +311,13 @@ Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task ç
 Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
 
 Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
+
+## 2026-06-04 Safe Test Scratch Standard Apply
+
+Testlerin repo checkout'unu kirletmeden deterministik calismasi icin `tests/safe_test_scratch.py` ortak helper'i eklendi. Scratch root `TEST_SCRATCH_ROOT`, sonra `RUNNER_TEMP/test-scratch`, sonra `TMPDIR/test-scratch` onceligiyle cozulur ve repo icinde ise fail eder.
+
+`test_scratch()` her test icin atomik benzersiz dizin acar, temp/home/cache/config/output env degerlerini scratch alanina yonlendirir ve debug retain env'i yoksa cikista temizler. `guard_repo_clean()` allowlist disi repo file create/delete/modify davranisini test fail'e cevirir.
+
+Davranis `tests/test_safe_test_scratch_standard.py` ile sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local `git add` `.git/index.lock` read-only filesystem hatasiyla durdu ve GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu tamamlanmadi; bu nedenle bu sandbox icinde commit/PR acilamadi.

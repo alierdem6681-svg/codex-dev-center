@@ -1,0 +1,10 @@
+{
+  "id": "test_scratch_standard",
+  "name": "Safe Test Scratch Standard",
+  "status": "active",
+  "risk": "medium",
+  "description": "Shared test scratch helper and repo write guard for deterministic non-mutating tests.",
+  "enabled": true,
+  "dashboard_visible": true,
+  "updated_at": "2026-06-04T13:52:42+00:00"
+}

@@ -249,3 +249,12 @@ Faz 19B-10A Model Policy
 - [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
 - [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
 - [x] Metadata kontrati unit test ile sabitlendi.
+
+## Faz 42 - Safe Test Scratch Standard
+
+- [x] Ortak `tests.safe_test_scratch` helper'i eklendi.
+- [x] Scratch root onceligi `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` olarak sabitlendi.
+- [x] Per-test atomik scratch dizini ve runtime env redirect davranisi unit test ile dogrulandi.
+- [x] Repo write guard allowlist disi checkout mutasyonunu yakalayacak sekilde sabitlendi.
+- [x] Module registry, settings ve action template kayitlari eklendi.
+- [ ] Mevcut uzun test dosyalarinin tempfile kullanimlari sonraki kucuk paketlerde helper'a kademeli tasinacak.
