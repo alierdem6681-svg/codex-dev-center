@@ -104,6 +104,8 @@ Dashboard status API notu:
 - Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
 - Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
 - `/api/pipeline-flow` ana ve legacy panelde read-only pipeline stage payload'u dondurur; raw mesaj, uzun description, stdout/stderr, log veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalmalidir.
+- `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
+- Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.

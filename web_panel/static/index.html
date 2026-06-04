@@ -75,7 +75,21 @@
       }
       button { cursor: pointer; background: #eaf0f4; color: var(--accent); }
       button.primary { background: #dcebf0; border-color: #c8dce5; }
-      .controls { display: grid; gap: 8px; grid-template-columns: 1.3fr repeat(4, minmax(120px, .6fr)); margin-bottom: 10px; }
+      .controls {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(150px, 1.3fr) repeat(4, minmax(120px, .6fr)) minmax(180px, .7fr);
+        margin-bottom: 10px;
+      }
+      .control-check {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .control-check input { width: 16px; height: 16px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
       .header-actions { align-items: center; position: relative; }
       .account-menu { position: relative; }
@@ -334,6 +348,10 @@
               <option value="risk">En riskli</option>
               <option value="errors">En çok hata</option>
             </select>
+            <label class="control-check" for="showLiveTasks">
+              <input id="showLiveTasks" type="checkbox">
+              Canlıya alınanları göster
+            </label>
           </div>
           <div id="tasksTable" class="desktop-table"></div>
           <div id="tasksCards" class="mobile-list"></div>
@@ -430,6 +448,15 @@
       let pipelineFlowFailureCount = 0;
       let activeFlowStage = new URLSearchParams(location.search).get('pipeline_stage') || '';
       function esc(value){return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+      function foldedText(value){
+        return String(value ?? '')
+          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/ı/g, 'i')
+          .replace(/İ/g, 'I')
+          .toUpperCase();
+      }
       function badge(value){
         const s = String(value ?? '-');
         const u = s.toUpperCase();
@@ -440,6 +467,55 @@
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
+      function taskStatus(t){
+        const status = foldedText(t.status);
+        if (status === 'CALISIYOR' || status === 'IN_PROGRESS') return 'RUNNING';
+        if (status === 'DEPLOYED' || status === 'CANLIDA') return 'DEPLOYED';
+        return status;
+      }
+      function taskIsRunning(t){ return taskStatus(t) === 'RUNNING'; }
+      function flagIsTrue(value){
+        if (value === true) return true;
+        return ['TRUE','YES','1','LIVE','DEPLOYED','ALREADY_DEPLOYED'].includes(foldedText(value));
+      }
+      function taskIsLive(t){
+        const deployment = foldedText(t.deployment_status || t.deploymentStatus || t.delivery_level);
+        const liveTimestamp = ['liveAt','live_at','deployedAt','deployed_at','production_deployed_at'].some(key => Boolean(t[key]));
+        return taskStatus(t) === 'DEPLOYED'
+          || flagIsTrue(t.isLive)
+          || flagIsTrue(t.live)
+          || flagIsTrue(t.production_deployed)
+          || liveTimestamp
+          || ['LIVE','DEPLOYED','ALREADY_DEPLOYED','LOCAL_VM_FALLBACK_DEPLOYED'].includes(deployment);
+      }
+      function stableTaskId(t){
+        return String(t.id || t.dispatch_id || t.title || t.created_at || '');
+      }
+      function taskRiskRank(t){
+        return riskRank[String(t.risk || t.risk_level || '').toLowerCase()] || 0;
+      }
+      function compareStableTaskId(a, b){
+        const left = stableTaskId(a);
+        const right = stableTaskId(b);
+        if (left < right) return -1;
+        if (left > right) return 1;
+        return 0;
+      }
+      function compareTasks(a, b){
+        if (taskIsRunning(a) !== taskIsRunning(b)) return taskIsRunning(a) ? -1 : 1;
+        if (sortMode.value === 'oldest') return (taskTime(a) - taskTime(b)) || compareStableTaskId(a, b);
+        if (sortMode.value === 'risk') {
+          return (taskRiskRank(b) - taskRiskRank(a))
+            || (taskTime(b) - taskTime(a))
+            || compareStableTaskId(a, b);
+        }
+        if (sortMode.value === 'errors') {
+          return ((b.error_count || 0) - (a.error_count || 0))
+            || (taskTime(b) - taskTime(a))
+            || compareStableTaskId(a, b);
+        }
+        return (taskTime(b) - taskTime(a)) || compareStableTaskId(a, b);
+      }
       function tasks(){ return ((latest.tasks || latest.queue || {}).tasks || []).slice(); }
       function workers(){ return ((latest.workers || {}).workers || []).slice(); }
       function accountDisplayName(data){
@@ -488,18 +564,28 @@
         profileAvatar.textContent = initials;
         profileMeta.textContent = mode;
       }
+      function setFilterOptions(selectEl, defaultLabel, values){
+        const current = selectEl.value;
+        const html = `<option value="">${esc(defaultLabel)}</option>` + values.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+        if (selectEl.dataset.optionsHtml !== html) {
+          selectEl.innerHTML = html;
+          selectEl.dataset.optionsHtml = html;
+        }
+        selectEl.value = current === '' || values.includes(current) ? current : '';
+      }
       function fillFilters(){
         const allTasks = tasks();
         const allWorkers = workers();
         const statuses = [...new Set(allTasks.map(t => t.status).filter(Boolean))].sort();
         const risks = [...new Set(allTasks.map(t => t.risk || t.risk_level).filter(Boolean))].sort();
         const workerIds = [...new Set(allWorkers.map(w => w.id).filter(Boolean))].sort();
-        statusFilter.innerHTML = '<option value="">Tüm durumlar</option>' + statuses.map(x => `<option>${esc(x)}</option>`).join('');
-        riskFilter.innerHTML = '<option value="">Tüm riskler</option>' + risks.map(x => `<option>${esc(x)}</option>`).join('');
-        workerFilter.innerHTML = '<option value="">Tüm çalışanlar</option>' + workerIds.map(x => `<option>${esc(x)}</option>`).join('');
+        setFilterOptions(statusFilter, 'Tüm durumlar', statuses);
+        setFilterOptions(riskFilter, 'Tüm riskler', risks);
+        setFilterOptions(workerFilter, 'Tüm çalışanlar', workerIds);
       }
       function filteredTasks(){
         let list = tasks();
+        if (!showLiveTasks.checked) list = list.filter(t => !taskIsLive(t));
         const q = search.value.toLowerCase();
         list = list.filter(t => {
           const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
@@ -508,10 +594,7 @@
             && (!workerFilter.value || t.assigned_worker === workerFilter.value)
             && (!riskFilter.value || (t.risk || t.risk_level) === riskFilter.value);
         });
-        if (sortMode.value === 'oldest') list.sort((a,b) => taskTime(a)-taskTime(b));
-        else if (sortMode.value === 'risk') list.sort((a,b) => (riskRank[b.risk || b.risk_level]||0)-(riskRank[a.risk || a.risk_level]||0));
-        else if (sortMode.value === 'errors') list.sort((a,b) => (b.error_count||0)-(a.error_count||0));
-        else list.sort((a,b) => taskTime(b)-taskTime(a));
+        list.sort(compareTasks);
         return list;
       }
       function renderTasks(){
@@ -795,7 +878,13 @@
           items[items.length - 1]?.focus();
         }
       });
-      [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
+      search.addEventListener('input', renderTasks);
+      [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks].forEach(el => {
+        el.addEventListener('change', event => {
+          event.preventDefault();
+          renderTasks();
+        });
+      });
       pipelineFlowTabs.addEventListener('keydown', handlePipelineTabKey);
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) schedulePipelineFlowRefresh();
