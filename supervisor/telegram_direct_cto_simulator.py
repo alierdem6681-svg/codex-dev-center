@@ -16,6 +16,7 @@ try:
         is_long_task_message,
         local_natural_reply,
         sha256_text,
+        wants_summary_before_new_tasks,
     )
 except ImportError:
     from critical_operation_policy import critical_operation_findings
@@ -27,6 +28,7 @@ except ImportError:
         is_long_task_message,
         local_natural_reply,
         sha256_text,
+        wants_summary_before_new_tasks,
     )
 
 
@@ -70,10 +72,14 @@ def simulate_case(label: str, message: str, allow_codex: bool = False, write_aud
     critical = critical_operation_findings(safe_text)
     action_command = is_action_command(safe_text)
     long_task = is_long_task_message(safe_text)
+    summary_before_new_tasks = wants_summary_before_new_tasks(safe_text)
     critical_reply = local_natural_reply(safe_text) if critical else None
     if critical_reply:
         local_reply = critical_reply
         route = "local_natural_reply"
+    elif summary_before_new_tasks:
+        local_reply = None
+        route = "async_job"
     elif action_command or long_task:
         local_reply = None
         route = "async_job"
@@ -99,6 +105,7 @@ def simulate_case(label: str, message: str, allow_codex: bool = False, write_aud
         "critical_operation_findings": critical,
         "action_command": action_command,
         "long_task": long_task,
+        "summary_before_new_tasks": summary_before_new_tasks,
         "async_ack_expected": route == "async_job",
         "ack_deadline_seconds": 3 if route == "async_job" else None,
         "route": route,

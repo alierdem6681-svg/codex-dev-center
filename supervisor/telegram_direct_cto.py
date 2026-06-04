@@ -367,6 +367,23 @@ def is_action_command(text):
     ]
     return any(w in lowered for w in action_words)
 
+
+def wants_summary_before_new_tasks(text):
+    lowered = (text or "").lower()
+    task_creation_phrases = [
+        "yeni görev açmadan önce",
+        "yeni gorev acmadan once",
+        "görev açmadan önce",
+        "gorev acmadan once",
+        "yeni task açmadan önce",
+        "yeni task acmadan once",
+    ]
+    summary_words = ["özet", "ozet", "rapor", "incele", "ayır", "ayir", "sınıflandır", "siniflandir"]
+    return any(phrase in lowered for phrase in task_creation_phrases) and any(
+        word in lowered for word in summary_words
+    )
+
+
 def run_direct_action(text):
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -603,6 +620,16 @@ def handle_message(token, expected_chat_id, msg):
     if critical_reply:
         audit_passthrough(chat_id, from_user, text, safe_text, "approval_required")
         send_message(token, chat_id, critical_reply)
+        return
+
+    if wants_summary_before_new_tasks(safe_text):
+        audit_passthrough(chat_id, from_user, text, safe_text, "summary_before_task_creation")
+        job_id = start_async_job(chat_id, safe_text)
+        send_message(
+            token,
+            chat_id,
+            f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
+        )
         return
 
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.

@@ -778,6 +778,16 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertTrue(result["async_ack_expected"])
         self.assertEqual(result["ack_deadline_seconds"], 3)
 
+    def test_summary_before_new_tasks_routes_async_without_router_submission(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "summary_before_tasks",
+            "Arşivdeki eski görevleri incele. Yeni görev açmadan önce bana kısa özet ver.",
+        )
+
+        self.assertTrue(result["summary_before_new_tasks"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertTrue(result["async_ack_expected"])
+
     def test_critical_operation_routes_to_approval_before_async(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "database_destructive",
@@ -841,6 +851,56 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[0][0], "start_async_job")
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("JOB-ACK", calls[1][2])
+
+    def test_handle_message_defers_router_when_summary_is_requested_before_new_tasks(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False):
+            calls.append(("start_async_job", chat_id, router_task_id, action_command))
+            return "JOB-SUMMARY"
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fail_submit_task(*_args, **_kwargs):
+            raise AssertionError("router task must not be created before the requested summary")
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.submit_task,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.submit_task = fail_submit_task
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "Arşivdeki eski görevleri incele. Yeni görev açmadan önce bana kısa özet ver.",
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.submit_task,
+                ) = originals
+
+        self.assertEqual(calls[0], ("start_async_job", "123", None, False))
+        self.assertEqual(calls[1][0], "send_message")
+        self.assertIn("yeni görev açmayacağım", calls[1][2])
 
     def test_handle_message_blocks_critical_operation_before_async_job(self):
         calls = []
