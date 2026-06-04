@@ -104,6 +104,7 @@ Ajan şu klasörleri inceler:
 - supervisor/service_watchdog.py
 - scripts/queue_owner_cleanup.py
 - web_panel/panel_server.py
+- docs/CONTROLLED_APPLY_PIPELINE.md
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
 - docs/worker_queue_production_sync_repair_20260604_054726.md
@@ -125,6 +126,7 @@ Controlled apply notu:
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
+- Apply raporu `Controlled Apply Stage Plan` bolumuyle proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy durumlarini sirali yazar.
 - `PIPELINE_FAILED` apply child tasklari icin yeni kok task acmadan root-cause raporu uretilmeli; `workspace_missing` gibi nedenler son hata, retry edilebilirlik ve onerilen duzeltme ile ayrastirilmalidir.
 
 Safe test scratch notu:

@@ -420,8 +420,34 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertIn("- Local pipeline: PASS", text)
         self.assertIn("- Production deploy: NOT_RUN", text)
         self.assertIn("- Critical operations: blocked_by_policy", text)
+        self.assertIn("## Controlled Apply Stage Plan", text)
+        self.assertIn("- 1. Proposal review: PASS", text)
+        self.assertIn("- 2. Patch plan: PASS", text)
+        self.assertIn("- 3. Diff review: PASS", text)
+        self.assertIn("- 4. Secret scan: PASS", text)
+        self.assertIn("- 5. Local tests: PASS", text)
+        self.assertIn("- 6. Report: PASS", text)
+        self.assertIn("- 7. Rollback note: PASS", text)
+        self.assertIn("- 8. Production deploy: NOT_RUN", text)
         self.assertIn("## Rollback Note", text)
         self.assertIn("delete branch `worker/test-controlled-apply`", text)
+
+    def test_repo_apply_stage_plan_marks_unsafe_diff_before_tests(self):
+        sections = worker_runner.repo_apply_control_report_sections(
+            risk="medium",
+            branch="worker/test-controlled-apply",
+            commit_files=["state/task_queue.json"],
+            unsafe_files=["state/task_queue.json"],
+            secret_findings=[],
+            validation_status="FAIL",
+            pipeline_status="NOT_RUN",
+        )
+        text = "\n".join(sections)
+
+        self.assertIn("- 2. Patch plan: FAIL", text)
+        self.assertIn("- 3. Diff review: FAIL", text)
+        self.assertIn("- 5. Local tests: NOT_RUN", text)
+        self.assertIn("- Production deploy: NOT_RUN", text)
 
     def test_production_readiness_simulation_contracts_are_non_mutating(self):
         contracts = production_readiness_suite.readiness_simulation_contracts()

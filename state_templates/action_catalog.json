@@ -254,7 +254,8 @@
       "requires_isolated_worktree": true,
       "requires_exact_path_allowlist": true,
       "requires_secret_scan": true,
-      "requires_control_report": true
+      "requires_control_report": true,
+      "requires_stage_plan_report": true
     },
     {
       "id": "validate_telegram_asset_safety_contract",

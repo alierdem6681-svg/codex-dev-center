@@ -80,6 +80,7 @@
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_report_checklist": true,
+    "repo_apply_stage_plan_report": true,
     "repo_apply_runtime_artifacts_ignored": true,
     "worker_claim_writes_dispatch_metadata": true,
     "bootstrap_preflight_enabled": true,

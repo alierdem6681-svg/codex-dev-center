@@ -300,3 +300,10 @@ Faz 19B-10A Model Policy
 - [x] Superseded duplicate parent task'larindan backlog continuation uretilmesi engellendi.
 - [x] Direct CTO action mode'da implementation sinyalli islerin plan-only kapanmasi engellendi.
 - [x] Module registry, settings, action catalog ve runtime status unit testleri guncellendi.
+
+## Faz 48 - Controlled Apply Stage Plan Contract
+
+- [x] Controlled apply pipeline plan dokumani eklendi.
+- [x] Apply raporu `Controlled Apply Stage Plan` bolumunde proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy durumlarini sirali yazar.
+- [x] Unsafe diff durumunda local testlerin calismadan `NOT_RUN` kalmasi unit test ile sabitlendi.
+- [x] Module registry, settings, action catalog ve yasayan dokumantasyon kayitlari guncellendi.

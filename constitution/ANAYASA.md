@@ -73,6 +73,7 @@ Telegram asset intake backend fotoğraf ve doküman mesajlarını dosya indirmed
 
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notu içermelidir.
+Apply raporu proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy durumlarını sıralı `Controlled Apply Stage Plan` olarak göstermelidir.
 
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.
 

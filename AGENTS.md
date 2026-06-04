@@ -205,6 +205,7 @@ Validated proposal apply worker'lari sadece izole git worktree ve worker branch 
 `AGENTS.md` gibi tekil allowlist dosyalari sadece exact dosya eslesmesiyle kabul edilir; `AGENTS.md.bak` veya `AGENTS.md/child` gibi varyantlar repo apply icin guvenli sayilmaz. Runtime `state/`, `logs/`, `reports/`, `workspaces/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database ve reklam platformu live-write kapsam disi kalir.
 
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notunu içermelidir.
+Apply raporu ayrıca `Controlled Apply Stage Plan` bölümüyle proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy durumlarını sıralı yazmalıdır.
 
 ## SAFE TEST SCRATCH STANDARD V1
 

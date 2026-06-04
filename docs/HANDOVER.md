@@ -920,3 +920,25 @@ Test:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Controlled Apply Stage Plan Contract Apply
+
+Tarih: 2026-06-04
+Görev: CTO-ACTION-20260604-144354-01-CONTROLLED-APPLY-PIPELINE
+Worker: worker-1
+
+Eklenenler:
+- `docs/CONTROLLED_APPLY_PIPELINE.md` proposal review'dan PR/finalizer handoff'una kadar controlled apply asamalarini tanimlar.
+- `supervisor/worker_runner.py` repo apply raporuna `Controlled Apply Stage Plan` bolumunu ekler.
+- Stage plan proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy durumlarini sirali yazar.
+- Unsafe path durumunda patch plan/diff review `FAIL`, local tests `NOT_RUN` olarak raporlanir.
+- AGENTS, anayasa, onboarding, roadmap, memory ve state template kayitlari guncellendi.
+
+Test:
+- `tests/test_runtime_status_model.py` rapor stage planini ve unsafe diff davranisini regresyon testiyle sabitler.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu izole clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.
