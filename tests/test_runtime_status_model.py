@@ -1344,6 +1344,53 @@ class DirectCtoProgressWatcherTest(unittest.TestCase):
 
 
 class ProductionReadinessSuiteScanTest(unittest.TestCase):
+    def test_dashboard_route_api_accepts_current_dashboard_shell(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            static = root / "web_panel" / "static"
+            static.mkdir(parents=True)
+            (static / "index.html").write_text(
+                """
+                <title>Codex Dev Center Yönetim Paneli</title>
+                <div>Görevler, pipeline flow ve güvenli panel yönetimi</div>
+                <nav>Pipeline Flow Görevler Workers Çıkış</nav>
+                <main>
+                  <span>Aktif Kuyruk</span>
+                  <span>Canlı İşler</span>
+                  <span>Kapalı Kayıt</span>
+                  <button>Canlıya alınanları göster</button>
+                  <script>
+                    const stages = {
+                      intake: 'Alım',
+                      queue: 'Kuyruk',
+                      worker: 'Worker',
+                      proposal: 'Proposal',
+                      validation: 'Doğrulama',
+                      approval: 'Onay',
+                      failed: 'Hata',
+                      closed: 'Kapalı',
+                      deployed: 'Canlı'
+                    };
+                  </script>
+                </main>
+                """,
+                encoding="utf-8",
+            )
+            (static / "login.html").write_text(
+                "Kullanıcı adı Şifre Giriş Yap İlk kullanıcıyı oluştur",
+                encoding="utf-8",
+            )
+
+            original_root = production_readiness_suite.ROOT
+            production_readiness_suite.ROOT = root
+            try:
+                results = {}
+                production_readiness_suite.dashboard_test(results)
+            finally:
+                production_readiness_suite.ROOT = original_root
+
+        self.assertTrue(results["dashboard_route_api_test"]["ok"])
+
     def test_iter_repo_text_files_tolerates_deleted_directory_during_walk(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

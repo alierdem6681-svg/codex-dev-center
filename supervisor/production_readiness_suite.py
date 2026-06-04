@@ -223,19 +223,25 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
 def dashboard_test(results: dict[str, Any]) -> None:
     index = (ROOT / "web_panel/static/index.html").read_text(encoding="utf-8", errors="replace")
     required_text = [
-        "Canlıya Alma Durumu",
-        "Ön Canlı Sonucu",
-        "Geri Alma",
-        "Yayına Alma",
-        "Görev Kuyruğu",
-        "Toparlama",
-        "Deploy Komutları",
-        "Kalite Kapıları",
+        "Codex Dev Center Yönetim Paneli",
+        "Görevler, pipeline flow ve güvenli panel yönetimi",
+        "Aktif Kuyruk",
+        "Canlı İşler",
+        "Kapalı Kayıt",
+        "Pipeline Flow",
+        "Görevler",
+        "Workers",
+        "Canlıya alınanları göster",
+        "Alım",
+        "Kuyruk",
+        "Worker",
+        "Proposal",
+        "Doğrulama",
+        "Onay",
+        "Hata",
+        "Kapalı",
+        "Canlı",
         "Çıkış",
-        "Pipeline Gözlemi",
-        "Runner",
-        "Run ID",
-        "Telegram CTO işleri",
     ]
     missing = [item for item in required_text if item not in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
