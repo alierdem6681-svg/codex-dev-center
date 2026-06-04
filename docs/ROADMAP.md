@@ -249,3 +249,11 @@ Faz 19B-10A Model Policy
 - [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
 - [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
 - [x] Metadata kontrati unit test ile sabitlendi.
+
+## Faz 42 - Read-Only / Dry-Run Write Policy
+
+- [x] Ortak read-only/dry-run write evidence helper'i eklendi.
+- [x] Readiness suite `CHECK_MODE=read_only|dry_run` altında state/report yazmadan `write-skipped` kanıtı döndürür.
+- [x] Drift checker aynı write evidence sözleşmesine bağlandı.
+- [x] Health/smoke test status ve report yazımları dry-run/read-only modda atlanır.
+- [x] Read-only, dry-run ve smoke write-skip davranışı unit testlerle sabitlendi.

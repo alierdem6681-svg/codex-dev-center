@@ -84,7 +84,9 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_quality_gate.py
 - supervisor/codex_quality_gate.py içindeki `standard-report` komutu readiness artefact'inden standart kalite raporu üretir
 - supervisor/codex_quality_gate.py içindeki `retry-simulation` komutu non-blocking retry deneme raporu üretir ve standard rapora gömülür
+- supervisor/read_only_execution.py içindeki `CHECK_MODE=read_only|dry_run|write_enabled` yazma politikası state/report yazımlarını `write-skipped` kanıtına çevirebilir
 - supervisor/production_readiness_suite.py
+- supervisor/production_readiness_suite.py `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` altında state/report yazmadan JSON sonucunda `write_evidence` ve `write_status=completed_with_write_skipped` döndürür
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
@@ -96,6 +98,7 @@ Ajan şu klasörleri inceler:
 - supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
+- supervisor/production_environment_manager.py health/smoke yazımlarında aynı read-only/dry-run write policy helper'ını kullanır
 - supervisor/service_watchdog.py
 - scripts/queue_owner_cleanup.py
 - web_panel/panel_server.py
@@ -151,6 +154,11 @@ Telegram asset intake notu:
 - Raw `file_id`, raw payload, token, secret veya header bilgisi intake event/task mesajına yazılmaz.
 - Dosya indirme, kalıcı saklama, checksum ve malware scan bu backend sınıflandırıcıda yapılmaz; sonraki asset processing aşamasına bırakılır.
 - Desteklenmeyen medya ve limit/allowlist dışı dokümanlar controlled reject olarak işaretlenir.
+
+Read-only / dry-run write policy notu:
+- `CHECK_MODE` veya `CODEX_CHECK_MODE` `read_only` ya da `dry_run` ise readiness, drift ve smoke write adapter'lari state/report dosyasi olusturmaz.
+- Sonuc payload'lari `mode`, `runtime_write_status`, `write_evidence`, `write_status`, `target`, `operation`, `write_attempted`, `write_status=skipped` ve `skip_reason` alanlariyla kanit dondurur.
+- `CHECK_MODE` verilmezse davranis `write_enabled` olarak geriye uyumludur.
 
 ## Servis Keşfi
 

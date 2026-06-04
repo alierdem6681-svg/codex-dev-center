@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import errno
 import importlib.util
 import json
 import os
@@ -12,6 +11,25 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from .read_only_execution import (
+        atomic_write_json_best_effort,
+        current_execution_mode,
+        read_only_write_error,
+        summarize_write_status,
+        write_evidence_items,
+        write_text_best_effort as _write_text_best_effort,
+    )
+except ImportError:
+    from read_only_execution import (
+        atomic_write_json_best_effort,
+        current_execution_mode,
+        read_only_write_error,
+        summarize_write_status,
+        write_evidence_items,
+        write_text_best_effort as _write_text_best_effort,
+    )
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -41,23 +59,8 @@ def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def read_only_write_error(exc: BaseException) -> bool:
-    return isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.EROFS
-
-
 def write_text_best_effort(path: Path, text: str, encoding: str = "utf-8") -> dict[str, Any]:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding=encoding)
-        return {"ok": True, "path": str(path)}
-    except OSError as exc:
-        return {
-            "ok": False,
-            "path": str(path),
-            "error": type(exc).__name__,
-            "errno": getattr(exc, "errno", None),
-            "read_only": read_only_write_error(exc),
-        }
+    return _write_text_best_effort(path, text, encoding=encoding, root=ROOT, operation="write_report")
 
 
 def read_json(path: Path, default: Any) -> Any:
@@ -70,26 +73,7 @@ def read_json(path: Path, default: Any) -> Any:
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> dict[str, Any]:
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        tmp.replace(path)
-        return {"ok": True, "path": str(path)}
-    except OSError as exc:
-        try:
-            if tmp.exists():
-                tmp.unlink()
-        except OSError:
-            pass
-        return {
-            "ok": False,
-            "path": str(path),
-            "error": type(exc).__name__,
-            "errno": getattr(exc, "errno", None),
-            "read_only": read_only_write_error(exc),
-        }
+    return atomic_write_json_best_effort(path, data, root=ROOT, operation="write_state")
 
 
 def run_cmd(cmd: list[str], timeout: int = 120) -> dict[str, Any]:
@@ -433,7 +417,7 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
     record(
         results,
         "rollback_simulation",
-        rollback_contract["ok"] and (report_write["ok"] or report_write.get("read_only")),
+        rollback_contract["ok"] and (report_write["ok"] or report_write.get("write_status") == "skipped"),
         {"report": str(report.relative_to(ROOT)), "report_write": report_write, "result": rollback, "contract": rollback_contract},
     )
 
@@ -606,11 +590,14 @@ def run_suite() -> dict[str, Any]:
         "production_deploy_performed": False,
         "staging_deploy_performed": False,
         "mutating_cloud_operations_performed": False,
+        "mode": current_execution_mode(),
     }
     payload["runtime_write_status"] = {
         "state": atomic_write_json(STATE / "production_readiness_status.json", payload),
     }
     payload["runtime_write_status"]["report"] = write_report(payload)
+    payload["write_evidence"] = write_evidence_items(payload["runtime_write_status"])
+    payload["write_status"] = summarize_write_status(payload["write_evidence"])
     return payload
 
 

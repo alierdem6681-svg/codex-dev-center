@@ -14,6 +14,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from .read_only_execution import (
+        atomic_write_json_best_effort,
+        summarize_write_status,
+        write_evidence_items,
+        write_text_best_effort,
+    )
+except ImportError:
+    from read_only_execution import (
+        atomic_write_json_best_effort,
+        summarize_write_status,
+        write_evidence_items,
+        write_text_best_effort,
+    )
+
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
 DEFAULT_SOURCE_ROOT = Path("/home/alierdem6681/codex-dev-center-github-export")
@@ -72,11 +87,7 @@ def read_json(path: Path, default: Any) -> Any:
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    return atomic_write_json_best_effort(path, data, root=ROOT, operation="write_state")
 
 
 def command_root() -> Path:
@@ -529,9 +540,13 @@ def health_check(scope: str = "production") -> dict[str, Any]:
         },
         "services": service_discovery(),
     }
-    atomic_write_json(STATE / f"{scope}_health_check_status.json", payload)
-    atomic_write_json(STATE / "last_health_check_status.json", payload)
-    write_environment_report("health_check", payload)
+    payload["runtime_write_status"] = {
+        f"{scope}_health_state": atomic_write_json(STATE / f"{scope}_health_check_status.json", payload),
+        "last_health_state": atomic_write_json(STATE / "last_health_check_status.json", payload),
+    }
+    payload["runtime_write_status"]["report"] = write_environment_report("health_check", payload)
+    payload["write_evidence"] = write_evidence_items(payload["runtime_write_status"])
+    payload["write_status"] = summarize_write_status(payload["write_evidence"])
     return payload
 
 
@@ -565,9 +580,13 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
         "health": health,
         "status_api_status": status.get("status"),
     }
-    atomic_write_json(STATE / f"{scope}_smoke_test_status.json", payload)
-    atomic_write_json(STATE / "last_smoke_test_status.json", payload)
-    write_environment_report("smoke_test", payload)
+    payload["runtime_write_status"] = {
+        f"{scope}_smoke_state": atomic_write_json(STATE / f"{scope}_smoke_test_status.json", payload),
+        "last_smoke_state": atomic_write_json(STATE / "last_smoke_test_status.json", payload),
+    }
+    payload["runtime_write_status"]["report"] = write_environment_report("smoke_test", payload)
+    payload["write_evidence"] = write_evidence_items(payload["runtime_write_status"])
+    payload["write_status"] = summarize_write_status(payload["write_evidence"])
     return payload
 
 
@@ -748,8 +767,7 @@ def write_production_outputs(result: dict[str, Any]) -> None:
     write_environment_report("production_deploy", result)
 
 
-def write_environment_report(kind: str, payload: dict[str, Any]) -> None:
-    REPORTS.mkdir(parents=True, exist_ok=True)
+def write_environment_report(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     status = payload.get("status") or ("PASS" if payload.get("ok") else "FAIL")
     lines = [
         "# Production Environment Last Report",
@@ -772,13 +790,37 @@ def write_environment_report(kind: str, payload: dict[str, Any]) -> None:
     blockers = payload.get("blockers", [])
     if blockers:
         lines += ["", "## Blockers"] + [f"- {item}" for item in blockers]
-    (REPORTS / "production_environment_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    text = "\n".join(lines) + "\n"
+    writes = {
+        "production_environment_report": write_text_best_effort(
+            REPORTS / "production_environment_last_report.md",
+            text,
+            root=ROOT,
+            operation="write_report",
+        )
+    }
     if kind == "staging_deploy":
-        (REPORTS / "staging_deploy_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        writes["staging_deploy_report"] = write_text_best_effort(
+            REPORTS / "staging_deploy_last_report.md",
+            text,
+            root=ROOT,
+            operation="write_report",
+        )
     if kind == "production_deploy":
-        (REPORTS / "production_runtime_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        writes["production_runtime_report"] = write_text_best_effort(
+            REPORTS / "production_runtime_last_report.md",
+            text,
+            root=ROOT,
+            operation="write_report",
+        )
     if kind == "rollback":
-        (REPORTS / "rollback_production_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        writes["rollback_production_report"] = write_text_best_effort(
+            REPORTS / "rollback_production_last_report.md",
+            text,
+            root=ROOT,
+            operation="write_report",
+        )
+    return writes
 
 
 def inspect_environment() -> dict[str, Any]:

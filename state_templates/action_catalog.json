@@ -51,7 +51,13 @@
       "requires_approval": false,
       "non_mutating": true,
       "simulation_contracts_required": true,
-      "dry_run_non_mutating_contracts_required": true
+      "dry_run_non_mutating_contracts_required": true,
+      "supports_check_modes": [
+        "read_only",
+        "dry_run",
+        "write_enabled"
+      ],
+      "write_skipped_evidence": true
     },
     {
       "id": "codex_quality_report",
@@ -103,7 +109,13 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/production_environment_manager.py health-check --scope production"
+      "command": "{python} supervisor/production_environment_manager.py health-check --scope production",
+      "supports_check_modes": [
+        "read_only",
+        "dry_run",
+        "write_enabled"
+      ],
+      "write_skipped_evidence": true
     },
     {
       "id": "smoke_test",
@@ -112,7 +124,13 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/production_environment_manager.py smoke-test --scope production"
+      "command": "{python} supervisor/production_environment_manager.py smoke-test --scope production",
+      "supports_check_modes": [
+        "read_only",
+        "dry_run",
+        "write_enabled"
+      ],
+      "write_skipped_evidence": true
     },
     {
       "id": "production_deploy_start",
