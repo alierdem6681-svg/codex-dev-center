@@ -219,3 +219,11 @@ Worker Dispatch v2 apply retry kucuk kapsama indirildi. Queue task normalizasyon
 Worker claim akisi task'i `RUNNING` yaparken `worker_id` ve `claimed_at` yazar. Router subtask metadata ve worker claim metadata davranisi `tests/test_runtime_status_model.py` icinde unit test ile sabitlendi.
 
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-04 Dashboard Gorev Listesi Duzeni Apply
+
+Dashboard Gorevler listesi artik render oncesinde deterministik comparator kullanir. `RUNNING` / `Calisiyor` gorevleri listenin ustunde kalir; canliya alinmis gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
+
+Canli gorev algisi `DEPLOYED`, `isLive`, `liveAt`, `deployment_status`, `delivery_level=DEPLOYED` ve `production_deployed` sinyallerini okur. Filtre option'lari runtime yenilemelerinde gereksiz yeniden yazilmaz, secili filtre korunur.
+
+Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

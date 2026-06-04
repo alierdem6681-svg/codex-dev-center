@@ -514,3 +514,26 @@ Eklenenler:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
+## Dashboard Gorev Listesi Duzeni Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-TASK-20260604-092627-014351-DASHBOARD-GÖREV-LISTESI-DÜZENI
+
+Eklenenler:
+- `web_panel/static/index.html` Gorevler listesine deterministik comparator ekledi.
+- `RUNNING` ve `Calisiyor` durumundaki gorevler liste basinda kalir.
+- `DEPLOYED`, `isLive`, `liveAt`, `deployment_status=LIVE/DEPLOYED`, `delivery_level=DEPLOYED` ve `production_deployed` sinyalleri canli gorev olarak algilanir.
+- Canli gorevler varsayilan listeden gizlenir; `Canliya alinanlari goster` checkbox'i ile dahil edilir.
+- Filtre option'lari sadece icerik degistiginde yeniden yazilir ve secili filtre degeri korunur.
+- `tests/test_dashboard_account_menu_markup.py` dashboard markup sozlesmesini canli filtre, running-first siralama ve filtre yenileme davranisi icin genisletti.
+
+Test:
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.

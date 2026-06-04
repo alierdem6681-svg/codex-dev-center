@@ -189,3 +189,12 @@ Faz 19B-10A Model Policy
 - [x] Worker claim akisi `worker_id` ve `claimed_at` alanlarini task kaydina yazar.
 - [x] Router subtask dispatch contract ve worker claim metadata davranisi unit test ile sabitlendi.
 - [ ] Retry attempt increment ve stale claim timeout re-dispatch davranisi sonraki kucuk pakete birakildi.
+
+## Faz 35 - Dashboard Gorev Listesi Duzeni
+
+- [x] Gorevler listesi deterministik comparator ile siralanir.
+- [x] `RUNNING` / `Calisiyor` gorevleri listenin ustunde kalir.
+- [x] Canliya alinmis gorevler varsayilan ana listeden gizlenir.
+- [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
+- [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
+- [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
