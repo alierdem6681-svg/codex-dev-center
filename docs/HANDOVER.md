@@ -667,3 +667,21 @@ Not:
 - Production deploy, staging deploy, canli Telegram API cagrisi, runtime asset storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
 - Runtime Telegram asset intake ve dashboard UI tablo/detay gorunumu sonraki kucuk paketlere birakildi.
+
+---
+
+## Telegram Asset Safety Tests Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-ACTION-20260604-102221-04-TELEGRAM-ASSET-SAFETY-TESTS
+
+Eklenenler:
+- `supervisor/telegram_asset_safety.py` manifest, limit, checksum, MIME/uzanti, redaction, simulator ve dashboard-safe snapshot sozlesmesini ekledi.
+- `tests/test_telegram_asset_safety.py` asset kabul, limit, manifest, secret redaction, Telegram simulator retry/idempotency ve dashboard smoke sozlesmesini unit test ile sabitledi.
+- `modules/telegram_asset_safety/` ve state template kayitlari yeni non-mutating module/action gorunurlugunu ekledi.
+
+Not:
+- Gercek Telegram API cagrisi, asset indirme, production deploy, staging deploy, runtime `state/`, `logs/`, `workspaces/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; repo template kayitlari guncellendi.
+- Local `git add` sandbox disindaki git metadata dizini read-only oldugu icin tamamlanamadi. GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.

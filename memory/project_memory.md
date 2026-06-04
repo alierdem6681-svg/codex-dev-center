@@ -263,3 +263,9 @@ Dashboard Telegram Asset Inbox icin kucuk backend kontrati eklendi. `web_panel/t
 Ana panel ve legacy panel `GET /api/dashboard/telegram-assets` ile `GET /api/dashboard/telegram-assets/{asset_id}` endpointlerini ayni helper'a baglar; POST denemeleri read-only 405 dondurur. `tests/test_telegram_asset_inbox.py` redaction, filtre/cursor, single manifest ve panel server wrapper davranisini sabitler.
 
 Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime asset storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Runtime Telegram asset intake ve dashboard UI tablo/detay gorunumu sonraki kucuk paketlere birakildi.
+
+## 2026-06-04 Telegram Asset Safety Tests Apply
+
+Telegram asset akisi icin ilk non-mutating guvenlik sozlesmesi eklendi. `supervisor/telegram_asset_safety.py` manifest schema, asset sayisi/boyutu, toplam boyut, caption uzunlugu, path traversal, tehlikeli uzanti, MIME/uzanti uyumu, sha256 checksum, secret redaction, simulator-only Telegram send ve dashboard-safe snapshot davranisini dogrular.
+
+Davranis `tests/test_telegram_asset_safety.py` icinde unit test ile sabitlendi. `modules/telegram_asset_safety/` ve `state_templates` kayitlari module/action gorunurlugu icin guncellendi. Bu paket gercek Telegram API cagrisi, asset indirme, production/staging deploy, runtime state/log/workspace mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

@@ -1,0 +1,13 @@
+{
+  "id": "telegram_asset_safety",
+  "name": "Telegram Asset Safety Contracts",
+  "status": "contract_ready",
+  "risk": "medium",
+  "settings_enabled": true,
+  "actions_enabled": true,
+  "dashboard_visible": true,
+  "description": "Non-mutating manifest, limit, redaction, simulator and dashboard safety contracts for future Telegram asset intake.",
+  "actions": [
+    "validate_telegram_asset_safety_contract"
+  ]
+}

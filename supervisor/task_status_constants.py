@@ -112,7 +112,9 @@ APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 WORKER_BLOCKED_SOURCES = {"telegram"}
 
 SENSITIVE_PATTERNS = [
+    re.compile(r"(?i)\b[A-Za-z0-9_-]*(?:token|api[_-]?key|password|passwd|secret|private[_-]?key)[A-Za-z0-9_-]*\s*[:=]\s*['\"]?[^'\"\s]+"),
     re.compile(r"(?i)\b(token|api[_-]?key|password|passwd|secret|private[_-]?key)\s*[:=]\s*['\"]?[^'\"\s]+"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{12,}\b"),
     re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{30,}\b"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
 ]
