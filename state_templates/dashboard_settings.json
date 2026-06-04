@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-04T06:08:03+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
@@ -42,6 +42,7 @@
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
     "show_controlled_execution_status": true,
+    "show_pipeline_flow": true,
     "show_last_health_check": true,
     "show_last_smoke_test": true,
     "show_last_error_recommendation": true

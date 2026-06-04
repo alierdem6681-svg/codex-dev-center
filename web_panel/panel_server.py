@@ -10,7 +10,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+WEB_PANEL_DIR = Path(__file__).resolve().parent
+if str(WEB_PANEL_DIR) not in sys.path:
+    sys.path.insert(0, str(WEB_PANEL_DIR))
+
 import auth as panel_auth
+from pipeline_flow import build_pipeline_flow
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -341,6 +346,10 @@ def status_payload():
     }
 
 
+def pipeline_flow_payload():
+    return build_pipeline_flow(ROOT)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         LOGS.mkdir(parents=True, exist_ok=True)
@@ -425,6 +434,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
+            return
+        if parsed.path == "/api/pipeline-flow":
+            self.send_json(pipeline_flow_payload())
             return
         if parsed.path in ("/", "/index.html"):
             self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
