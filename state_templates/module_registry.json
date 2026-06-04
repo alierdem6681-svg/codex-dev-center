@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:18:45+00:00",
+  "updated_at": "2026-06-04T14:48:58+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -303,7 +303,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, dry-run non-mutating, read-only/dry-run write evidence ve simülasyon sözleşmesi kapılarını çalıştırır.",
+      "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, Telegram-safe sonuç özeti, dry-run non-mutating, read-only/dry-run write evidence ve simülasyon sözleşmesi kapılarını çalıştırır.",
       "actions": [
         "production_readiness_suite"
       ]

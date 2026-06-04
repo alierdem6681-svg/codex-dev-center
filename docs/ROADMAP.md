@@ -306,3 +306,10 @@ Faz 19B-10A Model Policy
 - [x] `action_result_watcher` PR acmis repo apply action task'larini proposal dosyasi yok diye `FAILED_NO_PROPOSAL` durumuna dusurmez.
 - [x] PR URL'si, `PR_READY` delivery seviyesi veya `repo_apply_pr_ready_pipeline_passed` sonucu bulunan kayitlar `DONE` / `PR_READY` olarak korunur.
 - [x] Deploy edilmis kayit ve PR-ready kayit koruma davranisi runtime status regresyon testleriyle sabitlendi.
+
+## Faz 49 - Staging / Rollback Readiness Telegram Result Contract
+
+- [x] Production readiness suite `telegram_result_report_flow` kapisi eklendi.
+- [x] Telegram-safe ozet staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini kapsar.
+- [x] Ozet diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri ve runtime path bilgisi icermeyecek sekilde test edildi.
+- [x] Policy template, onboarding, anayasa, AGENTS ve memory/handover kayitlari guncellendi.

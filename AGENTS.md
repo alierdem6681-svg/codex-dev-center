@@ -190,6 +190,12 @@ Ana ve legacy panel `/api/status` payload'lari `qualityGateView` alanini donduru
 
 Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## TELEGRAM READINESS RESULT REPORT CONTRACT V1
+
+`supervisor/production_readiness_suite.py` `telegram_result_report_flow` kapisiyla staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini Telegram-safe kisa ozet sozlesmesiyle dogrular.
+
+Bu kapi gercek Telegram API cagirmaz; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri veya runtime path bilgisini Telegram ozetine koyamaz.
+
 ## OBSERVED ISSUE COMPLETION CONTRACT V1
 
 Drift registry/settings farklari tek alert sinyaliyle otomatik eklenmez; `supervisor/drift_checker.py` adaylari kanit kaynaklari ve confidence ile siniflandirir.

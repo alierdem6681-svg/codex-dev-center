@@ -1915,6 +1915,45 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
             ["git_reset_performed"],
         )
 
+    def test_telegram_result_report_flow_is_safe_summary_only(self):
+        results = {
+            "staging_smoke_test": {"ok": True, "status": "PASS"},
+            "rollback_simulation": {"ok": True, "status": "PASS"},
+            "secret_leakage_scan": {"ok": True, "status": "PASS"},
+            "forbidden_operation_scan": {"ok": True, "status": "PASS"},
+        }
+
+        production_readiness_suite.telegram_result_report(results)
+
+        gate = results["telegram_result_report_flow"]
+        self.assertTrue(gate["ok"])
+        details = gate["details"]
+        summary = details["summary"]
+        self.assertIn("Staging health/smoke: PASS", summary)
+        self.assertIn("Rollback planı: PASS", summary)
+        self.assertIn("Production deploy: yapılmadı", summary)
+        self.assertFalse(details["telegram_api_called"])
+        self.assertFalse(details["contract"]["telegram_api_called"])
+        self.assertFalse(details["contract"]["technical_output_included"])
+        self.assertLessEqual(
+            len(summary),
+            production_readiness_suite.TELEGRAM_RESULT_REPORT_MAX_CHARS,
+        )
+        self.assertLessEqual(
+            len(summary.splitlines()),
+            production_readiness_suite.TELEGRAM_RESULT_REPORT_MAX_LINES,
+        )
+        for forbidden in ["diff --git", "Traceback", "stdout:", "stderr:", "/opt/", "file_id"]:
+            self.assertNotIn(forbidden, summary)
+
+    def test_telegram_result_report_contract_rejects_technical_dump(self):
+        summary = "Production readiness özeti:\nstdout: diff --git a/app.py b/app.py\n"
+
+        contract = production_readiness_suite.telegram_result_report_contract(summary)
+
+        self.assertFalse(contract["ok"])
+        self.assertIn(r"\b(stdout|stderr)\b\s*[:=]", contract["forbidden_findings"])
+
     def test_readiness_writes_are_best_effort_in_read_only_runtime(self):
         exc = OSError(errno.EROFS, "Read-only file system")
         self.assertTrue(production_readiness_suite.read_only_write_error(exc))

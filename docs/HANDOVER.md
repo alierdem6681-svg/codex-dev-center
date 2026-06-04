@@ -936,3 +936,21 @@ Test:
 - `python3 -m unittest tests.test_runtime_status_model.ActionResultWatcherTest` PASS.
 - `python3 -m unittest discover -s tests` PASS, 203 test.
 - `python3 supervisor/production_readiness_suite.py --json` PASS, 100%.
+
+---
+
+## Staging / Rollback Readiness Telegram Result Contract Apply
+
+Tarih: 2026-06-04
+Görev: CTO-ACTION-20260604-144354-05-STAGING-ROLLBACK-READINESS
+Worker: worker-3
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` `telegram_result_report_flow` kapisini ekledi.
+- Gate staging health/smoke, rollback plani, genel readiness sonucu ve production deploy yapilmadi bilgisinden Telegram-safe kisa ozet uretir.
+- Ozet 900 karakter ve 12 satir limitiyle diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri ve runtime path bilgisini reddeder.
+- `tests/test_runtime_status_model.py` guvenli ozet ve teknik dump reddi regresyon testlerini ekledi.
+- `state_templates/production_readiness_policy.json`, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa ve memory kayitlari guncellendi.
+
+Not:
+- Production deploy, staging deploy, gercek Telegram API cagrisi, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

@@ -53,6 +53,25 @@ FORBIDDEN_MUTATION_PATTERNS = [
 
 SKIP_DIRS = {".git", "state", "logs", "workspaces", "backups", "tmp", "__pycache__"}
 TEXT_SUFFIXES = {".py", ".md", ".json", ".sh", ".html", ".css", ".js", ".txt", ".service"}
+TELEGRAM_RESULT_REPORT_MAX_CHARS = 900
+TELEGRAM_RESULT_REPORT_MAX_LINES = 12
+
+TELEGRAM_RESULT_FORBIDDEN_PATTERNS = [
+    re.compile(r"^diff --git ", re.M),
+    re.compile(r"^@@ ", re.M),
+    re.compile(r"^\+\+\+ ", re.M),
+    re.compile(r"^--- ", re.M),
+    re.compile(r"Traceback \(most recent call last\):"),
+    re.compile(r"\b(stdout|stderr)\b\s*[:=]", re.I),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{20,}\b"),
+    re.compile(r"\bya29\.[0-9A-Za-z_-]{20,}\b"),
+    re.compile(r"\braw_payload\b", re.I),
+    re.compile(r"\bfile_id\b", re.I),
+    re.compile(r"\bAuthorization\s*:", re.I),
+    re.compile(r"/opt/"),
+]
 
 
 def now() -> str:
@@ -394,6 +413,80 @@ def dry_run_non_mutating_contract(command_result: dict[str, Any], false_flags: l
     }
 
 
+def gate_status(results: dict[str, Any], name: str) -> str:
+    item = results.get(name, {})
+    if item.get("ok"):
+        return "PASS"
+    if item:
+        return "FAIL"
+    return "UNKNOWN"
+
+
+def build_telegram_readiness_result_report(results: dict[str, Any]) -> str:
+    failed = [name for name, item in results.items() if not item.get("ok")]
+    score = round(100 * (len(results) - len(failed)) / max(1, len(results)), 2)
+    fail_text = "yok"
+    if failed:
+        fail_text = ", ".join(failed[:3])
+        if len(failed) > 3:
+            fail_text += f" +{len(failed) - 3}"
+    lines = [
+        "Production readiness özeti:",
+        f"- Genel durum: {'PASS' if not failed else 'FAIL'}",
+        f"- Skor: {score}%",
+        f"- Staging health/smoke: {gate_status(results, 'staging_smoke_test')}",
+        f"- Rollback planı: {gate_status(results, 'rollback_simulation')}",
+        f"- Telegram raporu: güvenli kısa özet; teknik çıktı yok",
+        "- Production deploy: yapılmadı; GitHub Actions finalizer beklenir",
+        f"- Fail gate: {fail_text}",
+    ]
+    return "\n".join(lines)
+
+
+def telegram_result_report_contract(text: str) -> dict[str, Any]:
+    lines = text.splitlines()
+    findings = [
+        pattern.pattern
+        for pattern in TELEGRAM_RESULT_FORBIDDEN_PATTERNS
+        if pattern.search(text)
+    ]
+    ok = (
+        bool(text.strip())
+        and len(text) <= TELEGRAM_RESULT_REPORT_MAX_CHARS
+        and len(lines) <= TELEGRAM_RESULT_REPORT_MAX_LINES
+        and not findings
+    )
+    return {
+        "ok": ok,
+        "mode": "telegram_safe_summary_contract",
+        "max_chars": TELEGRAM_RESULT_REPORT_MAX_CHARS,
+        "max_lines": TELEGRAM_RESULT_REPORT_MAX_LINES,
+        "chars": len(text),
+        "lines": len(lines),
+        "forbidden_findings": findings,
+        "telegram_api_called": False,
+        "technical_output_included": False,
+    }
+
+
+def telegram_result_report(results: dict[str, Any]) -> None:
+    summary = build_telegram_readiness_result_report(results)
+    contract = telegram_result_report_contract(summary)
+    record(
+        results,
+        "telegram_result_report_flow",
+        contract["ok"],
+        {
+            "mode": "safe_summary_only",
+            "summary": summary,
+            "contract": contract,
+            "telegram_api_called": False,
+            "production_deploy_performed": False,
+            "mutating_cloud_operations_performed": False,
+        },
+    )
+
+
 def staging_and_rollback(results: dict[str, Any]) -> None:
     docs_ok = (ROOT / "docs/STAGING_ROLLBACK_READINESS_PLAN.md").exists()
     controller_ok = (ROOT / "supervisor/production_deploy_controller.py").exists()
@@ -580,6 +673,7 @@ def run_suite() -> dict[str, Any]:
     security_scans(results)
     staging_and_rollback(results)
     chaos_simulations(results)
+    telegram_result_report(results)
 
     failed = [name for name, item in results.items() if not item.get("ok")]
     score = round(100 * (len(results) - len(failed)) / max(1, len(results)), 2)

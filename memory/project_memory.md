@@ -363,3 +363,9 @@ Production readiness suite uzun dry-run JSON stdout'unu kesmeden saklayacak seki
 `supervisor/action_result_watcher.py` repo apply akışında PR açmış CTO action task'larını artık proposal workspace dosyası yok diye `FAILED_NO_PROPOSAL` durumuna düşürmez. PR URL'si, `PR_READY` delivery seviyesi veya `repo_apply_pr_ready_pipeline_passed` sonucu bulunan kayıtlar `DONE` / `PR_READY` olarak korunur ve production deploy bayrakları false kalır.
 
 Bu guard, PR hazır durumundaki işler için gereksiz dispatch/recovery çocuk görevleri açılmasını engeller. Davranış `tests/test_runtime_status_model.py` içindeki deployed-record ve PR-ready-record watcher regresyon testleriyle sabitlendi.
+
+## 2026-06-04 Staging / Rollback Readiness Telegram Result Contract
+
+Worker-3 staging/rollback readiness paketi production readiness suite'e `telegram_result_report_flow` gate'ini ekledi. Bu gate staging health/smoke, rollback plani, genel readiness sonucu ve production deploy yapilmadi bilgisinden Telegram'a uygun kisa ozet uretir.
+
+Kontrat: ozet 900 karakter ve 12 satiri asamaz; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri veya runtime path bilgisi iceremez. Gercek Telegram API cagrisi, production deploy, staging deploy veya runtime state/log mutasyonu yapilmaz.

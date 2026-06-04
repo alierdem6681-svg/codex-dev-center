@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-04T14:48:58+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -24,9 +24,20 @@
     "forbidden_operation_scan",
     "staging_smoke_test",
     "rollback_simulation",
+    "telegram_result_report_flow",
     "restart_simulation",
     "failure_injection_simulation"
   ],
+  "telegram_result_report_flow": {
+    "mode": "telegram_safe_summary_contract",
+    "real_telegram_api_called": false,
+    "technical_output_included": false,
+    "max_chars": 900,
+    "max_lines": 12,
+    "requires_staging_health_smoke_status": true,
+    "requires_rollback_plan_status": true,
+    "requires_production_deploy_not_performed": true
+  },
   "dry_run_non_mutating_contracts": {
     "staging_smoke_test": {
       "mode": "dry_run_non_mutating_contract",
@@ -63,6 +74,7 @@
     "staging_health_check",
     "staging_smoke_test",
     "rollback_simulation",
+    "telegram_result_report_flow",
     "github_actions_production_deploy",
     "production_health_check",
     "production_smoke_test",

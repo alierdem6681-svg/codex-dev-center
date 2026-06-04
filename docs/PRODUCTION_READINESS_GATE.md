@@ -18,6 +18,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Forbidden operation scan PASS
 - Ön canlı smoke test PASS
 - Geri alma simulation PASS
+- Telegram güvenli sonuç raporu akışı PASS
 - Ön canlı ve geri alma dry-run non-mutating JSON sözleşmesi PASS
 - Restart simulation PASS
 - Failure injection simulation PASS
@@ -31,6 +32,15 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
+
+## Telegram Sonuç Raporu
+
+Readiness suite `telegram_result_report_flow` kapısıyla kullanıcıya gidebilecek kısa Telegram özetini doğrular.
+
+- Özet staging health/smoke, rollback planı, genel readiness durumu ve production deploy yapılmadı bilgisini içerir.
+- Özet en fazla 900 karakter ve 12 satır olmalıdır.
+- Diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, token/private key/env değeri veya runtime path bilgisi içeremez.
+- Bu kapı gerçek Telegram API çağırmaz; sadece güvenli özet sözleşmesini test eder.
 
 ## Otomatik Yayına Alma Kuralı
 

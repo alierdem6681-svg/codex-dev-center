@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:18:45+00:00",
+  "updated_at": "2026-06-04T14:48:58+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -65,6 +65,9 @@
       "non_mutating": true,
       "simulation_contracts_required": true,
       "dry_run_non_mutating_contracts_required": true,
+      "telegram_result_report_flow_required": true,
+      "telegram_result_report_mode": "telegram_safe_summary_contract",
+      "telegram_result_report_real_api_called": false,
       "supports_check_modes": [
         "read_only",
         "dry_run",
