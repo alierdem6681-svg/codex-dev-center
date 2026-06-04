@@ -241,3 +241,9 @@ Telegram asset storage backlog icin ilk repo/app degisikligi olarak manifest v1 
 Fixture setleri `tests/fixtures/telegram_asset_manifest/` altinda tutulur ve `tests/test_telegram_asset_manifest_contract.py` ile valid, boundary, limit-asimi ve forbidden-field davranislari test edilir. `telegram_asset_manifest_contract` modulu state template registry/settings/action catalog icine eklendi.
 
 Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Repo worktree icinde runtime `state/` dizini yoktu ve olusturulmadi.
+
+## 2026-06-04 Dashboard Pipeline Expand State Tests Apply
+
+Dashboard Pipeline Flow ana gorevleri artik expand/collapse tercihini `main_task_code` / `root_task_id` anahtariyla ayni sayfa oturumunda korur. Polling, stage refresh veya `renderPipelineFlow()` yeniden cizimi kullanicinin kapattigi aktif ana gorevi otomatik tekrar acmaz.
+
+Davranis `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` regresyon testiyle sabitlendi. Compile, dashboard markup testleri, ana runtime status unittest paketi, `/tmp` kopyasinda production readiness suite, whitespace ve secret pattern diff scan PASS oldu. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

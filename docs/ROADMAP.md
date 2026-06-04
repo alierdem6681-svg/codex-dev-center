@@ -208,3 +208,9 @@ Faz 19B-10A Model Policy
 - [x] `20971520` byte Telegram indirme limiti unit test ile sabitlendi.
 - [x] Raw payload, Telegram file URL ve sensitive credential-like alan redaksiyon kontrati test edildi.
 - [ ] Runtime Telegram asset intake ve dashboard inbox gorunumu sonraki kucuk paketlere birakildi.
+
+## Faz 37 - Dashboard Pipeline Expand State Tests
+
+- [x] Pipeline ana gorev expand/collapse tercihi polling ve render refresh sonrasinda korunur.
+- [x] Kullanici kapattigi aktif ana gorev otomatik tekrar acilmaz.
+- [x] Expand state davranisi dashboard pipeline flow UI regresyon testiyle sabitlendi.
