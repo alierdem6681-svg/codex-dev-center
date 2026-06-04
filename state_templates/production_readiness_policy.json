@@ -48,6 +48,12 @@
       ]
     }
   },
+  "standard_quality_report_non_mutating_flags_required": [
+    "production_deploy_performed",
+    "staging_deploy_performed",
+    "mutating_cloud_operations_performed"
+  ],
+  "missing_standard_quality_report_non_mutating_flag_fails_gate": true,
   "real_deploy_sequence": [
     "git_clean_check",
     "github_remote_sync_check",
