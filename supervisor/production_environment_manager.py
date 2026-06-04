@@ -499,7 +499,7 @@ def service_discovery() -> dict[str, Any]:
 
 def status_api_auth_required(status: dict[str, Any]) -> bool:
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
-    return int(status.get("status") or 0) == 401 and body.get("login") is True
+    return int(status.get("status") or 0) == 401 and bool(body.get("login"))
 
 
 def health_check(scope: str = "production") -> dict[str, Any]:

@@ -3887,7 +3887,7 @@ class SystemRepairControlsTest(unittest.TestCase):
                 if path == "/health":
                     return {"ok": True, "status": 200, "body": {"ok": True}}
                 if path == "/api/status":
-                    return {"ok": False, "status": 401, "body": {"ok": False, "login": True}}
+                    return {"ok": False, "status": 401, "body": {"ok": False, "login": "/login"}}
                 return {"ok": False, "status": 404, "body": {}}
 
             originals = (
