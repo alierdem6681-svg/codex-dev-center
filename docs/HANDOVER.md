@@ -840,3 +840,24 @@ Not:
 - Production deploy, staging deploy, VM SSH, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu izole clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` kayıtları güncellendi.
 - Local `git add` `.git/index.lock` read-only filesystem hatasıyla bloklandı; bu sandbox içinde commit/PR oluşturulamadı.
+
+---
+
+## Dashboard Quality Gate Status Contract Apply
+
+Tarih: 2026-06-04
+Görev: CTO-APPLY-20260604-134419 / CTO-ACTION-20260604-131808-03-DASHBOARD-QUALITY-GATE-STATUS-CONTRACT
+
+Eklenenler:
+- Ana ve legacy panel `/api/status` payload'u `qualityGateView` kontrat v1 alanini dondurur.
+- `web_panel/quality_gate_view.py` production readiness ve son health check kaynaklarini merkezi olarak `READY`, `DEGRADED`, `NOT_READY`, `UNKNOWN` durumlarina indirger.
+- Legacy `quality_gate_status` karar kaynagi degildir; sadece `legacy_quality_gate_status` olarak tasinir.
+- Readiness/health eksik veya stale ise sonuc `UNKNOWN` olur; legacy fallback pozitif READY uretmez.
+- Legacy ile yeni kaynaklar cakisirse `legacy_conflict` reason code diagnostik olarak gorunur.
+
+Test:
+- `python3 -m compileall -q web_panel tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.DashboardPipelineTrackingStatusTest` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

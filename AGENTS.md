@@ -182,6 +182,14 @@ Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatc
 
 Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## DASHBOARD QUALITY GATE VIEW CONTRACT V1
+
+Ana ve legacy panel `/api/status` payload'lari `qualityGateView` alanini dondurur. Dashboard badge, renk, filtre ve kalite kapisi ozeti icin tek karar kaynagi bu alan olmalidir.
+
+`qualityGateView` `production_readiness_status.json`, `last_health_check_status.json` ve diagnostik `quality_gate_status.json` girdilerinden uretilir. Legacy `quality_gate_status` pozitif `READY` karari uretmek icin kullanilamaz; yalnizca `legacy_quality_gate_status` olarak tasinir veya eksik/stale durumda non-authoritative fallback nedeni verir.
+
+Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.

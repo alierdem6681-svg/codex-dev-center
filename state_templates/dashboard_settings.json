@@ -41,6 +41,8 @@
     "show_last_smoke_run": true,
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
+    "show_quality_gate_view": true,
+    "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
     "show_pipeline_flow": true,
     "show_last_health_check": true,

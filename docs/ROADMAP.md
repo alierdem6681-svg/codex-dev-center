@@ -270,3 +270,11 @@ Faz 19B-10A Model Policy
 - [x] Drift checker aynı write evidence sözleşmesine bağlandı.
 - [x] Health/smoke test status ve report yazımları dry-run/read-only modda atlanır.
 - [x] Read-only, dry-run ve smoke write-skip davranışı unit testlerle sabitlendi.
+
+## Faz 45 - Dashboard Quality Gate Status Contract
+
+- [x] Ana ve legacy `/api/status` payload'u `qualityGateView` kontrat v1 alanini dondurur.
+- [x] Readiness + health kaynaklari tek merkezi mapper ile `READY`, `DEGRADED`, `NOT_READY`, `UNKNOWN` durumlarina iner.
+- [x] Legacy `quality_gate_status` sadece `legacy_quality_gate_status` diagnostik alanina tasinir; pozitif READY fallback kaynagi olmaz.
+- [x] Missing/stale readiness veya health kaynaklari `UNKNOWN` sonucuna baglandi.
+- [x] Kontrat davranisi runtime status unit testleriyle sabitlendi.

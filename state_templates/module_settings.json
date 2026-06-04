@@ -23,8 +23,22 @@
     "show_last_smoke_run": true,
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
+    "show_quality_gate_view": true,
+    "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
     "show_pipeline_flow": true
+  },
+  "quality_gate_view": {
+    "enabled": true,
+    "contract_version": 1,
+    "endpoint": "/api/status",
+    "payload_key": "qualityGateView",
+    "readiness_source": "state/production_readiness_status.json",
+    "health_source": "state/last_health_check_status.json",
+    "legacy_source": "state/quality_gate_status.json",
+    "legacy_decision_source_allowed": false,
+    "legacy_positive_ready_fallback_allowed": false,
+    "stale_after_seconds": 86400
   },
   "pipeline_flow": {
     "enabled": true,

@@ -329,3 +329,11 @@ Bu guard, repo apply child task'larinin tek worker uzerine yigilip diger workerl
 Readiness, drift ve smoke kontrol yazımları ortak `supervisor/read_only_execution.py` helper'ına bağlandı. `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` olduğunda state/report dosyası oluşturulmaz; sonuç payload'ı `write_evidence` ve `write_status=completed_with_write_skipped` ile hedef, operasyon ve skip nedenini döndürür.
 
 Varsayılan mod `write_enabled` kaldığı için mevcut write-enabled ortam davranışı geriye uyumludur. Davranış `tests/test_runtime_status_model.py` içinde read-only, dry-run ve smoke write-skip regresyon testleriyle sabitlendi. Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yapılmadı.
+
+## 2026-06-04 Dashboard Quality Gate Status Contract Apply
+
+Dashboard kalite kapisi karari icin tek kaynakli `qualityGateView` sozlesmesi eklendi. Ana ve legacy panel `/api/status` payload'u readiness ve health kaynaklarini merkezi mapper ile `READY`, `DEGRADED`, `NOT_READY`, `UNKNOWN` durumlarina indirger.
+
+Legacy `quality_gate_status` artik dashboard karari icin tek basina kullanilmamali; payload icinde sadece `legacy_quality_gate_status` diagnostik alani olarak tasinir. Eksik veya stale readiness/health kaynagi `UNKNOWN` olur ve legacy fallback pozitif READY iddiasi uretmez.
+
+Davranis `tests/test_runtime_status_model.py` icindeki quality gate view kontrat testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

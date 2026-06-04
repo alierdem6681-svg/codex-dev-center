@@ -85,6 +85,7 @@ assert LEGACY_PANEL_SERVER_SPEC.loader is not None
 LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 
 import pipeline_flow  # noqa: E402
+import quality_gate_view  # noqa: E402
 
 
 class WorkerStatusModelTest(unittest.TestCase):
@@ -2122,6 +2123,84 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                     self.assertEqual(payload["github_actions"]["last_deploy_status"], "PASS")
                     self.assertEqual(payload["github_actions"]["runner_name"], "codex-dev-center-01")
                     self.assertEqual(payload["pipeline_status"]["task_to_deploy_test"], "PASS")
+            finally:
+                for module, original_state in originals.items():
+                    module.STATE = original_state
+
+    def test_quality_gate_view_contract_maps_readiness_and_health(self):
+        computed_at = "2026-06-04T12:00:00+00:00"
+        cases = [
+            ("PASS", {"ok": True, "checked_at": computed_at}, "READY", "success"),
+            ("PASS", {"status": "DEGRADED", "checked_at": computed_at}, "DEGRADED", "warning"),
+            ("PASS", {"ok": False, "checked_at": computed_at}, "NOT_READY", "error"),
+            ("FAIL", {"ok": True, "checked_at": computed_at}, "NOT_READY", "error"),
+            ("BLOCKED", {"ok": True, "checked_at": computed_at}, "NOT_READY", "error"),
+            ("UNKNOWN", {"ok": True, "checked_at": computed_at}, "UNKNOWN", "neutral"),
+            ("PASS", {}, "UNKNOWN", "neutral"),
+            ("PASS", {"ok": True}, "UNKNOWN", "neutral"),
+        ]
+
+        for readiness_status, health_payload, expected_status, expected_severity in cases:
+            with self.subTest(readiness=readiness_status, health=health_payload):
+                view = quality_gate_view.build_quality_gate_view(
+                    {"status": readiness_status, "checked_at": computed_at},
+                    health_payload,
+                    {"ok": False},
+                    computed_at=computed_at,
+                )
+
+            self.assertEqual(view["contract_version"], 1)
+            self.assertEqual(view["status"], expected_status)
+            self.assertEqual(view["severity"], expected_severity)
+            self.assertIn(view["source"], {"readiness_health", "legacy_fallback", "unknown"})
+            self.assertEqual(view["legacy_quality_gate_status"], "FAIL")
+
+    def test_quality_gate_view_uses_unknown_for_missing_stale_or_legacy_only(self):
+        view = quality_gate_view.build_quality_gate_view(
+            {"status": "PASS", "checked_at": "2026-06-02T11:59:00+00:00"},
+            {"ok": True, "checked_at": "2026-06-04T12:00:00+00:00"},
+            {"status": "PASS"},
+            computed_at="2026-06-04T12:00:00+00:00",
+        )
+
+        self.assertEqual(view["status"], "UNKNOWN")
+        self.assertEqual(view["source"], "legacy_fallback")
+        self.assertIn("readiness_stale", view["reason_codes"])
+        self.assertIn("legacy_fallback_non_authoritative", view["reason_codes"])
+
+    def test_status_payload_exposes_quality_gate_view_for_all_panel_servers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+            fresh_timestamp = "2099-01-01T00:00:00+00:00"
+            (state / "production_readiness_status.json").write_text(
+                json.dumps({"status": "PASS", "checked_at": fresh_timestamp}),
+                encoding="utf-8",
+            )
+            (state / "last_health_check_status.json").write_text(
+                json.dumps({"ok": True, "checked_at": fresh_timestamp}),
+                encoding="utf-8",
+            )
+            (state / "quality_gate_status.json").write_text(
+                json.dumps({"ok": False, "checked_at": fresh_timestamp}),
+                encoding="utf-8",
+            )
+
+            originals = {
+                panel_server: panel_server.STATE,
+                legacy_panel_server: legacy_panel_server.STATE,
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    payload = module.status_payload()
+                    view = payload["qualityGateView"]
+                    self.assertEqual(view["contract_version"], 1)
+                    self.assertEqual(view["status"], "READY")
+                    self.assertEqual(view["severity"], "success")
+                    self.assertEqual(view["source"], "readiness_health")
+                    self.assertEqual(view["legacy_quality_gate_status"], "FAIL")
+                    self.assertIn("legacy_conflict", view["reason_codes"])
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state
