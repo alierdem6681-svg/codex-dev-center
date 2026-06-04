@@ -877,7 +877,7 @@ def run_local_deploy_fallback(task: dict[str, Any]) -> dict[str, Any]:
         {
             "CODEX_LOCAL_DEPLOY_FALLBACK": "1",
             "CODEX_DEPLOY_ACTOR": "cto_finalizer",
-            "CODEX_PRODUCTION_DEPLOY_DESCRIPTION": redact_sensitive_text(task_text(task))[:1000],
+            "CODEX_PRODUCTION_DEPLOY_DESCRIPTION": f"cto_finalizer_local_fallback task_id={redact_sensitive_text(task.get('id', ''))[:160]}",
         }
     )
     try:
