@@ -254,16 +254,29 @@ SAFE_MARKER_KEYS = {
         "last_commit",
         "commit",
         "branch",
+        "source",
+        "workflow_run_id",
+        "runner",
     },
     "github_actions": {
         "status",
         "ok",
         "runner_name",
+        "vm_target",
         "workflow",
         "last_deploy_status",
         "last_deploy_run_id",
+        "last_deploy_run_url",
+        "last_deploy_commit",
+        "last_deploy_ref",
+        "last_deploy_at",
         "last_smoke_status",
         "last_smoke_run_id",
+        "last_smoke_run_url",
+        "last_smoke_commit",
+        "last_smoke_at",
+        "last_backup_path",
+        "public_health_url",
         "checked_at",
         "updated_at",
     },
@@ -385,6 +398,71 @@ def read_flow_markers(state_dir: Path) -> dict[str, dict[str, Any]]:
             read_json(state_dir / "last_smoke_test_status.json", {}),
             SAFE_MARKER_KEYS["last_smoke_test"],
         ),
+    }
+
+
+def marker_data_status(markers: dict[str, dict[str, Any]]) -> str:
+    has_pipeline = bool(markers.get("pipeline_status"))
+    has_actions = bool(markers.get("github_actions"))
+    if has_pipeline and has_actions:
+        return "available"
+    if has_pipeline or has_actions:
+        return "partial"
+    return "empty"
+
+
+def latest_marker_timestamp(markers: dict[str, dict[str, Any]]) -> str | None:
+    values: list[str] = []
+    for marker in markers.values():
+        for key in ("updated_at", "checked_at", "last_deploy_at", "last_smoke_at"):
+            value = marker.get(key)
+            if value:
+                values.append(str(value))
+    return max(values) if values else None
+
+
+def dashboard_refresh_seconds(root: Path) -> int:
+    settings = read_json(
+        root / "state" / "module_settings.json",
+        read_json(root / "state_templates" / "module_settings.json", {}),
+    )
+    if isinstance(settings, dict):
+        try:
+            return int(settings.get("dashboard", {}).get("poll_seconds", 5))
+        except Exception:
+            return 5
+    return 5
+
+
+def build_pipeline_tracking(root: Path | str = ROOT, generated_at: str | None = None) -> dict[str, Any]:
+    runtime_root = Path(root)
+    state_dir = runtime_root / "state"
+    markers = {
+        "pipeline_status": safe_marker(
+            read_json(state_dir / "pipeline_status.json", {}),
+            SAFE_MARKER_KEYS["pipeline_status"],
+        ),
+        "github_actions": safe_marker(
+            read_json(state_dir / "github_actions_status.json", {}),
+            SAFE_MARKER_KEYS["github_actions"],
+        ),
+    }
+    return {
+        "ok": True,
+        "generated_at": generated_at or utc_now(),
+        "read_only": True,
+        "non_mutating": True,
+        "production_deploy_allowed": False,
+        "critical_operations_allowed": False,
+        "refresh_seconds": dashboard_refresh_seconds(runtime_root),
+        "data_status": marker_data_status(markers),
+        "last_updated_at": latest_marker_timestamp(markers),
+        "source_files": [
+            "state/github_actions_status.json",
+            "state/pipeline_status.json",
+        ],
+        "github_actions": markers["github_actions"],
+        "pipeline_status": markers["pipeline_status"],
     }
 
 

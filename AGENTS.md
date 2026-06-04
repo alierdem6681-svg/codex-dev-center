@@ -150,7 +150,7 @@ Dashboard `/api/status` payload'u controlled execution proposal durumunu salt ok
 
 ## DASHBOARD PIPELINE TRACKING V1
 
-Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.json` ve `pipeline_status.json` dosyalarini salt okunur `github_actions` ve `pipeline_status` alanlariyla gosterir. Bu gorunurluk production deploy veya kritik altyapi islemi yetkisi vermez.
+Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.json` ve `pipeline_status.json` dosyalarini salt okunur `github_actions`, `pipeline_status` ve `pipeline_tracking` alanlariyla gosterir. Marker payload'lari allowlist ile temizlenir; raw mesaj, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. Bu gorunurluk production deploy veya kritik altyapi islemi yetkisi vermez.
 
 ## DASHBOARD PIPELINE FLOW BACKEND V0
 

@@ -462,3 +462,21 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Dashboard Pipeline Tracking Status Contract Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-065405 / CTO-DISPATCH-20260604-065009-CTO-ACTION-20260604-062153-04-DASHBOARD-PIPELINE-TRACKING
+
+Eklenenler:
+- Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'u `pipeline_tracking` read-only kontratini dondurur.
+- `github_actions` ve `pipeline_status` marker alanlari artik allowlist ile temizlenmis payload'dan beslenir.
+- Dashboard `Pipeline Gözlemi` bolumu tracking veri durumunu, salt-okunur siniri ve status payload'unun deploy yetkisi vermedigini gosterir.
+- `tests/test_runtime_status_model.py` marker dosyalari eksikken kontratin bos kalmasini ve stdout/stderr/log/raw output alanlarinin status payload'una sizmamasini dogrular.
+- `state_templates/module_settings.json`, `state_templates/module_registry.json`, `state_templates/action_catalog.json`, AGENTS, anayasa, onboarding, roadmap ve memory kayitlari hizalandi.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

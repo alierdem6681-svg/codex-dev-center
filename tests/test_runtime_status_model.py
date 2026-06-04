@@ -981,8 +981,14 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                     payload = module.status_payload()
                     self.assertIn("github_actions", payload)
                     self.assertIn("pipeline_status", payload)
+                    self.assertIn("pipeline_tracking", payload)
                     self.assertEqual(payload["github_actions"], {})
                     self.assertEqual(payload["pipeline_status"], {})
+                    self.assertEqual(payload["pipeline_tracking"]["data_status"], "empty")
+                    self.assertTrue(payload["pipeline_tracking"]["read_only"])
+                    self.assertTrue(payload["pipeline_tracking"]["non_mutating"])
+                    self.assertFalse(payload["pipeline_tracking"]["production_deploy_allowed"])
+                    self.assertFalse(payload["pipeline_tracking"]["critical_operations_allowed"])
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state
@@ -1017,6 +1023,69 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                     self.assertEqual(payload["github_actions"]["last_deploy_status"], "PASS")
                     self.assertEqual(payload["github_actions"]["runner_name"], "codex-dev-center-01")
                     self.assertEqual(payload["pipeline_status"]["task_to_deploy_test"], "PASS")
+                    self.assertEqual(payload["pipeline_tracking"]["data_status"], "available")
+                    self.assertEqual(payload["pipeline_tracking"]["github_actions"]["last_deploy_status"], "PASS")
+                    self.assertEqual(payload["pipeline_tracking"]["pipeline_status"]["task_to_deploy_test"], "PASS")
+            finally:
+                for module, original_state in originals.items():
+                    module.STATE = original_state
+
+    def test_status_payload_sanitizes_pipeline_tracking_marker_fields_for_all_panel_servers(self):
+        secret_text = "raw-status-terminal-output-should-not-leak"
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            state.mkdir(parents=True)
+            (state / "github_actions_status.json").write_text(
+                json.dumps(
+                    {
+                        "runner_name": "codex-dev-center-01",
+                        "vm_target": "codex-dev-center-01",
+                        "last_deploy_status": "PASS",
+                        "last_deploy_run_id": "26814905600",
+                        "last_deploy_commit": "abcdef123456",
+                        "stdout": secret_text,
+                        "stderr": secret_text,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "pipeline_status.json").write_text(
+                json.dumps(
+                    {
+                        "task_to_deploy_test": "PASS",
+                        "workflow_run_id": "26814905600",
+                        "commit": "abcdef123456",
+                        "log": secret_text,
+                        "raw_output": secret_text,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = {
+                panel_server: panel_server.STATE,
+                legacy_panel_server: legacy_panel_server.STATE,
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    payload = module.status_payload()
+                    subset = {
+                        "github_actions": payload["github_actions"],
+                        "pipeline_status": payload["pipeline_status"],
+                        "pipeline_tracking": payload["pipeline_tracking"],
+                    }
+                    encoded = json.dumps(subset, ensure_ascii=False)
+                    self.assertNotIn(secret_text, encoded)
+                    self.assertNotIn("stdout", encoded)
+                    self.assertNotIn("stderr", encoded)
+                    self.assertNotIn("raw_output", encoded)
+                    self.assertEqual(payload["github_actions"]["last_deploy_commit"], "abcdef123456")
+                    self.assertEqual(payload["pipeline_status"]["workflow_run_id"], "26814905600")
+                    self.assertEqual(payload["pipeline_tracking"]["source_files"], [
+                        "state/github_actions_status.json",
+                        "state/pipeline_status.json",
+                    ])
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state

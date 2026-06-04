@@ -136,6 +136,12 @@ Dashboard pipeline tracking icin ek regresyon testi eklendi. Ana panel ve legacy
 
 Compile, `tests.test_runtime_status_model` ve production readiness suite PASS oldu. Git metadata yolu read-only oldugu icin commit/PR olusturma adimi bu sandbox'ta calistirilamadi. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
+## 2026-06-04 Dashboard Pipeline Tracking Status Contract Apply
+
+Ana ve legacy panel `/api/status` payload'u pipeline marker dosyalarini artik `pipeline_tracking` read-only kontratiyla dondurur. Top-level `github_actions` ve `pipeline_status` alanlari geriye uyumlu kaldi, ancak marker payload'lari allowlist ile temizlenir; stdout/stderr/log/raw output gibi teknik alanlar status payload'una sizmaz.
+
+Dashboard `Pipeline Gözlemi` tracking veri durumunu, salt-okunur siniri ve status payload'unun deploy yetkisi vermedigini gosterir. Davranis `tests/test_runtime_status_model.py` regresyon testleriyle sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
 ## 2026-06-02 Worker Lifecycle Smoke Check v1
 
 Deploy ve VM smoke workflow'larina worker lifecycle kapisi eklendi.
