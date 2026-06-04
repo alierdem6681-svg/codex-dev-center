@@ -1,5 +1,20 @@
 # ROADMAP
 
+## 2026-06-04 Owner Queue Repair And Production Sync
+
+- [x] VM/runtime/service path discovery completed.
+- [x] Timestamped archive created before repair.
+- [x] Full runtime queue archived before cleanup.
+- [x] Active queue cleared to 0 tasks with `CANCELLED_BY_OWNER_CLEANUP` archive status.
+- [x] Runtime system state set to `READY_FOR_NEW_TASKS`.
+- [x] Locked/fsynced JSON helper added for queue/state writes.
+- [x] Lifecycle pending count and duplicate worker start behavior fixed.
+- [x] Repo apply no-change loop classified as terminal `NO_CHANGE`.
+- [x] Validation false-positive handling extended for negative safety phrases.
+- [ ] Final production runtime sync from current source commit.
+- [ ] Service restart and health smoke after deploy.
+- [ ] Commit and push final repair.
+
 ## Faz 1 - Temel VM ve Hafıza
 
 - [x] VM oluştur

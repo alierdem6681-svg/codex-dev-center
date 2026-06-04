@@ -14,17 +14,24 @@ from pathlib import Path
 try:
     from .critical_operation_policy import critical_operation_findings
     from .cto_task_router import submit_task, trigger_lifecycle
-    from .task_status_constants import redact_sensitive_text
+    from .task_status_constants import read_json as read_state_json, redact_sensitive_text
 except ImportError:
     try:
         from critical_operation_policy import critical_operation_findings
         from cto_task_router import submit_task, trigger_lifecycle
-        from task_status_constants import redact_sensitive_text
+        from task_status_constants import read_json as read_state_json, redact_sensitive_text
     except ImportError:
         def critical_operation_findings(value):
             return []
         submit_task = None
         trigger_lifecycle = None
+        def read_state_json(path, default):
+            try:
+                if Path(path).exists():
+                    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+            except Exception:
+                return default
+            return default
         def redact_sensitive_text(value):
             return str(value or "")
 
@@ -156,12 +163,7 @@ def service_status(name):
         return "unknown"
 
 def read_json(path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return default
-    return default
+    return read_state_json(Path(path), default)
 
 def queue_counts():
     queue = read_json(STATE / "task_queue.json", {"tasks": []})

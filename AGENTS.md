@@ -52,6 +52,11 @@ Production workflow manuel çalışır ve confirm alanına tam olarak `DEPLOY-CO
 
 Veri silme, migration, secret erişimi, IAM, DNS/firewall, billing, Google Ads mutate ve maliyet artıran cloud işlemleri risk kapısına bağlıdır ve otomatik yapılmaz.
 
+Owner-directed emergency repair exception:
+- Queue/lifecycle/worker sistemi kendi kendine yeni görev alamayacak kadar bozulursa ve owner açıkça doğrudan VM repair isterse, Codex dışarıdan bakım yapabilir.
+- Bu istisnada önce timestamped archive alınır, queue snapshot saklanır, destructive olmayan runtime state onarımı yapılır ve finalde commit/push + servis health raporu verilir.
+- Bu istisna secret/IAM/billing/DNS/firewall/destructive database/Google Ads live mutate yasağını kaldırmaz.
+
 ## Çalışma Prensibi
 
 Her görev:

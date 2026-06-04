@@ -24,14 +24,17 @@ try:
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         TASK_STATUS_VALIDATION_FAILED,
+        atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
         redact_sensitive_text,
     )
 except ImportError:
@@ -44,14 +47,17 @@ except ImportError:
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_RUNNING,
         TASK_STATUS_VALIDATION_FAILED,
+        atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
         redact_sensitive_text,
     )
 
@@ -153,19 +159,10 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 def read_json(path: Path, default: Any) -> Any:
-    try:
-        if not path.exists():
-            return default
-        return json.loads(path.read_text())
-    except Exception:
-        return default
+    return read_state_json(path, default)
 
 def write_json(path, data) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    atomic_write_json(Path(path), data)
 
 def append_log(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -678,10 +675,17 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
     fetch = run_cmd(["git", "fetch", "origin", "main", "--prune"], cwd=SOURCE_ROOT, timeout=180)
     base_ref = "origin/main" if fetch["ok"] else "HEAD"
     worktree.parent.mkdir(parents=True, exist_ok=True)
+    prune_before = run_cmd(["git", "worktree", "prune"], cwd=SOURCE_ROOT, timeout=120)
     add_worktree = run_cmd(["git", "worktree", "add", "-b", branch, str(worktree), base_ref], cwd=SOURCE_ROOT, timeout=180)
+    prune_after: dict[str, Any] = {}
+    if not add_worktree["ok"]:
+        prune_after = run_cmd(["git", "worktree", "prune", "--expire", "now"], cwd=SOURCE_ROOT, timeout=120)
+        add_worktree = run_cmd(["git", "worktree", "add", "-b", branch, str(worktree), base_ref], cwd=SOURCE_ROOT, timeout=180)
     if not add_worktree["ok"]:
         metadata = {
             "git_fetch": fetch,
+            "git_worktree_prune_before": prune_before,
+            "git_worktree_prune_after": prune_after,
             "git_worktree": add_worktree,
             "production_deployed": False,
             "repo_applied": False,
@@ -777,9 +781,9 @@ Beklenen çıktı:
         validation_status = "NOT_READY"
         pipeline_status = "NOT_RUN"
     elif not commit_files:
-        status = TASK_STATUS_FAILED_NO_PROPOSAL
-        result = "repo_apply_worker_completed_without_changes"
-        validation_status = "NOT_READY"
+        status = TASK_STATUS_NO_CHANGE
+        result = "repo_apply_worker_completed_without_changes_noop"
+        validation_status = "NO_CHANGE"
         pipeline_status = "NOT_RUN"
     elif unsafe_files:
         status = TASK_STATUS_VALIDATION_FAILED
@@ -868,6 +872,8 @@ Beklenen çıktı:
         "commit_files": commit_files,
         "ignored_generated_files": ignored_generated_files,
         "unsafe_files": unsafe_files,
+        "git_worktree_prune_before": prune_before,
+        "git_worktree_prune_after": prune_after,
         "secret_scan_findings": secret_findings,
         "codex_return_code": returncode,
         "progress_watchdog": progress_result,

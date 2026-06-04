@@ -4,10 +4,16 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from .state_file_lock import state_file_lock
+except ImportError:
+    from state_file_lock import state_file_lock
 
 TASK_STATUS_RECEIVED = "RECEIVED"
 TASK_STATUS_ROUTED = "ROUTED"
@@ -29,6 +35,10 @@ TASK_STATUS_FAILED_RETRYABLE = "FAILED_RETRYABLE"
 TASK_STATUS_TIMEOUT = "TIMEOUT"
 TASK_STATUS_ERROR = "ERROR"
 TASK_STATUS_ARCHIVED_STALE = "ARCHIVED_STALE"
+TASK_STATUS_ARCHIVED = "ARCHIVED"
+TASK_STATUS_CANCELLED = "CANCELLED"
+TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP = "CANCELLED_BY_OWNER_CLEANUP"
+TASK_STATUS_NO_CHANGE = "NO_CHANGE"
 TASK_STATUS_REQUIRES_APPROVAL = "REQUIRES_APPROVAL"
 TASK_STATUS_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 TASK_STATUS_BLOCKED = "BLOCKED"
@@ -55,6 +65,10 @@ KNOWN_TASK_STATUSES = {
     TASK_STATUS_TIMEOUT,
     TASK_STATUS_ERROR,
     TASK_STATUS_ARCHIVED_STALE,
+    TASK_STATUS_ARCHIVED,
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP,
+    TASK_STATUS_NO_CHANGE,
     TASK_STATUS_REQUIRES_APPROVAL,
     TASK_STATUS_APPROVAL_REQUIRED,
     TASK_STATUS_BLOCKED,
@@ -83,6 +97,10 @@ TERMINAL_TASK_STATUSES = {
     TASK_STATUS_TIMEOUT,
     TASK_STATUS_ERROR,
     TASK_STATUS_ARCHIVED_STALE,
+    TASK_STATUS_ARCHIVED,
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP,
+    TASK_STATUS_NO_CHANGE,
     TASK_STATUS_REQUIRES_APPROVAL,
     TASK_STATUS_APPROVAL_REQUIRED,
     TASK_STATUS_BLOCKED,
@@ -119,6 +137,14 @@ STATUS_ALIASES = {
     "validation_failed": TASK_STATUS_VALIDATION_FAILED,
     "pipeline_failed": TASK_STATUS_PIPELINE_FAILED,
     "archived_stale": TASK_STATUS_ARCHIVED_STALE,
+    "archived": TASK_STATUS_ARCHIVED,
+    "cancelled": TASK_STATUS_CANCELLED,
+    "canceled": TASK_STATUS_CANCELLED,
+    "cancelled_by_owner_cleanup": TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP,
+    "canceled_by_owner_cleanup": TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP,
+    "no_change": TASK_STATUS_NO_CHANGE,
+    "noop": TASK_STATUS_NO_CHANGE,
+    "no_op": TASK_STATUS_NO_CHANGE,
     "stalled": TASK_STATUS_STALLED,
     "timeout": TASK_STATUS_TIMEOUT,
     "error": TASK_STATUS_ERROR,
@@ -194,22 +220,59 @@ def is_worker_eligible_task(task: dict[str, Any]) -> bool:
     return is_active_task(task) and not worker_block_reason(task)
 
 
+def _json_corrupt_backup_path(path: Path) -> Path:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    return path.with_name(f"{path.name}.corrupt.{stamp}.bak")
+
+
+def _fsync_parent(path: Path) -> None:
+    try:
+        dir_fd = os.open(str(path.parent), os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _load_json_text(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
 def read_json(path: Path, default: Any) -> Any:
     try:
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8-sig"))
+            return _load_json_text(path)
     except Exception:
+        try:
+            backup = _json_corrupt_backup_path(path)
+            shutil.copy2(path, backup)
+        except Exception:
+            pass
+        for candidate in sorted(path.parent.glob(path.name + ".*.tmp"), key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                return _load_json_text(candidate)
+            except Exception:
+                continue
         return default
     return default
 
 
 def atomic_write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if isinstance(data, dict):
-        data["updated_at"] = utc_now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    with state_file_lock(path):
+        if isinstance(data, dict):
+            data["updated_at"] = utc_now()
+        tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
+        encoded = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        with tmp.open("w", encoding="utf-8") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _load_json_text(tmp)
+        os.replace(tmp, path)
+        _fsync_parent(path)
 
 
 def append_audit(root: Path, event: str, payload: dict[str, Any]) -> None:

@@ -4,6 +4,25 @@
 
 VM oluşturuldu ve temel Codex Dev Center dizin yapısı kuruldu.
 
+## 2026-06-04 Owner Queue Repair And Production Sync
+
+Owner-directed emergency repair started on VM `codex-dev-center-01`.
+
+Current verified repair facts:
+- Runtime path: `/opt/codex-dev-center`
+- Source checkout: `/home/alierdem6681/codex-dev-center-github-export`
+- Archive: `/opt/codex-dev-center/archives/system_repair_20260604_054027`
+- Queue cleanup archive: `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup`
+- Original runtime queue: 1161 tasks
+- Cleanup candidates: 719
+- Active queue remaining after cleanup: 0
+- Cleanup status: `CANCELLED_BY_OWNER_CLEANUP`
+- System state: `READY_FOR_NEW_TASKS`
+
+Repair code added locked/fsynced JSON writes, corrupt JSON backup handling, lifecycle pending-count fixes, systemd duplicate-start prevention, repo apply `NO_CHANGE`, worktree prune/retry, dashboard health sync fields, and an owner cleanup script.
+
+Final commit/push, production runtime sync, service restart, and smoke verification must be completed before declaring the system fully ready.
+
 ## Yeni Gelen Codex / Agent Önce Ne Yapmalı?
 
 Sırasıyla şu dosyaları oku:

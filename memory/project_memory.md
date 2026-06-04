@@ -18,6 +18,23 @@ Kullanıcı teknik bilmediğini açıkça belirtmiştir. Bu nedenle sistem:
 - Web panel hazırlamak
 - Telegram bağlantısını kurmak
 
+## 2026-06-04 Owner Queue Repair Memory
+
+Owner-directed emergency repair was performed directly on VM `codex-dev-center-01` because CTO/worker queue state itself was unhealthy and could not safely receive another queued task.
+
+Key facts:
+- Runtime path: `/opt/codex-dev-center`
+- Source checkout: `/home/alierdem6681/codex-dev-center-github-export`
+- Main archive: `/opt/codex-dev-center/archives/system_repair_20260604_054027`
+- Queue cleanup archive: `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup`
+- Original queue: 1161 tasks
+- Cleanup candidates: 719
+- Active queue remaining after cleanup: 0
+- Cleanup status: `CANCELLED_BY_OWNER_CLEANUP`
+- System state after cleanup: `READY_FOR_NEW_TASKS`
+
+Repair code now uses locked/fsynced atomic JSON writes, terminal `NO_CHANGE` for repo apply no-op, safer lifecycle pending counts, duplicate start no-op checks, broader validation false-positive safety phrases, and an owner cleanup script.
+
 ## STEP 17A Memory
 
 Kullanıcı bundan sonra her geliştirme sonrası AGENT_ONBOARDING_MAP.md dahil tüm ilgili yaşayan dokümantasyonun güncel tutulmasını istedi. Living Documentation temel politikası ve modül dosyaları oluşturuldu.

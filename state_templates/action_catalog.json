@@ -133,6 +133,17 @@
       "status_alias_separator_normalization": true
     },
     {
+      "id": "queue_owner_cleanup",
+      "label": "Owner Kuyruk Temizliği",
+      "module": "backup_recovery",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": true,
+      "owner_directed_only": true,
+      "archive_required": true,
+      "command": "{python} scripts/queue_owner_cleanup.py --archive {archive_path} --execute"
+    },
+    {
       "id": "repo_apply_validation",
       "label": "Controlled Repo Apply Doğrulaması",
       "module": "workers",

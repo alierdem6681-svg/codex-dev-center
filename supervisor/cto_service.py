@@ -10,6 +10,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from .task_status_constants import atomic_write_json, read_json as read_state_json
+except ImportError:
+    from task_status_constants import atomic_write_json, read_json as read_state_json
+
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -48,19 +53,10 @@ def send_message(chat_id, text):
         return json.loads(r.read().decode())
 
 def read_json(path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception:
-        pass
-    return default
+    return read_state_json(Path(path), default)
 
 def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    atomic_write_json(Path(path), data)
 
 def service_status(name):
     p = subprocess.run(["systemctl", "is-active", name], text=True, capture_output=True, timeout=10)

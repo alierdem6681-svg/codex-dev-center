@@ -15,8 +15,10 @@ try:
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_STALLED,
+        atomic_write_json,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
         worker_block_reason,
     )
 except ImportError:
@@ -31,8 +33,10 @@ except ImportError:
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_STALLED,
+        atomic_write_json,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
         worker_block_reason,
     )
 
@@ -69,19 +73,10 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 def load_json(path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception:
-        pass
-    return default
+    return read_state_json(Path(path), default)
 
 def save_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    atomic_write_json(Path(path), data)
 
 def safe_id(value):
     out = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(value))

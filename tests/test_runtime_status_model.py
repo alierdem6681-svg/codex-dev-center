@@ -36,6 +36,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_DONE,
     TASK_STATUS_FAILED_RETRYABLE,
     TASK_STATUS_FAILED_TIMEOUT,
+    TASK_STATUS_NO_CHANGE,
     TASK_STATUS_PIPELINE_FAILED,
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
@@ -2150,6 +2151,101 @@ class SupervisorCliCompletionTest(unittest.TestCase):
 
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
         self.assertEqual(queue["tasks"][0]["result"], "manual")
+
+
+class SystemRepairControlsTest(unittest.TestCase):
+    def test_no_change_status_is_terminal_alias(self):
+        self.assertEqual(normalize_status("no change"), TASK_STATUS_NO_CHANGE)
+        self.assertEqual(normalize_status("noop"), TASK_STATUS_NO_CHANGE)
+
+    def test_critical_policy_ignores_turkish_negative_safety_phrases(self):
+        safe_text = "\n".join(
+            [
+                "Google Ads API mutate islemi yapma.",
+                "Secret okuma ve token/private key gosterme.",
+                "IAM, billing, DNS ve firewall degistirme.",
+                "Production deploy yapma; mutate kapali.",
+            ]
+        )
+        self.assertEqual(critical_operation_policy.critical_operation_findings(safe_text), [])
+
+    def test_lifecycle_pending_count_excludes_assigned_and_running(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {"id": "P", "status": "PENDING", "risk": "low"},
+                            {"id": "Q", "status": "QUEUED", "risk": "low"},
+                            {"id": "A", "status": "ASSIGNED", "risk": "low"},
+                            {"id": "R", "status": "RUNNING", "risk": "low"},
+                            {"id": "F", "status": "FAILED_RETRYABLE", "risk": "low"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original = lifecycle_manager.QUEUE_PATH
+            lifecycle_manager.QUEUE_PATH = queue_path
+            try:
+                pending, running, active = lifecycle_manager.queue_counts()
+            finally:
+                lifecycle_manager.QUEUE_PATH = original
+
+        self.assertEqual(pending, 2)
+        self.assertEqual(running, 1)
+        self.assertEqual(active, 4)
+
+    def test_owner_cleanup_archives_and_empties_queue(self):
+        spec = importlib.util.spec_from_file_location(
+            "queue_owner_cleanup_test_module",
+            ROOT / "scripts" / "queue_owner_cleanup.py",
+        )
+        queue_owner_cleanup = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(queue_owner_cleanup)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            (runtime / "reports").mkdir()
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {"id": "TASK-1", "status": "RUNNING", "risk": "low"},
+                            {"id": "TASK-2", "status": "FAILED_RETRYABLE", "risk": "low"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": "TASK-1"}]}),
+                encoding="utf-8",
+            )
+            (state / "system_state.json").write_text(json.dumps({"phase": "BUSY"}), encoding="utf-8")
+
+            archive = runtime / "archives" / "repair"
+            payload = queue_owner_cleanup.cleanup(runtime, archive, execute=True)
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            system_state = json.loads((state / "system_state.json").read_text(encoding="utf-8"))
+            archive_snapshot_exists = (archive / "task_queue_before_owner_cleanup.json").exists()
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["original_task_count"], 2)
+        self.assertEqual(queue["tasks"], [])
+        self.assertEqual(queue["cleanup_status"], "CANCELLED_BY_OWNER_CLEANUP")
+        self.assertEqual(workers["workers"][0]["status"], "IDLE")
+        self.assertEqual(system_state["system_state"], "READY_FOR_NEW_TASKS")
+        self.assertTrue(archive_snapshot_exists)
 
 
 if __name__ == "__main__":

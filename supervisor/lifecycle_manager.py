@@ -20,6 +20,7 @@ try:
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_PENDING,
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
@@ -27,10 +28,12 @@ try:
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_STALLED,
         TASK_STATUS_VALIDATION_FAILED,
+        atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_risk,
         normalize_status,
+        read_json as read_state_json,
         worker_block_reason,
     )
 except ImportError:
@@ -44,6 +47,7 @@ except ImportError:
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_FAILED_TIMEOUT,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_PENDING,
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
@@ -51,10 +55,12 @@ except ImportError:
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_STALLED,
         TASK_STATUS_VALIDATION_FAILED,
+        atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
         normalize_risk,
         normalize_status,
+        read_json as read_state_json,
         worker_block_reason,
     )
 
@@ -98,19 +104,10 @@ def log(msg):
         return
 
 def read_json(path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception as exc:
-        log(f"READ_JSON_ERROR path={path} err={exc}")
-    return default
+    return read_state_json(Path(path), default)
 
 def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{time.time_ns()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    atomic_write_json(Path(path), data)
 
 def safe_id(value):
     out = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(value or "TASK"))
@@ -121,6 +118,13 @@ def service_name(worker):
 
 def systemctl(action, worker):
     svc = service_name(worker)
+    active = systemctl_is_active(worker)
+    if action == "start" and active:
+        log(f"SYSTEMCTL_NOOP action=start svc={svc} reason=already_active")
+        return True
+    if action == "stop" and not active:
+        log(f"SYSTEMCTL_NOOP action=stop svc={svc} reason=already_inactive")
+        return True
     cmd = ["sudo", "/bin/systemctl", action, svc]
     try:
         p = subprocess.run(cmd, text=True, capture_output=True, timeout=30)
@@ -128,6 +132,15 @@ def systemctl(action, worker):
         return p.returncode == 0
     except Exception as exc:
         log(f"SYSTEMCTL_ERROR action={action} worker={worker} err={exc}")
+        return False
+
+def systemctl_is_active(worker):
+    svc = service_name(worker)
+    try:
+        p = subprocess.run(["/bin/systemctl", "is-active", "--quiet", svc], text=True, capture_output=True, timeout=10)
+        return p.returncode == 0
+    except Exception as exc:
+        log(f"SYSTEMCTL_IS_ACTIVE_ERROR worker={worker} err={exc}")
         return False
 
 def update_worker_state(worker_id, status, note=""):
@@ -165,9 +178,10 @@ def queue_counts():
     q, _changes = normalize_queue_payload(q)
     tasks = q.get("tasks", [])
     worker_tasks = [t for t in tasks if is_worker_eligible_task(t)]
-    pending = [t for t in worker_tasks if normalize_status(t.get("status")) in ("PENDING", "QUEUED", "ASSIGNED")]
+    pending = [t for t in worker_tasks if normalize_status(t.get("status")) in ("PENDING", "QUEUED")]
+    assigned = [t for t in worker_tasks if normalize_status(t.get("status")) == "ASSIGNED"]
     running = [t for t in worker_tasks if normalize_status(t.get("status")) == "RUNNING"]
-    active = pending + running
+    active = pending + assigned + running
     return len(pending), len(running), len(active)
 
 def choose_worker(title):

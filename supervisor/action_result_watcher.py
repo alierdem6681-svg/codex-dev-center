@@ -13,16 +13,20 @@ try:
     from .task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
+        atomic_write_json,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
     )
 except ImportError:
     from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_READY_FOR_VALIDATION,
+        atomic_write_json,
         normalize_queue_payload,
         normalize_status,
+        read_json as read_state_json,
     )
 
 PROJECT_ID = "eterna-498108"
@@ -44,19 +48,10 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 def read_json(path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception:
-        pass
-    return default
+    return read_state_json(Path(path), default)
 
 def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = now()
-    tmp = path.with_name(path.name + f".{os.getpid()}.{datetime.now(timezone.utc).timestamp()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    atomic_write_json(Path(path), data)
 
 def metadata_token():
     req = urllib.request.Request(

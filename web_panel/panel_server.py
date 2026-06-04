@@ -27,10 +27,18 @@ if str(SUPERVISOR_DIR) not in sys.path:
     sys.path.insert(0, str(SUPERVISOR_DIR))
 
 try:
-    from task_status_constants import normalize_status, worker_block_reason
+    from task_status_constants import normalize_status, read_json as read_state_json, worker_block_reason
 except Exception:
     def normalize_status(value, default="QUEUED"):
         return str(value or default).strip().upper()
+
+    def read_state_json(path, default):
+        try:
+            if Path(path).exists():
+                return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            return {"error": str(exc), "path": str(path)}
+        return default
 
     def worker_block_reason(task):
         if str(task.get("source", "")).lower() == "telegram":
@@ -62,12 +70,7 @@ def now() -> str:
 
 
 def read_json(path: Path, default):
-    try:
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception as exc:
-        return {"error": str(exc), "path": str(path)}
-    return default
+    return read_state_json(Path(path), default)
 
 
 def read_text(path: Path, default: str = "") -> str:
@@ -391,6 +394,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/health":
+            system_state = read_json(STATE / "system_state.json", {})
             self.send_json({
                 "ok": True,
                 "service": "codex-panel",
@@ -399,7 +403,12 @@ class Handler(BaseHTTPRequestHandler):
                 "scope": SCOPE,
                 "root": str(ROOT),
                 "port": PORT,
-                "version": "production-environment-v1"
+                "version": "production-environment-v1",
+                "system_state": system_state.get("system_state") or system_state.get("state") or system_state.get("phase"),
+                "active_queue_remaining": system_state.get("active_queue_remaining"),
+                "production_running_commit": system_state.get("production_running_commit"),
+                "github_origin_main_commit": system_state.get("github_origin_main_commit"),
+                "production_github_sync": system_state.get("production_github_sync"),
             })
             return
         if parsed.path in ("/login", "/login.html"):

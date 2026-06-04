@@ -159,7 +159,10 @@
   "backup_recovery": {
     "manual_backup_enabled": true,
     "auto_backup_before_package": true,
-    "verify_backup_after_create": true
+    "verify_backup_after_create": true,
+    "owner_queue_cleanup_enabled": true,
+    "owner_queue_cleanup_requires_archive": true,
+    "owner_queue_cleanup_status_file": "state/queue_owner_cleanup_status.json"
   },
   "security_approval": {
     "approval_gate_enabled": true,

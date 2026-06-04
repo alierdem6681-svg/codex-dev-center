@@ -90,9 +90,11 @@ Ajan şu klasörleri inceler:
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
+- scripts/queue_owner_cleanup.py
 - web_panel/panel_server.py
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
+- docs/worker_queue_production_sync_repair_20260604_054726.md
 
 Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
@@ -108,6 +110,7 @@ Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.
 - Status aliaslari case farki ve yaygin ayirici varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED TIMEOUT` ve `FAILED.TIMEOUT` gibi girdiler standart enumlara cevrilir.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
+- 2026-06-04 owner repair sonrasinda runtime queue bilincli olarak bosaltildi. Snapshot `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup` altindadir; yeni gorevler temiz queue uzerinden alinmalidir.
 
 ## Servis Keşfi
 

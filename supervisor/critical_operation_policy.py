@@ -57,13 +57,16 @@ SAFE_CRITICAL_CONTEXT_PATTERNS: list[re.Pattern[str]] = [
         r"yapilamaz|yapılamaz|yapilmadi|yapılmadı|yapmadi|yapmadı|"
         r"dokunma|dokunmadi|dokunmadı|dokunulmadi|dokunulmadı|"
         r"dokunulmayacak|dokunulmaz|"
+        r"okuma|okunmayacak|okunmaz|gosterme|gösterme|gosterilmez|gösterilmez|"
+        r"yazma|yazilmayacak|yazılmayacak|rotate etme|"
         r"degistirme|değiştirme|degistirilmedi|değiştirilmedi|"
         r"uygulama|uygulanmadi|uygulanmadı|olmaz|olmadi|olmadı|yok)\b",
         re.I,
     ),
     re.compile(
         r"\b(yapma|yapmayacak|yapilmayacak|yapılmayacak|dokunma|"
-        r"degistirme|değiştirme|uygulama|yasak|forbidden)\b"
+        r"okuma|gosterme|gösterme|yazma|degistirme|değiştirme|"
+        r"rotate etme|uygulama|kapali|kapalı|yasak|forbidden)\b"
         rf"[^\n]*\b({CRITICAL_CONTEXT_TERMS})\b",
         re.I,
     ),
