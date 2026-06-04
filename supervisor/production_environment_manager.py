@@ -377,7 +377,7 @@ def http_text(port: int, path: str, timeout: int = 5) -> dict[str, Any]:
         conn.request("GET", path, headers=automation_headers())
         response = conn.getresponse()
         body = response.read().decode("utf-8", errors="replace")
-        return {"ok": response.status < 400, "status": response.status, "body": body[:20000]}
+        return {"ok": response.status < 400, "status": response.status, "body": body[:120000]}
     except Exception as exc:
         return {"ok": False, "status": 0, "error": str(exc), "body": ""}
 
