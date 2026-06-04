@@ -3375,6 +3375,72 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(tasks["TASK-UNASSIGNED"]["assigned_worker"], "worker-4")
         self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-UNASSIGNED")
 
+    def test_dispatch_rebalances_pending_task_when_preassigned_worker_is_busy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-4", "status": "RUNNING", "current_task": "TASK-BUSY"},
+                            {"id": "worker-3", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-PENDING",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-4",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+
+        task = queue["tasks"][0]
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(task["status"], "ASSIGNED")
+        self.assertEqual(task["assigned_worker"], "worker-3")
+        self.assertEqual(task["worker_id"], "worker-3")
+        self.assertEqual(worker_map["worker-3"]["current_task"], "TASK-PENDING")
+        self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-BUSY")
+
     def test_wake_now_dispatches_before_starting_worker_services(self):
         calls = []
         originals = (

@@ -782,3 +782,17 @@ Neden:
 
 Test:
 - `tests/test_runtime_status_model.py` apply workspace metadata kontrolunu regresyon testiyle sabitler.
+
+---
+
+## Pending Dispatch Rebalance Guard
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- `supervisor_cli dispatch`, `PENDING/QUEUED` durumundaki ve henuz claim edilmemis task'larda tercih edilen worker mesgulse kalan idle worker'a atama yapabilir.
+- `ASSIGNED/RUNNING` task'lar yine korunur; aktif claim veya calisan task baska workera ezilmez.
+- Bu guard, tek worker uzerine yigilmis pending apply task'lari varken bosta duran worker kapasitesinin kullanilmasini saglar.
+
+Test:
+- `tests/test_runtime_status_model.py` busy preassigned worker senaryosunda pending task'in idle worker'a dengelenmesini sabitler.

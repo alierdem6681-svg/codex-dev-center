@@ -249,3 +249,9 @@ Faz 19B-10A Model Policy
 - [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
 - [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
 - [x] Metadata kontrati unit test ile sabitlendi.
+
+## Faz 42 - Pending Dispatch Rebalance Guard
+
+- [x] Pending/queued task tercih edilen worker mesgulse bosta duran worker'a dengelenebilir.
+- [x] Assigned/running task'lar reassign edilmez; aktif claim korunur.
+- [x] Dispatch rebalance kontrati unit test ile sabitlendi.

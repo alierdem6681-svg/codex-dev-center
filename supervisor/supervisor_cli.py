@@ -173,8 +173,6 @@ def dispatch(_args):
             for task in pending_tasks:
                 if task.get("id") in assigned_task_ids:
                     continue
-                if str(task.get("assigned_worker") or "").strip():
-                    continue
                 if not remaining_idle:
                     break
                 assign(remaining_idle.pop(0), task)
