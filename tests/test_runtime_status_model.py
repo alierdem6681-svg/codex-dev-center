@@ -1481,6 +1481,39 @@ class DirectCtoJobRecoveryTest(unittest.TestCase):
         self.assertEqual(job["status"], TASK_STATUS_FAILED_RETRYABLE)
         self.assertEqual(job["result"], "direct_cto_process_lost_retryable")
 
+    def test_stale_direct_cto_job_recovery_is_silent_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job_path = self.write_job(tmp, "JOB-SILENT", pid=999999999)
+            calls = []
+            original_send = direct_cto_job_recovery.tg_send
+            direct_cto_job_recovery.tg_send = lambda chat_id, text: calls.append((chat_id, text)) or True
+            try:
+                result = direct_cto_job_recovery.reconcile_stale_jobs(tmp, stale_seconds=1)
+            finally:
+                direct_cto_job_recovery.tg_send = original_send
+            job = json.loads(job_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(calls, [])
+        self.assertNotIn("stale_recovery_notified_at", job)
+
+    def test_stale_direct_cto_job_recovery_can_notify_when_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job_path = self.write_job(tmp, "JOB-NOTIFY", pid=999999999)
+            calls = []
+            original_send = direct_cto_job_recovery.tg_send
+            direct_cto_job_recovery.tg_send = lambda chat_id, text: calls.append((chat_id, text)) or True
+            try:
+                result = direct_cto_job_recovery.reconcile_stale_jobs(tmp, stale_seconds=1, notify=True)
+            finally:
+                direct_cto_job_recovery.tg_send = original_send
+            job = json.loads(job_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["changed"], 1)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "123")
+        self.assertIn("stale_recovery_notified_at", job)
+
     def test_running_direct_cto_job_with_live_process_is_left_active(self):
         with tempfile.TemporaryDirectory() as tmp:
             job_path = self.write_job(tmp, "JOB-LIVE", pid=os.getpid())

@@ -26,6 +26,16 @@ ACTIVE_DIRECT_CTO_STATUSES = {"QUEUED", "RUNNING"}
 DEFAULT_STALE_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_STALE_SECONDS", "300"))
 
 
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+DEFAULT_RECOVERY_NOTIFY = env_flag("CODEX_DIRECT_CTO_RECOVERY_NOTIFY", False)
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -145,11 +155,12 @@ def reconcile_stale_jobs(
     app: Path | str = APP,
     *,
     stale_seconds: int = DEFAULT_STALE_SECONDS,
-    notify: bool = True,
+    notify: bool | None = None,
 ) -> dict[str, Any]:
     root = Path(app).resolve()
     jobs_dir = root / "state" / "direct_cto_jobs"
     log_dir = root / "logs"
+    should_notify = DEFAULT_RECOVERY_NOTIFY if notify is None else bool(notify)
     checked = 0
     changed = 0
     recovered: list[str] = []
@@ -187,7 +198,7 @@ def reconcile_stale_jobs(
             "previous_pid": progress.get("pid"),
         }
 
-        if notify:
+        if should_notify:
             try:
                 if notify_job(job):
                     job["stale_recovery_notified_at"] = now()

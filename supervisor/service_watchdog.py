@@ -118,7 +118,7 @@ def health_once():
     drift_check()
     result["actions"].append("drift_check")
 
-    direct_cto_recovery = reconcile_stale_jobs(APP)
+    direct_cto_recovery = reconcile_stale_jobs(APP, notify=False)
     result["direct_cto_recovery"] = direct_cto_recovery
     if direct_cto_recovery.get("changed"):
         result["actions"].append("direct_cto_stale_job_recovery")
