@@ -754,7 +754,7 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
                 "state": stage_state(definition["id"], set(stage_status_counts)),
                 "task_count": len(stage_tasks),
                 "status_counts": stage_status_counts,
-                "tasks": [compact_task(task) for task in stage_tasks[:8]],
+                "tasks": [compact_task(task) for task in stage_tasks],
             }
         )
 

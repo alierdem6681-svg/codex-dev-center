@@ -866,8 +866,20 @@
       function flowMainTasks(){
         return latestFlow && Array.isArray(latestFlow.main_tasks) ? latestFlow.main_tasks : [];
       }
+      function selectedFlowStageTasks(stage){
+        const current = stage || selectedFlowStage();
+        return current && Array.isArray(current.tasks) ? current.tasks : [];
+      }
       function flowStateBadge(state){
         return badge(flowStateLabels[String(state || '').toLowerCase()] || state || '-');
+      }
+      function renderFlowTaskRow(task){
+        return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(task.updated_at || task.finished_at || task.created_at))}</div></div>`;
+      }
+      function renderFlowStageTasks(stage){
+        const stageTasks = selectedFlowStageTasks(stage);
+        if (!stageTasks.length) return '<div class="muted">Bu stage içinde görev yok.</div>';
+        return stageTasks.map(task => renderFlowTaskRow(task)).join('');
       }
       function renderFlowMainTasks(){
         const mainTasks = flowMainTasks();
@@ -957,13 +969,7 @@
           pipelineFlowPanel.innerHTML = `<div class="muted">${esc(pipelineFlowError || 'Stage verisi yok.')}</div>`;
           return;
         }
-        const tasksHtml = (selected.tasks || []).map(task => {
-          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(task.updated_at || task.finished_at || task.created_at))}</div></div>`;
-        }).join('') || '<div class="muted">Bu stage içinde görev yok.</div>';
-        pipelineFlowPanel.innerHTML = `
-          ${renderFlowMainTasks()}
-          <div>${tasksHtml}</div>
-        `;
+        pipelineFlowPanel.innerHTML = renderFlowStageTasks(selected);
         bindFlowMainTaskToggleClicks();
       }
       function handlePipelineTabKey(event){

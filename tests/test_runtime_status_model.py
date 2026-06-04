@@ -2756,6 +2756,43 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertEqual(flow["summary"]["failed_count"], 2)
         self.assertEqual(flow["summary"]["blocked_count"], 2)
 
+    def test_pipeline_flow_stage_tasks_include_all_matching_tasks_for_tabs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            deployed_tasks = [
+                {
+                    "id": f"TASK-DEPLOYED-{index:02}",
+                    "status": TASK_STATUS_DEPLOYED,
+                    "updated_at": f"2026-06-04T09:{index:02}:00+00:00",
+                }
+                for index in range(12)
+            ]
+            self.write_flow_runtime(
+                root,
+                deployed_tasks
+                + [
+                    {
+                        "id": "TASK-RUNNING",
+                        "status": TASK_STATUS_RUNNING,
+                        "updated_at": "2026-06-04T10:00:00+00:00",
+                    }
+                ],
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        deployed = self.stage_by_id(flow, "deployed")
+        worker = self.stage_by_id(flow, "worker")
+
+        self.assertEqual(deployed["task_count"], 12)
+        self.assertEqual(len(deployed["tasks"]), 12)
+        self.assertEqual(
+            {task["id"] for task in deployed["tasks"]},
+            {task["id"] for task in deployed_tasks},
+        )
+        self.assertEqual(worker["task_count"], 1)
+        self.assertEqual([task["id"] for task in worker["tasks"]], ["TASK-RUNNING"])
+
     def test_pipeline_flow_groups_main_tasks_and_legacy_records(self):
         root_id = "CTO-TASK-20260604-091747-621734-TELEGRAM-ACTION-COMMAND"
         backlog_id = "CTO-BACKLOG-20260604-091751-464617-TELEGRAM-ACTION-COMMAND"
@@ -2917,6 +2954,12 @@ class DashboardPipelineFlowUiTest(unittest.TestCase):
         self.assertIn("flowDateTime", html)
         self.assertIn("flowMainTasks", html)
         self.assertIn("renderFlowMainTasks", html)
+        self.assertIn("function selectedFlowStageTasks(stage)", html)
+        self.assertIn("function renderFlowStageTasks(stage)", html)
+        self.assertIn("const stageTasks = selectedFlowStageTasks(stage);", html)
+        self.assertIn("pipelineFlowPanel.innerHTML = renderFlowStageTasks(selected);", html)
+        self.assertNotIn("${renderFlowMainTasks()}", html)
+        self.assertNotIn("const tasksHtml = (selected.tasks || [])", html)
         self.assertIn('class="flow-main-task"', html)
         self.assertIn("pipelineMainTaskExpanded = new Map()", html)
         self.assertIn("function flowMainTaskKey(mainTask)", html)
