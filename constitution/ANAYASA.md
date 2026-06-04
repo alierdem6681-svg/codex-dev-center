@@ -94,3 +94,7 @@ Her görev için kayıt tutulur:
 ## 9. Devir Teslim Kuralı
 
 Her geliştirme sonunda HANDOVER.md, ROADMAP.md ve memory/project_memory.md güncellenir.
+
+## 10. Telegram Asset Güvenliği
+
+Telegram asset sözleşmeleri gerçek Telegram API'ye fallback yapmadan, secret/env/token/private key değeri okumadan ve runtime state mutasyonu yapmadan test edilir. Asset manifest, limit, checksum, MIME/uzantı ve dashboard hata görünürlüğü redaction kurallarına bağlı kalmalıdır.

@@ -88,6 +88,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
+- supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
@@ -136,6 +137,11 @@ Dashboard Telegram asset inbox backend notu:
 - Ana ve legacy panel `GET /api/dashboard/telegram-assets` ve `GET /api/dashboard/telegram-assets/{asset_id}` endpointlerini ayni helper'a baglar.
 - Payload ham Telegram id, chat id, signed URL, storage path/bucket/object key, secret-like alan, raw message veya upstream payload dondurmemelidir.
 - POST veya mutate niyetli endpoint davranisi read-only 405 kalmalidir; runtime Telegram asset intake ve UI tablo/detay gorunumu ayri paketlerde ilerlemelidir.
+
+Telegram asset safety notu:
+- `modules/telegram_asset_safety/` ve `supervisor/telegram_asset_safety.py` gelecekteki Telegram asset intake icin non-mutating test sozlesmesini tutar.
+- Manifest dogrulama, limitler, checksum, MIME/uzanti eslesmesi, secret redaction, simulator retry/idempotency ve dashboard-safe snapshot davranisi `tests/test_telegram_asset_safety.py` ile sabitlenir.
+- Bu sozlesme gercek Telegram API cagrisi, asset indirme, production deploy veya secret/env/token/private key degeri okuma yetkisi vermez.
 
 ## Servis Keşfi
 

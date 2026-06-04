@@ -1,0 +1,33 @@
+{
+  "enabled": true,
+  "real_telegram_fallback_allowed": false,
+  "runtime_asset_inbox": "state/telegram_asset_inbox",
+  "contract": {
+    "manifest_schema_version": "telegram_asset_manifest_v1",
+    "max_asset_count": 10,
+    "max_asset_bytes": 20971520,
+    "max_total_bytes": 52428800,
+    "max_caption_length": 1024,
+    "max_filename_length": 160,
+    "unknown_manifest_fields_policy": "reject",
+    "unknown_asset_fields_policy": "reject",
+    "allowed_mime_extensions": {
+      "image/jpeg": [
+        ".jpg",
+        ".jpeg"
+      ],
+      "image/png": [
+        ".png"
+      ],
+      "image/webp": [
+        ".webp"
+      ],
+      "application/pdf": [
+        ".pdf"
+      ],
+      "text/plain": [
+        ".txt"
+      ]
+    }
+  }
+}

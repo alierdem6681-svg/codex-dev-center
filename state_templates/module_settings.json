@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:20:30+00:00",
+  "updated_at": "2026-06-04T11:23:30+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -90,6 +90,17 @@
     "forbid_raw_payload": true,
     "forbid_file_url": true,
     "forbid_sensitive_fields": true
+  },
+  "telegram_asset_safety": {
+    "enabled": true,
+    "contract_ready": true,
+    "real_telegram_fallback_allowed": false,
+    "runtime_asset_inbox": "state/telegram_asset_inbox",
+    "test_command": "{python} -m unittest tests.test_telegram_asset_safety",
+    "manifest_schema_version": "telegram_asset_manifest_v1",
+    "reject_unknown_manifest_fields": true,
+    "reject_unknown_asset_fields": true,
+    "dashboard_snapshot_raw_payload_included": false
   },
   "cto_router": {
     "enabled": true,

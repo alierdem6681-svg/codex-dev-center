@@ -1,0 +1,15 @@
+{
+  "actions": [
+    {
+      "id": "validate_telegram_asset_safety_contract",
+      "label": "Validate Telegram Asset Safety Contract",
+      "module": "telegram_asset_safety",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "real_telegram_api": false,
+      "command": "{python} -m unittest tests.test_telegram_asset_safety"
+    }
+  ]
+}

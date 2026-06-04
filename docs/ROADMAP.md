@@ -224,3 +224,11 @@ Faz 19B-10A Model Policy
 - [x] Filtre, cursor, single manifest ve panel server wrapper davranisi unit test ile sabitlendi.
 - [ ] Runtime Telegram asset intake akisi sonraki kucuk pakete birakildi.
 - [ ] Dashboard inbox UI tablo/detay gorunumu sonraki kucuk pakete birakildi.
+
+## Faz 39 - Telegram Asset Safety Tests
+
+- [x] Telegram asset manifest/limit/checksum/MIME sozlesmesi non-mutating module olarak eklendi.
+- [x] Secret redaction, simulator retry/idempotency ve dashboard-safe snapshot davranisi unit test ile sabitlendi.
+- [x] Module registry, settings ve action template kayitlari eklendi.
+- [ ] Gercek Telegram asset intake backend sonraki kucuk pakette bu sozlesmeye baglanacak.
+- [ ] Dashboard asset inbox UI sonraki kucuk pakette stub veriden runtime veriye genisletilecek.
