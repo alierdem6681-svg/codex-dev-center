@@ -2239,6 +2239,17 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "backlog_dispatcher_child_already_created")
 
+    def test_backlog_candidate_skips_dispatcher_child(self):
+        task = {
+            "id": "CTO-DISPATCH-CHILD",
+            "status": TASK_STATUS_PROPOSAL_DONE,
+            "risk": "medium",
+            "source": "cto_backlog_dispatcher",
+            "title": "Validation: Dashboard Pipeline Flow UI Tabs",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "backlog_dispatcher_child_not_backlog_candidate")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")

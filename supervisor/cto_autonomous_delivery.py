@@ -276,6 +276,8 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         return "repo_apply_child_already_created"
     if task.get("backlog_dispatcher_child"):
         return "backlog_dispatcher_child_already_created"
+    if str(task.get("source", "")).lower() == "cto_backlog_dispatcher":
+        return "backlog_dispatcher_child_not_backlog_candidate"
     if task.get("parent_task_id") and str(task.get("source", "")).lower() == "cto":
         return "already_child_task"
     if str(task.get("source", "")).lower() == "telegram" and status in ACTIVE_TASK_STATUSES:
