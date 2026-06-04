@@ -791,6 +791,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                     "ok": True,
                     "status": "PASS",
                     "dry_run": True,
+                    "staging_deploy_performed": False,
                     "mutating_cloud_operations_performed": False,
                 }
             ),
@@ -798,7 +799,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
 
         contract = production_readiness_suite.dry_run_non_mutating_contract(
             result,
-            ["mutating_cloud_operations_performed"],
+            ["staging_deploy_performed", "mutating_cloud_operations_performed"],
         )
 
         self.assertTrue(contract["ok"])
@@ -809,23 +810,43 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 "ok": True,
                 "status": "PASS",
                 "dry_run": True,
+                "staging_deploy_performed": False,
                 "mutating_cloud_operations_performed": True,
             }
         )
 
         contract = production_readiness_suite.dry_run_non_mutating_contract(
             result,
-            ["mutating_cloud_operations_performed"],
+            ["staging_deploy_performed", "mutating_cloud_operations_performed"],
         )
 
         self.assertFalse(contract["ok"])
         self.assertEqual(contract["flag_mismatches"], ["mutating_cloud_operations_performed"])
+
+        result["stdout"] = json.dumps(
+            {
+                "ok": True,
+                "status": "PASS",
+                "dry_run": True,
+                "staging_deploy_performed": True,
+                "mutating_cloud_operations_performed": False,
+            }
+        )
+
+        contract = production_readiness_suite.dry_run_non_mutating_contract(
+            result,
+            ["staging_deploy_performed", "mutating_cloud_operations_performed"],
+        )
+
+        self.assertFalse(contract["ok"])
+        self.assertEqual(contract["flag_mismatches"], ["staging_deploy_performed"])
 
     def test_staging_and_rollback_rejects_mutating_rollback_dry_run(self):
         staging_payload = {
             "ok": True,
             "status": "PASS",
             "dry_run": True,
+            "staging_deploy_performed": False,
             "mutating_cloud_operations_performed": False,
         }
         rollback_payload = {

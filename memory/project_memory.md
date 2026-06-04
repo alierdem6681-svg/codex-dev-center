@@ -197,3 +197,11 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Staging / Rollback / Production Readiness Apply
+
+Staging dry-run readiness kaniti guclendirildi. `production_environment_manager.py staging-deploy --dry-run` artik `staging_deploy_performed=false` alanini acikca dondurur; `production_readiness_suite.py` staging dry-run kontratinda bu alani `mutating_cloud_operations_performed=false` ile birlikte zorunlu sayar.
+
+Davranis `tests/test_runtime_status_model.py` icinde staging dry-run payload'u gercek staging deploy yapilmis gibi gorunurse readiness kapisinin FAIL olmasiyla sabitlendi. Bu paket production deploy, staging deploy, runtime secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local `git add` git metadata dizini read-only oldugu icin, `/tmp` kopyasindan `git push` DNS/network kisiti nedeniyle, GitHub connector branch olusturma cagrisi da `user cancelled MCP tool call` sonucu tamamlanamadigi icin PR acilamadi.

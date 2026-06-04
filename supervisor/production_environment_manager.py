@@ -462,6 +462,7 @@ def staging_deploy(dry_run: bool = False) -> dict[str, Any]:
         "remote_sync": remote_sync() if git.get("ok") else {"ok": False, "reason": "git_unavailable"},
         "critical_exceptions": critical,
         "commands": configured_commands(),
+        "staging_deploy_performed": False,
         "mutating_cloud_operations_performed": False,
     }
     blockers = []
@@ -485,6 +486,7 @@ def staging_deploy(dry_run: bool = False) -> dict[str, Any]:
     result["ok"] = bool(result["panel"].get("ok") and result["health"].get("ok") and result["smoke"].get("ok"))
     result["status"] = "PASS" if result["ok"] else "FAIL"
     result["blockers"] = [] if result["ok"] else ["staging_health_or_smoke_failed"]
+    result["staging_deploy_performed"] = bool(result["ok"])
     write_stage_outputs(result)
     return result
 

@@ -365,6 +365,35 @@ Not:
 
 ---
 
+## Staging / Rollback / Production Readiness Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-064124 / CTO-ACTION-20260604-062153-05-STAGING-ROLLBACK-READINESS
+
+Eklenenler:
+- `supervisor/production_environment_manager.py` staging dry-run çıktısına `staging_deploy_performed=false` kanıtını ekler.
+- `supervisor/production_readiness_suite.py` staging dry-run kontratında `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` alanlarını birlikte zorunlu tutar.
+- `tests/test_runtime_status_model.py` staging dry-run içinde gerçek staging deploy yapılmış görünürse readiness kapısının FAIL olacağını sabitler.
+- Production readiness policy, staging/rollback readiness dokümanları, onboarding map, roadmap ve memory aynı sözleşmeye hizalandı.
+
+Güvenlik sınırı:
+- Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- Geçici `/tmp` git repo kopyasında `python3 supervisor/production_readiness_suite.py --json` PASS; staging kontratı `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` alanlarını doğruladı.
+- `git diff --check` PASS.
+- Secret pattern scan PASS.
+
+PR durumu:
+- Local `git add` sandbox dışındaki git worktree metadata dizininde `index.lock` oluşturamadığı için başarısız oldu.
+- `/tmp` git kopyasından `git push` DNS/network kısıtı nedeniyle GitHub'a erişemedi.
+- GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` döndürdüğü için PR açılamadı.
+
+---
+
 ## Queue / Status Normalizer Apply Retry
 
 Tarih: 2026-06-03

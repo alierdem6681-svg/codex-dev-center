@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:41:24+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -47,7 +47,8 @@
       "requires_approval": false,
       "non_mutating": true,
       "simulation_contracts_required": true,
-      "dry_run_non_mutating_contracts_required": true
+      "dry_run_non_mutating_contracts_required": true,
+      "staging_dry_run_requires_staging_deploy_performed_false": true
     },
     {
       "id": "codex_quality_report",

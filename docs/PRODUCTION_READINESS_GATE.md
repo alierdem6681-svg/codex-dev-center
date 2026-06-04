@@ -26,7 +26,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 
 Restart ve failure injection kapıları canlı servis, cloud veya production deploy çalıştırmadan doğrulanır.
 
-- `staging_smoke_test` dry-run sonucunda `dry_run=true` ve `mutating_cloud_operations_performed=false` alanlarını doğrular.
+- `staging_smoke_test` dry-run sonucunda `dry_run=true`, `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` alanlarını doğrular.
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.

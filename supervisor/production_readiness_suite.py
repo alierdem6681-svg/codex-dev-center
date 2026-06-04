@@ -371,7 +371,10 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
     manager_ok = (ROOT / "supervisor/production_environment_manager.py").exists()
     staging = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "staging-deploy", "--dry-run"], timeout=180)
     rollback = run_cmd([sys.executable, "supervisor/production_environment_manager.py", "--json", "rollback", "--dry-run"], timeout=120)
-    staging_contract = dry_run_non_mutating_contract(staging, ["mutating_cloud_operations_performed"])
+    staging_contract = dry_run_non_mutating_contract(
+        staging,
+        ["staging_deploy_performed", "mutating_cloud_operations_performed"],
+    )
     rollback_contract = dry_run_non_mutating_contract(rollback, ["git_reset_performed", "data_mutation_performed"])
     record(
         results,

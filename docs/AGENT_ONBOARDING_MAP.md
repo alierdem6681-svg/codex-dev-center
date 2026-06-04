@@ -85,7 +85,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_quality_gate.py içindeki `standard-report` komutu readiness artefact'inden standart kalite raporu üretir
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
-- supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
+- supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması; staging dry-run için `staging_deploy_performed=false` kanıtı da zorunludur
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
