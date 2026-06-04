@@ -1576,6 +1576,27 @@ class DashboardPipelineFlowTest(unittest.TestCase):
                     module.ROOT = original_root
 
 
+class DashboardPipelineFlowUiTest(unittest.TestCase):
+    def test_dashboard_index_has_accessible_pipeline_flow_tabs_and_safe_polling(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("/api/pipeline-flow", html)
+        self.assertIn('role="tablist"', html)
+        self.assertIn('role="tab"', html)
+        self.assertIn('role="tabpanel"', html)
+        self.assertIn("pipeline_stage", html)
+        self.assertIn("pipelineFlowTabs.addEventListener('keydown'", html)
+        self.assertIn("AbortController", html)
+        self.assertIn("document.hidden", html)
+        self.assertIn("pipelineFlowFailureCount", html)
+        self.assertIn("renderPipelineFlow", html)
+        self.assertIn("<strong>${esc(task.id || '-')}</strong>", html)
+        self.assertIn("${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}", html)
+        self.assertNotIn("task.description", html)
+        self.assertNotIn("task.stdout", html)
+        self.assertNotIn("task.stderr", html)
+
+
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
         return {
