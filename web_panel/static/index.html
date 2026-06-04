@@ -77,13 +77,56 @@
       button.primary { background: #dcebf0; border-color: #c8dce5; }
       .controls { display: grid; gap: 8px; grid-template-columns: 1.3fr repeat(4, minmax(120px, .6fr)); margin-bottom: 10px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .pipeline-flow {
+        display: grid;
+        grid-template-columns: repeat(9, minmax(112px, 1fr));
+        gap: 8px;
+      }
+      .stage-tile {
+        min-height: 118px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fbfcfd;
+      }
+      .stage-tile.active { border-color: #b6cbd4; background: #edf5f8; }
+      .stage-tile.complete { border-color: #bfd8cc; background: #eef7f2; }
+      .stage-tile.blocked { border-color: #dfc888; background: #fbf5e6; }
+      .stage-tile.failed { border-color: #dfb1b1; background: #fbeeee; }
+      .stage-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        min-height: 24px;
+      }
+      .stage-label { font-weight: 700; font-size: 13px; }
+      .stage-count { font-size: 20px; font-weight: 700; margin-top: 10px; }
+      .stage-tasks { margin-top: 8px; display: grid; gap: 4px; }
+      .stage-task {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pipeline-markers {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
       pre { margin: 0; white-space: pre-wrap; background: #f2f4f6; padding: 10px; border-radius: 7px; max-height: 280px; overflow: auto; }
       .mobile-list { display: none; }
+      @media (max-width: 1250px) {
+        .pipeline-flow { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+      }
       @media (max-width: 980px) {
-        .grid, .wide, .three, .controls { grid-template-columns: 1fr; }
+        .grid, .wide, .three, .controls, .pipeline-flow { grid-template-columns: 1fr; }
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
@@ -150,6 +193,12 @@
         </section>
       </div>
 
+      <section>
+        <h2>Pipeline Stage Akışı</h2>
+        <div id="pipelineFlowBox" class="pipeline-flow"></div>
+        <div id="pipelineFlowMarkers" class="pipeline-markers"></div>
+      </section>
+
       <div class="wide">
         <section>
           <h2>Görevler</h2>
@@ -202,8 +251,13 @@
 
     <script>
       let latest = {};
+      let latestFlow = {};
       const riskRank = {critical: 4, high: 3, medium: 2, low: 1};
       const tr = {
+        ACTIVE: 'Aktif',
+        BLOCKED: 'Bloklu',
+        COMPLETE: 'Tamam',
+        EMPTY: 'Boş',
         FAILED: 'Hatalı',
         RUNNING: 'Çalışıyor',
         ASSIGNED: 'Atandı',
@@ -232,7 +286,7 @@
         const s = String(value ?? '-');
         const u = s.toUpperCase();
         let cls = 'badge';
-        if (['PASS','OK','DONE','TRUE','ACTIVE'].includes(u)) cls += ' ok';
+        if (['PASS','OK','DONE','TRUE','ACTIVE','COMPLETE'].includes(u)) cls += ' ok';
         if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN'].includes(u)) cls += ' warn';
         if (['FAIL','FAILED','ERROR','FALSE','INACTIVE','STALLED'].includes(u)) cls += ' bad';
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
@@ -273,7 +327,35 @@
         }</tbody></table>`;
         tasksCards.innerHTML = list.map(t => `<div class="item"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('');
       }
-      function render(data){
+      function renderPipelineFlow(flow){
+        latestFlow = flow || {};
+        const stages = Array.isArray(latestFlow.stages) ? latestFlow.stages : [];
+        pipelineFlowBox.innerHTML = stages.map(stage => {
+          const state = String(stage.state || 'empty').toLowerCase();
+          const tasks = Array.isArray(stage.tasks) ? stage.tasks.slice(0, 3) : [];
+          const taskRows = tasks.map(task => {
+            const worker = task.assigned_worker ? ` - ${task.assigned_worker}` : '';
+            return `<div class="stage-task" title="${esc(task.id || '')}">${esc(task.id || '-')}${esc(worker)}</div>`;
+          }).join('');
+          return `<div class="stage-tile ${esc(state)}">
+            <div class="stage-head"><span class="stage-label">${esc(stage.label || stage.id)}</span>${badge(state)}</div>
+            <div class="stage-count">${esc(stage.task_count ?? 0)}</div>
+            <div class="muted">${esc(Object.keys(stage.status_counts || {}).join(', ') || 'Durum yok')}</div>
+            <div class="stage-tasks">${taskRows}</div>
+          </div>`;
+        }).join('') || '<div class="muted">Pipeline stage verisi yok.</div>';
+        const markers = latestFlow.markers || {};
+        pipelineFlowMarkers.innerHTML = [
+          `Güncel stage: ${latestFlow.summary?.current_stage || '-'}`,
+          `Toplam görev: ${latestFlow.summary?.task_count ?? '-'}`,
+          `Bloklu: ${latestFlow.summary?.blocked_count ?? '-'}`,
+          `Hatalı: ${latestFlow.summary?.failed_count ?? '-'}`,
+          `Pipeline: ${markers.pipeline_status?.status || markers.pipeline_status?.task_to_deploy_test || '-'}`,
+          `GitHub: ${markers.github_actions?.last_deploy_status || '-'}`,
+          `Smoke: ${markers.last_smoke_test?.status || '-'}`
+        ].map(badge).join('');
+      }
+      function render(data, flow){
         latest = data;
         const readiness = data.production_readiness || {};
         const deploy = data.production_deploy || {};
@@ -386,10 +468,14 @@
         reportsBox.innerHTML = (data.reports || []).map(r => `<div>${esc(r)}</div>`).join('') || 'Rapor yok';
         fillFilters();
         renderTasks();
+        renderPipelineFlow(flow);
       }
       async function refresh(){
-        const res = await fetch('/api/status', {cache:'no-store'});
-        render(await res.json());
+        const [statusRes, flowRes] = await Promise.all([
+          fetch('/api/status', {cache:'no-store'}),
+          fetch('/api/pipeline-flow', {cache:'no-store'})
+        ]);
+        render(await statusRes.json(), await flowRes.json());
       }
       async function runAction(action){
         actionResult.textContent = 'Çalışıyor...';

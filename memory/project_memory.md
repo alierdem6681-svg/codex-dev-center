@@ -196,4 +196,14 @@ Guvenlik siniri:
 
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
+Local commit/PR tamamlanamadi: `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Dashboard Pipeline Flow UI v1
+
+Ana dashboard `web_panel/static/index.html` artik `/api/status` yaninda `/api/pipeline-flow` endpoint'ini de okur. `Pipeline Stage Akışı` bolumu backend payload stage sirasini kullanarak stage state'i, task sayisi, status ozeti, guvenli task id/worker satirlari ve marker ozetlerini read-only gosterir.
+
+Davranis `tests/test_runtime_status_model.py` icindeki statik UI kontrat testiyle sabitlendi. JSON validation, compile, unit test, gecici `/tmp` git kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

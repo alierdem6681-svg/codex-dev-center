@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:39:51+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -24,7 +24,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Read-only pipeline stage backend payload for dashboard flow tabs without raw task messages or terminal output.",
+      "description": "Read-only pipeline stage payload and dashboard UI view without raw task messages or terminal output.",
       "actions": [
         "view_pipeline_flow"
       ]

@@ -179,4 +179,4 @@ Faz 19B-10A Model Policy
 - [x] Gercek task status enumlari sabit pipeline stage sirasina maplenir.
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
-- [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+- [x] Dashboard ana ekranina `/api/pipeline-flow` kullanan stage akisi gorunumu eklendi.
