@@ -1720,6 +1720,52 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertTrue(all(stage["task_count"] == 0 for stage in flow["stages"]))
         self.assertTrue(all(stage["state"] == "empty" for stage in flow["stages"]))
 
+    def test_pipeline_flow_live_polling_contract_preserves_client_state_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = self.write_flow_runtime(
+                root,
+                [{"id": "TASK-RUNNING", "status": TASK_STATUS_RUNNING, "risk": "medium"}],
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root, generated_at="2026-06-04T10:30:00+00:00")
+            first_revision = flow["serverRevision"]
+            future = time.time() + 1
+            os.utime(state / "task_queue.json", (future, future))
+            later_flow = pipeline_flow.build_pipeline_flow(root)
+
+        self.assertEqual(flow["flowId"], "dashboard_pipeline_flow")
+        self.assertEqual(flow["runId"], "runtime_state")
+        self.assertEqual(flow["resetToken"], "dashboard_pipeline_flow:runtime_state")
+        self.assertEqual(flow["generatedAt"], flow["generated_at"])
+        self.assertEqual(flow["generatedAt"], "2026-06-04T10:30:00+00:00")
+        self.assertIsInstance(first_revision, int)
+        self.assertGreaterEqual(first_revision, 0)
+        self.assertGreater(later_flow["serverRevision"], first_revision)
+        self.assertFalse(flow["requiresUiReset"])
+        self.assertEqual(flow["initialUiDefaults"]["activeFlowStage"], "worker")
+        self.assertIn("stages", flow["mergePolicy"]["serverOwned"])
+        self.assertIn("main_tasks", flow["mergePolicy"]["serverOwned"])
+        self.assertIn("markers", flow["mergePolicy"]["serverOwned"])
+        self.assertIn("activeFlowStage", flow["mergePolicy"]["clientOwned"])
+        self.assertIn("pipelineMainTaskExpanded", flow["mergePolicy"]["clientOwned"])
+        self.assertIn("filters", flow["mergePolicy"]["clientOwned"])
+
+    def test_pipeline_flow_reset_token_uses_safe_run_marker_when_available(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(
+                root,
+                [{"id": "TASK-RUNNING", "status": TASK_STATUS_RUNNING, "risk": "medium"}],
+                {"pipeline_status.json": {"last_task_id": "CTO-RUN-123", "stdout": "hidden"}},
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        self.assertEqual(flow["runId"], "CTO-RUN-123")
+        self.assertEqual(flow["resetToken"], "dashboard_pipeline_flow:CTO-RUN-123")
+        self.assertEqual(flow["markers"]["pipeline_status"]["last_task_id"], "CTO-RUN-123")
+
     def test_pipeline_flow_maps_failed_blocked_approval_and_validation_failed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1922,6 +1968,17 @@ class DashboardPipelineFlowUiTest(unittest.TestCase):
         self.assertIn('data-main-task-key="${esc(key)}"', html)
         self.assertIn("details.addEventListener('toggle'", html)
         self.assertIn("pipelineMainTaskExpanded.set(key, event.currentTarget.open)", html)
+        self.assertIn("pipelineFlowLastAppliedRevision", html)
+        self.assertIn("pipelineFlowResetToken", html)
+        self.assertIn("function pipelineFlowResponseMeta(payload)", html)
+        self.assertIn("function resetPipelineFlowClientState(payload)", html)
+        self.assertIn("function applyPipelineFlowResponse(payload)", html)
+        self.assertIn("serverRevision", html)
+        self.assertIn("resetToken", html)
+        self.assertIn("requiresUiReset", html)
+        self.assertIn("meta.revision <= pipelineFlowLastAppliedRevision", html)
+        self.assertIn("applyPipelineFlowResponse(await res.json())", html)
+        self.assertNotIn("latestFlow = await res.json()", html)
         self.assertNotIn('class="flow-main-task" ${index === 0 ?', html)
         self.assertIn("latestFlow.main_tasks", html)
         self.assertIn("day: '2-digit'", html)

@@ -659,6 +659,8 @@
       let pipelineFlowTimer = null;
       let pipelineFlowAbort = null;
       let pipelineFlowFailureCount = 0;
+      let pipelineFlowLastAppliedRevision = null;
+      let pipelineFlowResetToken = '';
       let pipelineMainTaskExpanded = new Map();
       let activeFlowStage = new URLSearchParams(location.search).get('pipeline_stage') || '';
       function esc(value){return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -921,14 +923,15 @@
         if (current) return current;
         return stages.find(stage => Number(stage.task_count || 0) > 0) || stages[0];
       }
+      function syncPipelineStageUrl(stageId){
+        const url = new URL(location.href);
+        if (stageId) url.searchParams.set('pipeline_stage', stageId);
+        else url.searchParams.delete('pipeline_stage');
+        history.replaceState(null, '', url);
+      }
       function setPipelineStage(stageId, updateUrl = true){
         activeFlowStage = stageId || '';
-        if (updateUrl) {
-          const url = new URL(location.href);
-          if (activeFlowStage) url.searchParams.set('pipeline_stage', activeFlowStage);
-          else url.searchParams.delete('pipeline_stage');
-          history.replaceState(null, '', url);
-        }
+        if (updateUrl) syncPipelineStageUrl(activeFlowStage);
         renderPipelineFlow();
       }
       function renderPipelineFlow(){
@@ -983,13 +986,48 @@
         if (pipelineFlowTimer) clearTimeout(pipelineFlowTimer);
         pipelineFlowTimer = setTimeout(refreshPipelineFlow, pipelineFlowInterval());
       }
+      function pipelineFlowResponseMeta(payload){
+        const hasRevision = Boolean(payload) && (
+          Object.prototype.hasOwnProperty.call(payload, 'serverRevision')
+          || Object.prototype.hasOwnProperty.call(payload, 'server_revision')
+        );
+        const revision = Number(hasRevision ? (payload.serverRevision ?? payload.server_revision) : 0);
+        const resetToken = String(payload?.resetToken ?? payload?.reset_token ?? '');
+        const requiresUiReset = payload?.requiresUiReset === true || payload?.requires_ui_reset === true;
+        return {
+          hasRevision,
+          revision: Number.isFinite(revision) ? revision : 0,
+          resetToken,
+          requiresUiReset
+        };
+      }
+      function resetPipelineFlowClientState(payload){
+        const defaults = payload?.initialUiDefaults || payload?.initial_ui_defaults || {};
+        pipelineMainTaskExpanded = new Map();
+        activeFlowStage = String(defaults.activeFlowStage || defaults.active_flow_stage || '');
+        syncPipelineStageUrl(activeFlowStage);
+      }
+      function applyPipelineFlowResponse(payload){
+        const meta = pipelineFlowResponseMeta(payload);
+        const staleRevision = meta.hasRevision
+          && pipelineFlowLastAppliedRevision !== null
+          && meta.resetToken === pipelineFlowResetToken
+          && meta.revision <= pipelineFlowLastAppliedRevision;
+        if (staleRevision) return false;
+        const resetTokenChanged = Boolean(pipelineFlowResetToken && meta.resetToken && meta.resetToken !== pipelineFlowResetToken);
+        if (resetTokenChanged || meta.requiresUiReset) resetPipelineFlowClientState(payload);
+        latestFlow = payload;
+        if (meta.hasRevision) pipelineFlowLastAppliedRevision = meta.revision;
+        if (meta.resetToken) pipelineFlowResetToken = meta.resetToken;
+        return true;
+      }
       async function refreshPipelineFlow(){
         if (pipelineFlowAbort) pipelineFlowAbort.abort();
         pipelineFlowAbort = new AbortController();
         try {
           const res = await fetch('/api/pipeline-flow', {cache:'no-store', signal:pipelineFlowAbort.signal});
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          latestFlow = await res.json();
+          applyPipelineFlowResponse(await res.json());
           pipelineFlowError = '';
           pipelineFlowFailureCount = 0;
         } catch (err) {

@@ -247,3 +247,11 @@ Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime 
 Dashboard Pipeline Flow ana gorevleri artik expand/collapse tercihini `main_task_code` / `root_task_id` anahtariyla ayni sayfa oturumunda korur. Polling, stage refresh veya `renderPipelineFlow()` yeniden cizimi kullanicinin kapattigi aktif ana gorevi otomatik tekrar acmaz.
 
 Davranis `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` regresyon testiyle sabitlendi. Compile, dashboard markup testleri, ana runtime status unittest paketi, `/tmp` kopyasinda production readiness suite, whitespace ve secret pattern diff scan PASS oldu. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Dashboard Pipeline Live Polling Contract Apply
+
+Dashboard Pipeline Flow polling kontrati genisletildi. `/api/pipeline-flow` artik `serverRevision`, `resetToken`, `requiresUiReset`, `mergePolicy`, `flowId`, `runId`, `generatedAt` ve `initialUiDefaults` alanlarini dondurur.
+
+Frontend eski/ayni revision response'larini ayni reset token altinda full replace olarak uygulamaz. Reset token degismedikce veya `requiresUiReset=true` gelmedikce active stage ve ana gorev expand/collapse state'i client-owned overlay olarak korunur.
+
+Davranis `tests/test_runtime_status_model.py` icindeki backend kontrat ve frontend markup testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

@@ -107,6 +107,7 @@ Dashboard status API notu:
 - `/api/pipeline-flow` ana ve legacy panelde read-only pipeline stage payload'u dondurur; raw mesaj, uzun description, stdout/stderr, log veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalmalidir.
 - `web_panel/static/index.html` Pipeline Flow ana gorev expand/collapse state'ini stable main task key ile tutar; polling refresh selected stage veya kullanici toggle state'ini resetlememelidir.
 - Expand state regresyonu `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ile stable key, toggle handler ve refresh state merge sozlesmesini kontrol eder.
+- `/api/pipeline-flow` live polling kontrati `serverRevision`, `resetToken`, `requiresUiReset`, `mergePolicy` ve `initialUiDefaults` alanlarini dondurur. Frontend eski veya ayni revision refresh'lerini uygulamaz; reset token degismedikce client-owned stage/expand/filter/scroll state korunmalidir.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 
