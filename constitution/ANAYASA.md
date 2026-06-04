@@ -34,6 +34,8 @@ Başlangıç rolleri:
 - worker-3: DevOps, yayına alma ve servisler
 - worker-4: Test, kalite ve denetim
 
+Worker dispatch sözleşmesi izlenebilir olmalıdır: queue task kayıtları `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını taşımalı; terminal task statusları yeniden worker kuyruğuna alınmamalıdır.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.
@@ -66,6 +68,8 @@ Dashboard controlled execution proposal görünürlüğü salt okunurdur. Propos
 Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy panel `/api/status` payload'larında GitHub Actions ve pipeline marker durumunu göstermek production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 
 Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/api/pipeline-flow` payload'larında task stage akışını göstermek raw kullanıcı mesajı, uzun açıklama, stdout/stderr, log, terminal dump, production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
+
+Dashboard Pipeline Flow UI sekmeleri aynı salt okunur sözleşmeye bağlıdır. Aktif stage seçimini ve canlı polling görünürlüğünü yönetmek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
 
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notu içermelidir.

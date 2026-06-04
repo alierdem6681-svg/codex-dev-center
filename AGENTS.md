@@ -156,6 +156,14 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## DASHBOARD PIPELINE FLOW UI TABS V0
+
+Ana dashboard `/api/pipeline-flow` payload'unu yatay stage tablariyla salt okunur gosterir. Aktif tab `pipeline_stage` query parametresiyle korunur; polling canli kalir, arka planda yavaslar ve hata durumunda son guvenli veri stale olarak gosterilir. Bu UI production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
+## WORKER DISPATCH CONTRACT V1
+
+Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
+
 ## QUALITY GATE STANDARD REPORT V1
 
 `supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

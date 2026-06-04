@@ -43,6 +43,7 @@ TASK_STATUS_REQUIRES_APPROVAL = "REQUIRES_APPROVAL"
 TASK_STATUS_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 TASK_STATUS_BLOCKED = "BLOCKED"
 TASK_STATUS_DEPLOYED = "DEPLOYED"
+TASK_DEFAULT_MAX_ATTEMPTS = 1
 
 KNOWN_TASK_STATUSES = {
     TASK_STATUS_RECEIVED,
@@ -186,6 +187,43 @@ def normalize_risk(value: Any) -> str:
     return risk
 
 
+def _positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def ensure_dispatch_contract(task: dict[str, Any]) -> dict[str, Any]:
+    task_id = str(task.get("id") or "").strip()
+    parent_task_id = str(task.get("parent_task_id") or "").strip()
+    root_task_id = str(task.get("root_task_id") or parent_task_id or task_id).strip()
+    dispatch_id = str(task.get("dispatch_id") or task_id or root_task_id).strip()
+
+    if root_task_id:
+        task["root_task_id"] = root_task_id
+    if dispatch_id:
+        task["dispatch_id"] = dispatch_id
+
+    attempt = _positive_int(task.get("attempt"), 1)
+    max_attempts = _positive_int(task.get("max_attempts"), TASK_DEFAULT_MAX_ATTEMPTS)
+    if max_attempts < attempt:
+        max_attempts = attempt
+    task["attempt"] = attempt
+    task["max_attempts"] = max_attempts
+
+    assigned_worker = str(task.get("assigned_worker") or "").strip()
+    worker_id = str(task.get("worker_id") or assigned_worker).strip()
+    if worker_id:
+        task["worker_id"] = worker_id
+
+    task.setdefault("last_error_code", "")
+    task.setdefault("claimed_at", None)
+    task.setdefault("finished_at", None)
+    return task
+
+
 def task_risk_upper(task: dict[str, Any]) -> str:
     return normalize_risk(task.get("risk") or task.get("risk_level")).upper()
 
@@ -198,6 +236,7 @@ def normalize_task(task: dict[str, Any]) -> dict[str, Any]:
     if "source" not in task or not str(task.get("source", "")).strip():
         task["source"] = "local"
     task["source"] = str(task["source"]).strip().lower()
+    ensure_dispatch_contract(task)
     return task
 
 

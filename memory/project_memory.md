@@ -211,3 +211,17 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Dashboard Pipeline Flow UI Tabs v0
+
+Dashboard ana HTML'i artik `/api/pipeline-flow` payload'unu yatay stage sekmeleriyle gosterir. Aktif stage `pipeline_stage` URL query parametresiyle korunur, tablar klavye ile gezilebilir ve Pipeline Flow verisi 5 saniyelik read-only polling ile yenilenir. Tarayici sekmesi arka plandayken polling 15 saniyeye yavaslar; fetch hatalarinda son veri stale olarak korunur ve backoff uygulanir.
+
+Frontend kontrati `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ile sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-04 Worker Dispatch v2 Apply Retry
+
+Worker Dispatch v2 apply retry kucuk kapsama indirildi. Queue task normalizasyonu artik dispatch contract metadata alanlarini varsayilanlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
+
+Worker claim akisi task'i `RUNNING` yaparken `worker_id` ve `claimed_at` yazar. Router subtask metadata ve worker claim metadata davranisi `tests/test_runtime_status_model.py` icinde unit test ile sabitlendi.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

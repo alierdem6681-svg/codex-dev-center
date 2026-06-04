@@ -82,8 +82,63 @@
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
       pre { margin: 0; white-space: pre-wrap; background: #f2f4f6; padding: 10px; border-radius: 7px; max-height: 280px; overflow: auto; }
       .mobile-list { display: none; }
+      .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+      .section-title-row h2 { margin-bottom: 0; }
+      .tabbar {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 10px 0 6px;
+        scrollbar-width: thin;
+      }
+      .tab-button {
+        flex: 0 0 auto;
+        min-height: 38px;
+        min-width: 108px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .tab-button[aria-selected="true"] {
+        background: #dcebf0;
+        border-color: #8eb7c7;
+        color: #234b5d;
+        font-weight: 700;
+      }
+      .tab-count {
+        min-width: 24px;
+        border-radius: 999px;
+        padding: 1px 7px;
+        background: rgba(32, 36, 44, .08);
+        color: var(--ink);
+        font-size: 12px;
+        text-align: center;
+      }
+      .flow-summary {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(4, minmax(130px, 1fr));
+        margin: 2px 0 8px;
+      }
+      .flow-summary > div {
+        min-width: 0;
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+      }
+      .flow-value { font-size: 17px; font-weight: 700; margin-top: 2px; }
+      .flow-task {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.2fr) minmax(140px, .8fr) minmax(120px, .6fr);
+        gap: 8px;
+        align-items: start;
+        border-top: 1px solid var(--line);
+        padding: 9px 0;
+      }
+      .flow-marker-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
       @media (max-width: 980px) {
-        .grid, .wide, .three, .controls { grid-template-columns: 1fr; }
+        .grid, .wide, .three, .controls, .flow-summary, .flow-task { grid-template-columns: 1fr; }
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
@@ -149,6 +204,18 @@
           <div id="lastChecksBox"></div>
         </section>
       </div>
+
+      <section>
+        <div class="section-title-row">
+          <h2>Pipeline Flow</h2>
+          <div class="actions">
+            <span id="pipelineFlowUpdated" class="badge">Yükleniyor</span>
+            <span id="pipelineFlowMode" class="badge">Salt okunur</span>
+          </div>
+        </div>
+        <div id="pipelineFlowTabs" class="tabbar" role="tablist" aria-label="Pipeline Flow stage sekmeleri"></div>
+        <div id="pipelineFlowPanel" role="tabpanel" aria-live="polite"></div>
+      </section>
 
       <div class="wide">
         <section>
@@ -227,6 +294,30 @@
         TRUE: 'Açık',
         FALSE: 'Kapalı'
       };
+      const flowStageLabels = {
+        intake: 'Alım',
+        queue: 'Kuyruk',
+        worker: 'Worker',
+        proposal: 'Proposal',
+        validation: 'Doğrulama',
+        approval: 'Onay',
+        failed: 'Hata',
+        closed: 'Kapalı',
+        deployed: 'Canlı'
+      };
+      const flowStateLabels = {
+        empty: 'Boş',
+        active: 'Aktif',
+        blocked: 'Bloklu',
+        failed: 'Hatalı',
+        complete: 'Tamam'
+      };
+      let latestFlow = null;
+      let pipelineFlowError = '';
+      let pipelineFlowTimer = null;
+      let pipelineFlowAbort = null;
+      let pipelineFlowFailureCount = 0;
+      let activeFlowStage = new URLSearchParams(location.search).get('pipeline_stage') || '';
       function esc(value){return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
       function badge(value){
         const s = String(value ?? '-');
@@ -272,6 +363,122 @@
           list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
         }</tbody></table>`;
         tasksCards.innerHTML = list.map(t => `<div class="item"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('');
+      }
+      function flowStages(){
+        return latestFlow && Array.isArray(latestFlow.stages) ? latestFlow.stages : [];
+      }
+      function flowStateBadge(state){
+        return badge(flowStateLabels[String(state || '').toLowerCase()] || state || '-');
+      }
+      function selectedFlowStage(){
+        const stages = flowStages();
+        if (!stages.length) return null;
+        const existing = stages.find(stage => stage.id === activeFlowStage);
+        if (existing) return existing;
+        const current = stages.find(stage => stage.id === latestFlow?.summary?.current_stage);
+        if (current) return current;
+        return stages.find(stage => Number(stage.task_count || 0) > 0) || stages[0];
+      }
+      function setPipelineStage(stageId, updateUrl = true){
+        activeFlowStage = stageId || '';
+        if (updateUrl) {
+          const url = new URL(location.href);
+          if (activeFlowStage) url.searchParams.set('pipeline_stage', activeFlowStage);
+          else url.searchParams.delete('pipeline_stage');
+          history.replaceState(null, '', url);
+        }
+        renderPipelineFlow();
+      }
+      function renderPipelineFlow(){
+        if (!latestFlow && !pipelineFlowError) {
+          pipelineFlowTabs.innerHTML = '';
+          pipelineFlowPanel.innerHTML = '<div class="muted">Pipeline flow yükleniyor.</div>';
+          return;
+        }
+        const stages = flowStages();
+        const selected = selectedFlowStage();
+        if (selected && activeFlowStage !== selected.id) activeFlowStage = selected.id;
+        const generatedAt = latestFlow?.generated_at ? new Date(latestFlow.generated_at).toLocaleTimeString() : '-';
+        const stale = pipelineFlowError && latestFlow ? 'Son veri korunuyor' : '';
+        pipelineFlowUpdated.textContent = pipelineFlowError ? `Hata: ${pipelineFlowError}` : `Güncellendi ${generatedAt}`;
+        pipelineFlowMode.textContent = stale || (latestFlow?.non_mutating ? 'Salt okunur' : 'Kontrol ediliyor');
+        pipelineFlowTabs.innerHTML = stages.map(stage => {
+          const selectedAttr = selected && stage.id === selected.id ? 'true' : 'false';
+          const label = flowStageLabels[stage.id] || stage.label || stage.id;
+          return `<button type="button" class="tab-button" role="tab" id="flow-tab-${esc(stage.id)}" aria-controls="pipelineFlowPanel" aria-selected="${selectedAttr}" tabindex="${selectedAttr === 'true' ? '0' : '-1'}" data-stage="${esc(stage.id)}"><span>${esc(label)}</span><span class="tab-count">${esc(stage.task_count ?? 0)}</span></button>`;
+        }).join('');
+        pipelineFlowTabs.querySelectorAll('[data-stage]').forEach(button => {
+          button.addEventListener('click', () => setPipelineStage(button.dataset.stage || ''));
+        });
+        if (!selected) {
+          pipelineFlowPanel.innerHTML = `<div class="muted">${esc(pipelineFlowError || 'Stage verisi yok.')}</div>`;
+          return;
+        }
+        const statusCounts = Object.entries(selected.status_counts || {});
+        const summary = latestFlow?.summary || {};
+        const markers = latestFlow?.markers || {};
+        const pipelineMarker = markers.pipeline_status || {};
+        const githubMarker = markers.github_actions || {};
+        const smokeMarker = markers.last_smoke_test || {};
+        const tasksHtml = (selected.tasks || []).map(task => {
+          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(task.updated_at || task.finished_at || task.created_at || '-')}</div></div>`;
+        }).join('') || '<div class="muted">Bu stage içinde görev yok.</div>';
+        pipelineFlowPanel.innerHTML = `
+          <div class="flow-summary">
+            <div><div class="muted">Seçili stage</div><div class="flow-value">${esc(flowStageLabels[selected.id] || selected.label || selected.id)}</div></div>
+            <div><div class="muted">Stage durumu</div><div>${flowStateBadge(selected.state)}</div></div>
+            <div><div class="muted">Toplam görev</div><div class="flow-value">${esc(summary.task_count ?? 0)}</div></div>
+            <div><div class="muted">Blok / hata</div><div>${badge(summary.blocked_count ?? 0)} ${badge(summary.failed_count ?? 0)}</div></div>
+          </div>
+          <div class="flow-marker-row">
+            ${badge(`Pipeline: ${pipelineMarker.task_to_deploy_test || pipelineMarker.status || '-'}`)}
+            ${badge(`GitHub: ${githubMarker.last_deploy_status || githubMarker.status || '-'}`)}
+            ${badge(`Smoke: ${smokeMarker.status || smokeMarker.ok || '-'}`)}
+          </div>
+          <div class="muted">Status dağılımı</div>
+          <div class="flow-marker-row">${statusCounts.length ? statusCounts.map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') : badge('Boş')}</div>
+          <div>${tasksHtml}</div>
+        `;
+      }
+      function handlePipelineTabKey(event){
+        const buttons = Array.from(pipelineFlowTabs.querySelectorAll('[role="tab"]'));
+        if (!buttons.length) return;
+        const currentIndex = Math.max(0, buttons.findIndex(button => button.getAttribute('aria-selected') === 'true'));
+        let nextIndex = null;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % buttons.length;
+        if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = buttons.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        buttons[nextIndex].focus();
+        setPipelineStage(buttons[nextIndex].dataset.stage || '');
+      }
+      function pipelineFlowInterval(){
+        if (document.hidden) return 15000;
+        return Math.min(30000, 5000 * Math.max(1, pipelineFlowFailureCount));
+      }
+      function schedulePipelineFlowRefresh(){
+        if (pipelineFlowTimer) clearTimeout(pipelineFlowTimer);
+        pipelineFlowTimer = setTimeout(refreshPipelineFlow, pipelineFlowInterval());
+      }
+      async function refreshPipelineFlow(){
+        if (pipelineFlowAbort) pipelineFlowAbort.abort();
+        pipelineFlowAbort = new AbortController();
+        try {
+          const res = await fetch('/api/pipeline-flow', {cache:'no-store', signal:pipelineFlowAbort.signal});
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          latestFlow = await res.json();
+          pipelineFlowError = '';
+          pipelineFlowFailureCount = 0;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          pipelineFlowError = err.message || 'pipeline_flow_fetch_failed';
+          pipelineFlowFailureCount += 1;
+        } finally {
+          renderPipelineFlow();
+          schedulePipelineFlowRefresh();
+        }
       }
       function render(data){
         latest = data;
@@ -402,7 +609,13 @@
         location.href = '/login';
       }
       [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
+      pipelineFlowTabs.addEventListener('keydown', handlePipelineTabKey);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) schedulePipelineFlowRefresh();
+        else refreshPipelineFlow();
+      });
       refresh();
+      refreshPipelineFlow();
       setInterval(refresh, 5000);
     </script>
   </body>

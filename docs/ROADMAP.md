@@ -181,4 +181,11 @@ Faz 19B-10A Model Policy
 - [x] Gercek task status enumlari sabit pipeline stage sirasina maplenir.
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
-- [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+- [x] UI stage tab gorunumu yatay sekmeler, URL'de aktif stage korunumu ve canli polling ile eklendi.
+
+## Faz 34 - Worker Dispatch v2 Contract Metadata
+
+- [x] Queue task normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini varsayilanlar.
+- [x] Worker claim akisi `worker_id` ve `claimed_at` alanlarini task kaydina yazar.
+- [x] Router subtask dispatch contract ve worker claim metadata davranisi unit test ile sabitlendi.
+- [ ] Retry attempt increment ve stale claim timeout re-dispatch davranisi sonraki kucuk pakete birakildi.

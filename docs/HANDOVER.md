@@ -497,3 +497,50 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Worker Dispatch v2 Apply Retry - Dispatch Contract Metadata
+
+Tarih: 2026-06-04
+
+Görev: CTO-DISPATCH-20260604-082648-CTO-TASK-20260604-082503-854382-WORKER-DISPATCH-V2
+
+Eklenenler:
+- Queue task normalizasyonu dispatch contract alanlarını varsayılanlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
+- Worker claim akışı task'i `RUNNING` yaparken `worker_id` ve `claimed_at` alanlarını yazar.
+- Router subtask metadata ve worker claim metadata davranışı unit test ile sabitlendi.
+- AGENTS, Anayasa, onboarding, roadmap, memory ve state template kayıtları güncellendi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
+## Dashboard Pipeline Flow UI Tabs v0
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-082940 / CTO-TASK-20260604-082503-828558-DASHBOARD-PIPELINE-FLOW-UI-TABS
+
+Eklenenler:
+- `web_panel/static/index.html` icinde `/api/pipeline-flow` verisini kullanan yatay Pipeline Flow stage sekmeleri.
+- Aktif stage `pipeline_stage` URL query parametresiyle korunur.
+- Pipeline Flow verisi 5 saniyede bir yenilenir; tarayici sekmesi arka plandayken polling 15 saniyeye yavaslar ve hata durumunda kontrollu backoff uygulanir.
+- Sekmeler `role="tablist"`, `role="tab"` ve `role="tabpanel"` ile klavye gezintisini destekler.
+- Task satirlari sadece backend'in guvenli compact alanlarini text escaping ile gosterir.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.DashboardPipelineFlowUiTest` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 116 test.
+- Gecici `/tmp` git repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- `git diff --check` PASS.
+- Secret pattern scan bulgu vermedi.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.

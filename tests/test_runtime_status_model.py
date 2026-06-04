@@ -18,6 +18,7 @@ from supervisor import (  # noqa: E402
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
+    cto_task_router,
     direct_cto_job_recovery,
     lifecycle_manager,
     production_deploy_controller,
@@ -104,6 +105,36 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual([change["id"] for change in changes], ["TASK-READY", "TASK-DONE"])
         self.assertEqual(changes[0]["to_status"], TASK_STATUS_READY_FOR_VALIDATION)
         self.assertEqual(changes[1]["to_status"], TASK_STATUS_DONE)
+
+    def test_router_subtasks_get_dispatch_contract_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Worker Dispatch v2",
+                message="worker queue pipeline",
+                risk="medium",
+                split=True,
+            )
+
+        parent = result["task"]
+        subtasks = result["subtasks"]
+
+        self.assertEqual(parent["root_task_id"], parent["id"])
+        self.assertEqual(parent["dispatch_id"], parent["id"])
+        self.assertEqual(parent["attempt"], 1)
+        self.assertEqual(parent["max_attempts"], 1)
+        self.assertIsNone(parent["claimed_at"])
+        self.assertIsNone(parent["finished_at"])
+        self.assertEqual(len(subtasks), 3)
+        for subtask in subtasks:
+            self.assertEqual(subtask["root_task_id"], parent["id"])
+            self.assertEqual(subtask["dispatch_id"], subtask["id"])
+            self.assertEqual(subtask["attempt"], 1)
+            self.assertEqual(subtask["max_attempts"], 1)
+            self.assertEqual(subtask["last_error_code"], "")
+            self.assertIsNone(subtask["claimed_at"])
+            self.assertIsNone(subtask["finished_at"])
 
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
@@ -516,6 +547,77 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertIsNone(claimed)
         self.assertEqual(payload["tasks"][0]["status"], "RUNNING")
         self.assertEqual(payload["tasks"][1]["status"], "PENDING")
+
+    def test_worker_does_not_claim_terminal_dispatch_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-TERMINAL",
+                                "status": TASK_STATUS_READY_FOR_VALIDATION,
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                                "worker_eligible": True,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                claimed = worker_runner.claim_task("worker-1")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(claimed)
+        self.assertEqual(payload["tasks"][0]["status"], TASK_STATUS_READY_FOR_VALIDATION)
+
+    def test_worker_claim_records_dispatch_claim_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-CLAIM",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                claimed = worker_runner.claim_task("worker-2")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIsNotNone(claimed)
+        self.assertEqual(claimed["status"], TASK_STATUS_RUNNING)
+        self.assertEqual(claimed["assigned_worker"], "worker-2")
+        self.assertEqual(claimed["worker_id"], "worker-2")
+        self.assertEqual(claimed["root_task_id"], "TASK-CLAIM")
+        self.assertEqual(claimed["dispatch_id"], "TASK-CLAIM")
+        self.assertEqual(claimed["attempt"], 1)
+        self.assertEqual(claimed["max_attempts"], 1)
+        self.assertTrue(claimed["claimed_at"])
+        self.assertEqual(claimed["claimed_at"], claimed["started_at"])
+        self.assertEqual(payload["tasks"][0]["worker_id"], "worker-2")
+        self.assertEqual(payload["tasks"][0]["claimed_at"], claimed["claimed_at"])
 
     def test_late_progress_update_does_not_reopen_finished_task(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1474,6 +1576,27 @@ class DashboardPipelineFlowTest(unittest.TestCase):
                     module.ROOT = original_root
 
 
+class DashboardPipelineFlowUiTest(unittest.TestCase):
+    def test_dashboard_index_has_accessible_pipeline_flow_tabs_and_safe_polling(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("/api/pipeline-flow", html)
+        self.assertIn('role="tablist"', html)
+        self.assertIn('role="tab"', html)
+        self.assertIn('role="tabpanel"', html)
+        self.assertIn("pipeline_stage", html)
+        self.assertIn("pipelineFlowTabs.addEventListener('keydown'", html)
+        self.assertIn("AbortController", html)
+        self.assertIn("document.hidden", html)
+        self.assertIn("pipelineFlowFailureCount", html)
+        self.assertIn("renderPipelineFlow", html)
+        self.assertIn("<strong>${esc(task.id || '-')}</strong>", html)
+        self.assertIn("${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}", html)
+        self.assertNotIn("task.description", html)
+        self.assertNotIn("task.stdout", html)
+        self.assertNotIn("task.stderr", html)
+
+
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
         return {
@@ -2117,6 +2240,37 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "pipeline_failed_requires_root_cause_mode")
 
+    def test_backlog_candidate_skips_parent_with_existing_repo_apply_child(self):
+        task = {
+            "id": "PARENT",
+            "status": TASK_STATUS_PROPOSAL_DONE,
+            "risk": "medium",
+            "repo_apply_child": "CTO-APPLY-PARENT",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "repo_apply_child_already_created")
+
+    def test_backlog_candidate_skips_parent_with_existing_dispatcher_child(self):
+        task = {
+            "id": "PARENT",
+            "status": TASK_STATUS_READY_FOR_VALIDATION,
+            "risk": "medium",
+            "backlog_dispatcher_child": "CTO-DISPATCH-PARENT",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "backlog_dispatcher_child_already_created")
+
+    def test_backlog_candidate_skips_dispatcher_child(self):
+        task = {
+            "id": "CTO-DISPATCH-CHILD",
+            "status": TASK_STATUS_PROPOSAL_DONE,
+            "risk": "medium",
+            "source": "cto_backlog_dispatcher",
+            "title": "Validation: Dashboard Pipeline Flow UI Tabs",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "backlog_dispatcher_child_not_backlog_candidate")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")
@@ -2187,6 +2341,21 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(child["execution_mode"], "repo_apply")
         self.assertTrue(child["repo_apply_allowed"])
         self.assertEqual(queue["tasks"][0]["repo_apply_child"], child["id"])
+
+    def test_dispatcher_validation_child_does_not_create_repo_apply_child(self):
+        tasks = [
+            {
+                "id": "VALIDATION-CHILD",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "source": lifecycle_manager.BACKLOG_DISPATCHER_SOURCE,
+                "dispatcher_mode": "validation",
+                "risk": "medium",
+                "title": "Validation: Dashboard Profile / Account Menu",
+            }
+        ]
+
+        self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
+        self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
 
     def test_idle_worker_state_clears_current_task(self):
         with tempfile.TemporaryDirectory() as tmp:
