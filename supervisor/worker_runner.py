@@ -661,6 +661,30 @@ def pipeline_passed(results: list[dict[str, Any]]) -> bool:
     return bool(results) and all(item.get("ok") for item in results)
 
 
+def repo_apply_stage_plan_lines(
+    *,
+    commit_files: list[str],
+    unsafe_files: list[str],
+    secret_findings: list[dict[str, Any]],
+    validation_status: str,
+    pipeline_status: str,
+) -> list[str]:
+    diff_review = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
+    patch_plan = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
+    secret_review = "APPROVAL_REQUIRED" if secret_findings else "PASS"
+    return [
+        "## Controlled Apply Stage Plan",
+        f"- 1. Proposal review: {validation_status} - validated proposal/task evidence is the only apply input.",
+        f"- 2. Patch plan: {patch_plan} - scope is limited before commit staging.",
+        f"- 3. Diff review: {diff_review} - exact allowlist and blocked runtime paths are checked.",
+        f"- 4. Secret scan: {secret_review} - changed text files are scanned before pipeline gates.",
+        f"- 5. Local tests: {pipeline_status} - compile/unit/readiness gates must pass before PR handoff.",
+        "- 6. Report: PASS - patch scope, gates and deploy proof are recorded in this report.",
+        "- 7. Rollback note: PASS - branch, post-merge and runtime rollback notes are recorded below.",
+        "- 8. Production deploy: NOT_RUN - finalizer/GitHub Actions gate is required after PR merge.",
+    ]
+
+
 def repo_apply_control_report_sections(
     *,
     risk: str,
@@ -689,6 +713,14 @@ def repo_apply_control_report_sections(
         lines.extend([f"  - {rel}" for rel in commit_files])
     lines.extend(
         [
+            "",
+            *repo_apply_stage_plan_lines(
+                commit_files=commit_files,
+                unsafe_files=unsafe_files,
+                secret_findings=secret_findings,
+                validation_status=validation_status,
+                pipeline_status=pipeline_status,
+            ),
             "",
             "## Rollback Note",
             f"- Branch rollback: delete branch `{branch}` or revert the PR commit before merge.",

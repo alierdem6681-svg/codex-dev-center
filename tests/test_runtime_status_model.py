@@ -420,8 +420,34 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertIn("- Local pipeline: PASS", text)
         self.assertIn("- Production deploy: NOT_RUN", text)
         self.assertIn("- Critical operations: blocked_by_policy", text)
+        self.assertIn("## Controlled Apply Stage Plan", text)
+        self.assertIn("- 1. Proposal review: PASS", text)
+        self.assertIn("- 2. Patch plan: PASS", text)
+        self.assertIn("- 3. Diff review: PASS", text)
+        self.assertIn("- 4. Secret scan: PASS", text)
+        self.assertIn("- 5. Local tests: PASS", text)
+        self.assertIn("- 6. Report: PASS", text)
+        self.assertIn("- 7. Rollback note: PASS", text)
+        self.assertIn("- 8. Production deploy: NOT_RUN", text)
         self.assertIn("## Rollback Note", text)
         self.assertIn("delete branch `worker/test-controlled-apply`", text)
+
+    def test_repo_apply_stage_plan_marks_unsafe_diff_before_tests(self):
+        sections = worker_runner.repo_apply_control_report_sections(
+            risk="medium",
+            branch="worker/test-controlled-apply",
+            commit_files=["state/task_queue.json"],
+            unsafe_files=["state/task_queue.json"],
+            secret_findings=[],
+            validation_status="FAIL",
+            pipeline_status="NOT_RUN",
+        )
+        text = "\n".join(sections)
+
+        self.assertIn("- 2. Patch plan: FAIL", text)
+        self.assertIn("- 3. Diff review: FAIL", text)
+        self.assertIn("- 5. Local tests: NOT_RUN", text)
+        self.assertIn("- Production deploy: NOT_RUN", text)
 
     def test_production_readiness_simulation_contracts_are_non_mutating(self):
         contracts = production_readiness_suite.readiness_simulation_contracts()
@@ -511,6 +537,16 @@ class WorkerStatusModelTest(unittest.TestCase):
         )
 
         self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["safety_status"], "pass")
+        self.assertEqual(report["safety_reasons"], [])
+        self.assertEqual(
+            report["required_false_flags"],
+            {
+                "production_deploy_performed": False,
+                "staging_deploy_performed": False,
+                "mutating_cloud_operations_performed": False,
+            },
+        )
         self.assertEqual(report["flaky_commands"], ["unit_test"])
         self.assertEqual(len(report["attempts"]), 2)
         for attempt in report["attempts"]:
@@ -597,6 +633,65 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertTrue(report["retry_simulation"]["non_blocking"])
         self.assertIn("## Retry Simulation", summary)
         self.assertIn("python3 supervisor/codex_quality_gate.py json-check attempt 1", summary)
+        self.assertIn("Safety status: fail", summary)
+
+    def test_retry_simulation_safety_is_visible_but_non_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            reports = root / "reports"
+            state.mkdir()
+            reports.mkdir()
+            gates = [
+                "python_compile_check",
+                "json_validation",
+                "yaml_validation",
+                "secret_leakage_scan",
+                "forbidden_operation_scan",
+                "unit_test",
+                "integration_test",
+                "staging_smoke_test",
+                "rollback_simulation",
+                "restart_simulation",
+                "failure_injection_simulation",
+            ]
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (reports / "quality-gate-retry-simulation.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "dry_run": False,
+                        "non_blocking": True,
+                        "attempts": [],
+                        "commands": [],
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": True,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+            summary = codex_quality_gate.render_standard_quality_summary(report)
+
+        self.assertEqual(report["status"], "pass")
+        retry = report["retry_simulation"]
+        self.assertEqual(retry["safety_status"], "fail")
+        self.assertIn("dry_run_not_true", retry["safety_reasons"])
+        self.assertIn("staging_deploy_performed_not_false", retry["safety_reasons"])
+        self.assertTrue(retry["non_blocking"])
+        self.assertIn("Safety reasons: dry_run_not_true, staging_deploy_performed_not_false", summary)
 
     def test_standard_quality_report_fails_when_required_artifact_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3818,6 +3913,233 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(task["worker_id"], "worker-3")
         self.assertEqual(worker_map["worker-3"]["current_task"], "TASK-PENDING")
         self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-BUSY")
+
+    def test_dispatch_requeues_stale_claim_and_increments_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "ERROR", "current_task": "TASK-STALE"},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STALE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 2,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(result["stale_requeued"][0]["task"], "TASK-STALE")
+        self.assertEqual(task["status"], "ASSIGNED")
+        self.assertEqual(task["assigned_worker"], "worker-2")
+        self.assertEqual(task["worker_id"], "worker-2")
+        self.assertEqual(task["attempt"], 2)
+        self.assertEqual(task["max_attempts"], 2)
+        self.assertEqual(task["last_error_code"], "stale_claim_timeout")
+        self.assertEqual(task["previous_worker_id"], "worker-1")
+        self.assertIsNone(task["claimed_at"])
+        self.assertEqual(worker_map["worker-1"]["current_task"], None)
+        self.assertEqual(worker_map["worker-2"]["current_task"], "TASK-STALE")
+
+    def test_dispatch_marks_stale_claim_terminal_after_max_attempts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-2", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STALE-DONE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 1,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        self.assertEqual(result["assignments"], [])
+        self.assertEqual(result["stale_terminal"][0]["task"], "TASK-STALE-DONE")
+        self.assertEqual(task["status"], TASK_STATUS_FAILED_TIMEOUT)
+        self.assertEqual(task["last_error_code"], "stale_claim_timeout")
+        self.assertEqual(task["result"], "stale_claim_timeout_max_attempts_reached")
+        self.assertTrue(task["finished_at"])
+        self.assertIsNone(workers["workers"][0]["current_task"])
+
+    def test_dispatch_keeps_active_stale_claim_on_current_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "RUNNING", "current_task": "TASK-ACTIVE"},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-ACTIVE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 2,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(result["assignments"], [])
+        self.assertEqual(result["stale_requeued"], [])
+        self.assertEqual(task["status"], "RUNNING")
+        self.assertEqual(task["assigned_worker"], "worker-1")
+        self.assertEqual(task["worker_id"], "worker-1")
+        self.assertEqual(task["attempt"], 1)
+        self.assertEqual(worker_map["worker-2"]["current_task"], None)
 
     def test_wake_now_dispatches_before_starting_worker_services(self):
         calls = []

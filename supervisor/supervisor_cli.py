@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -11,9 +12,11 @@ try:
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
+        TASK_STATUS_FAILED_TIMEOUT,
         TASK_STATUS_PENDING,
         TASK_STATUS_QUEUED,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_RUNNING,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -26,9 +29,11 @@ except ImportError:
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
+        TASK_STATUS_FAILED_TIMEOUT,
         TASK_STATUS_PENDING,
         TASK_STATUS_QUEUED,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_RUNNING,
         atomic_write_json,
         is_worker_eligible_task,
         normalize_queue_payload,
@@ -45,8 +50,136 @@ STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
+try:
+    DISPATCH_STALE_CLAIM_SECONDS = max(1, int(os.environ.get("CODEX_DISPATCH_STALE_CLAIM_SECONDS", "1800")))
+except ValueError:
+    DISPATCH_STALE_CLAIM_SECONDS = 1800
+
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+def parse_iso_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+def positive_int(value, default):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+def stale_claim_started_at(task):
+    for key in ("claimed_at", "assigned_at", "started_at", "updated_at", "created_at"):
+        parsed = parse_iso_datetime(task.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+def worker_actively_owns_task(task, workers_by_id):
+    task_id = str(task.get("id") or "")
+    worker_id = str(task.get("worker_id") or task.get("assigned_worker") or "")
+    worker = workers_by_id.get(worker_id)
+    if not worker:
+        return False
+    status = str(worker.get("status") or "").strip().upper()
+    current_task = str(worker.get("current_task") or "")
+    return current_task == task_id and status in {"ASSIGNED", "RUNNING", "REVIEWING"}
+
+def reconcile_stale_dispatch_claims(queue, workers, stale_seconds=None):
+    stale_seconds = positive_int(stale_seconds, DISPATCH_STALE_CLAIM_SECONDS)
+    workers_by_id = {str(w.get("id") or ""): w for w in workers.get("workers", [])}
+    current_time = datetime.now(timezone.utc)
+    current_iso = current_time.isoformat()
+    requeued = []
+    terminal = []
+
+    for task in queue.get("tasks", []):
+        status = normalize_status(task.get("status"))
+        if status not in {TASK_STATUS_ASSIGNED, TASK_STATUS_RUNNING}:
+            continue
+        if not is_worker_eligible_task(task):
+            continue
+        if worker_actively_owns_task(task, workers_by_id):
+            continue
+
+        started_at = stale_claim_started_at(task)
+        if started_at is None:
+            continue
+        age_seconds = max(0, int((current_time - started_at).total_seconds()))
+        if age_seconds < stale_seconds:
+            continue
+
+        task_id = str(task.get("id") or "")
+        previous_worker = str(task.get("worker_id") or task.get("assigned_worker") or "")
+        attempt = positive_int(task.get("attempt"), 1)
+        max_attempts = positive_int(task.get("max_attempts"), attempt)
+        if max_attempts < attempt:
+            max_attempts = attempt
+
+        worker = workers_by_id.get(previous_worker)
+        if worker and str(worker.get("current_task") or "") == task_id:
+            worker_status = str(worker.get("status") or "").strip().upper()
+            if worker_status not in {"ASSIGNED", "RUNNING", "REVIEWING"}:
+                worker["current_task"] = None
+                worker["last_seen"] = current_iso
+                worker["note"] = f"stale_claim_reconciled:{task_id}"
+
+        task["last_error_code"] = "stale_claim_timeout"
+        task["previous_worker_id"] = previous_worker
+        task["stale_claim_detected_at"] = current_iso
+        task["claimed_at"] = None
+        task["started_at"] = None
+        task["assigned_worker"] = None
+        task["worker_id"] = ""
+        task["updated_at"] = current_iso
+
+        if attempt < max_attempts:
+            task["attempt"] = attempt + 1
+            task["max_attempts"] = max_attempts
+            task["status"] = TASK_STATUS_PENDING
+            task["delivery_level"] = "RETRY_DISPATCH_PENDING"
+            task["result"] = "stale_claim_timeout_retry_scheduled"
+            task["dispatch_requeue_reason"] = "stale_claim_timeout"
+            task["finished_at"] = None
+            requeued.append(
+                {
+                    "task": task_id,
+                    "previous_worker": previous_worker,
+                    "attempt": task["attempt"],
+                    "max_attempts": max_attempts,
+                    "age_seconds": age_seconds,
+                }
+            )
+            continue
+
+        task["attempt"] = attempt
+        task["max_attempts"] = max_attempts
+        task["status"] = TASK_STATUS_FAILED_TIMEOUT
+        task["delivery_level"] = TASK_STATUS_FAILED_TIMEOUT
+        task["result"] = "stale_claim_timeout_max_attempts_reached"
+        task["finished_at"] = current_iso
+        terminal.append(
+            {
+                "task": task_id,
+                "previous_worker": previous_worker,
+                "attempt": attempt,
+                "max_attempts": max_attempts,
+                "age_seconds": age_seconds,
+            }
+        )
+
+    return requeued, terminal
 
 def read_json(path, default):
     try:
@@ -137,7 +270,12 @@ def dispatch(_args):
             workers = read_json(workers_path, {"workers": []})
             queue = read_json(queue_path, {"tasks": []})
 
-            idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
+            stale_requeued, stale_terminal = reconcile_stale_dispatch_claims(queue, workers)
+            idle_workers = [
+                w
+                for w in workers.get("workers", [])
+                if w.get("status") in ("IDLE", "READY") and not w.get("current_task")
+            ]
             idle_by_id = {str(w.get("id") or ""): w for w in idle_workers}
             queue, _changes = normalize_queue_payload(queue)
             dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
@@ -180,10 +318,33 @@ def dispatch(_args):
             write_json(queue_path, queue)
             write_json(workers_path, workers)
 
+    for item in stale_requeued:
+        log(
+            f"DISPATCH_STALE_REQUEUED task={item['task']} previous_worker={item['previous_worker']} "
+            f"attempt={item['attempt']}/{item['max_attempts']} age_seconds={item['age_seconds']}"
+        )
+
+    for item in stale_terminal:
+        log(
+            f"DISPATCH_STALE_TERMINAL task={item['task']} previous_worker={item['previous_worker']} "
+            f"attempt={item['attempt']}/{item['max_attempts']} age_seconds={item['age_seconds']}"
+        )
+
     for item in assignments:
         log(f"DISPATCH worker={item['worker']} task={item['task']}")
 
-    print(json.dumps({"ok": True, "assignments": assignments}, indent=2, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "assignments": assignments,
+                "stale_requeued": stale_requeued,
+                "stale_terminal": stale_terminal,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
 def completion_target_status(task):
     if task.get("validation_status") == "PASS" and task.get("pipeline_status") == "PASS":

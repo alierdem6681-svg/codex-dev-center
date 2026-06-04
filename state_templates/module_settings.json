@@ -80,8 +80,12 @@
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_report_checklist": true,
+    "repo_apply_stage_plan_report": true,
     "repo_apply_runtime_artifacts_ignored": true,
     "worker_claim_writes_dispatch_metadata": true,
+    "stale_claim_retry_dispatch_enabled": true,
+    "stale_claim_timeout_seconds": 1800,
+    "stale_claim_requires_no_active_worker_ownership": true,
     "bootstrap_preflight_enabled": true,
     "repo_apply_no_change_terminal_outcome": true
   },
@@ -164,6 +168,8 @@
     "status_alias_space_hyphen_normalization": true,
     "status_alias_separator_normalization": true,
     "dispatch_contract_metadata_required": true,
+    "stale_claim_retry_dispatch_enabled": true,
+    "stale_claim_terminal_status": "FAILED_TIMEOUT",
     "dispatch_contract_fields": [
       "root_task_id",
       "dispatch_id",
@@ -206,6 +212,11 @@
       "result",
       "failure_hint",
       "retry_changed_result"
+    ],
+    "retry_simulation_safety_fields": [
+      "safety_status",
+      "safety_reasons",
+      "required_false_flags"
     ],
     "required_checks": [
       "lint",

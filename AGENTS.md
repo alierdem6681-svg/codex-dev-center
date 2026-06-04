@@ -212,6 +212,16 @@ Validated proposal apply worker'lari sadece izole git worktree ve worker branch 
 
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notunu içermelidir.
 
+Repo apply control report ayrıca stage plan satırlarını içermelidir: proposal review, patch plan, diff review, secret scan, local tests, report, rollback note ve production deploy kapısı ayrı ayrı PASS/FAIL/NO_CHANGE/NOT_RUN olarak görünür.
+
+## QUALITY GATE RETRY SAFETY V1
+
+`supervisor/codex_quality_gate.py retry-simulation` çıktısı dry-run güvenliğini açıkça raporlar. `safety_status`, `safety_reasons` ve `required_false_flags` alanları dry-run true ve production/staging/cloud mutate bayraklarının false olduğunu doğrular.
+
+## STALE DISPATCH CLAIM REPAIR V1
+
+`supervisor_cli dispatch` aktif worker sahipliği olmayan stale `ASSIGNED`/`RUNNING` claim'leri yaş eşiğinden sonra aynı task üzerinde retry'a alabilir. Maksimum deneme dolarsa task `FAILED_TIMEOUT` olur; yeni kök görev açılmaz.
+
 ## SAFE TEST SCRATCH STANDARD V1
 
 Testler repo checkout icine runtime state, cache, config, log veya output dosyasi yazmamalidir. Ortak helper `tests/safe_test_scratch.py` uzerinden scratch root sirasi `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` olarak cozulur; repo icindeki scratch root reddedilir.

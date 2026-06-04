@@ -954,3 +954,23 @@ Eklenenler:
 
 Not:
 - Production deploy, staging deploy, gercek Telegram API cagrisi, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+---
+
+## Direct CTO PR Batch Integration Apply
+
+Tarih: 2026-06-04
+Görevler:
+- CTO-ACTION-20260604-144354-01-CONTROLLED-APPLY-PIPELINE
+- CTO-ACTION-20260604-144354-02-QUALITY-GATE-TEST-SIMULATION
+- CTO-ACTION-20260604-144354-03-WORKER-DISPATCH-V2
+
+Eklenenler:
+- `supervisor/worker_runner.py` repo apply control report icin stage plan satirlari uretir.
+- `supervisor/codex_quality_gate.py` retry simulation raporuna dry-run safety alanlari ekler.
+- `supervisor/supervisor_cli.py` aktif worker sahipligi olmayan stale dispatch claim'leri ayni task uzerinde retry/timeout olarak reconcile eder.
+- `docs/CONTROLLED_APPLY_PIPELINE.md`, state template kayitlari, onboarding, roadmap ve memory kayitlari guncellendi.
+
+Not:
+- PR #103, #104 ve #105 current main ile conflict verdigi icin kod/test/template degisiklikleri elle entegre edildi.
+- Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.

@@ -313,3 +313,10 @@ Faz 19B-10A Model Policy
 - [x] Telegram-safe ozet staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini kapsar.
 - [x] Ozet diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri ve runtime path bilgisi icermeyecek sekilde test edildi.
 - [x] Policy template, onboarding, anayasa, AGENTS ve memory/handover kayitlari guncellendi.
+
+## Faz 50 - Direct CTO PR Batch Integration
+
+- [x] Repo apply control report stage plan satirlari eklendi.
+- [x] Quality gate retry simulation dry-run safety alanlari eklendi.
+- [x] Stale dispatch claim repair ayni task uzerinde retry/timeout statüsüyle sabitlendi.
+- [x] PR #103, #104 ve #105 conflict nedeniyle current main uzerine elle entegre edildi.

@@ -369,3 +369,9 @@ Bu guard, PR hazır durumundaki işler için gereksiz dispatch/recovery çocuk g
 Worker-3 staging/rollback readiness paketi production readiness suite'e `telegram_result_report_flow` gate'ini ekledi. Bu gate staging health/smoke, rollback plani, genel readiness sonucu ve production deploy yapilmadi bilgisinden Telegram'a uygun kisa ozet uretir.
 
 Kontrat: ozet 900 karakter ve 12 satiri asamaz; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri veya runtime path bilgisi iceremez. Gercek Telegram API cagrisi, production deploy, staging deploy veya runtime state/log mutasyonu yapilmaz.
+
+## 2026-06-04 Direct CTO PR Batch Integration
+
+PR #103, #104 ve #105 current main ile conflict verdigi icin otomatik merge yerine kod/test/template degisiklikleri elle entegre edildi.
+
+Entegrasyon kapsami: `worker_runner` repo apply stage plan report, `codex_quality_gate` retry simulation dry-run safety alanlari ve `supervisor_cli` stale dispatch claim repair. Stale claim repair aktif worker sahipligi yoksa ayni task uzerinde retry planlar; deneme siniri dolarsa `FAILED_TIMEOUT` terminal statüsüne alir ve yeni kok gorev acmaz.

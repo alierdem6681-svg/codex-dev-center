@@ -120,3 +120,11 @@ Readiness, audit, risk review, test plan ve proposal-only işler feature deliver
 Repo apply boş diff ürettiğinde hedef zaten sağlanmışsa terminal başarıdır; retry veya yeni backlog görevi açılmaz. Timeout ve usage-limit durumlarında retry kararı aynı task üzerinde idempotency key ile tutulmalıdır.
 
 State JSON yazımları atomik tmp+fsync+rename akışıyla yapılmalı, kalan tmp dosyaları otomatik doğru state kabul edilmemeli ve audit çıktısı secret değerleri loglamamalıdır.
+
+## 13. Apply, Retry ve Claim Onarımı
+
+Repo apply raporları stage plan, diff review, secret scan, local test, rollback note ve production deploy yapılmadı kanıtını ayrı ayrı göstermelidir.
+
+Quality gate retry simülasyonu dry-run safety alanlarını (`safety_status`, `safety_reasons`, `required_false_flags`) üretmelidir.
+
+Worker aktif sahipliği olmayan stale dispatch claim'leri yeni kök görev açmadan aynı task üzerinde retry'a alınmalı; deneme sınırı dolarsa `FAILED_TIMEOUT` terminal statüsü verilmelidir.

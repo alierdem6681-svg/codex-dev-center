@@ -178,6 +178,9 @@ Observed issue completion notu:
 - Worker workspace preflight `bootstrap_diagnostics.json` uretir; missing/invalid bootstrap ana isi baslatmadan acik tanı verir.
 - Timeout/usage-limit retry kararlari `retry_policy` idempotency key'i ile ayni task uzerinde tutulur.
 - `atomic_json_state_audit()` state JSON ve kalan tmp dosyalarini raporlar; tmp dosyasini otomatik guvenilir state saymaz.
+- `worker_runner.repo_apply_stage_plan_lines()` apply control report icinde stage plan, diff review, secret scan, local test, rollback ve production deploy kapisini gorunur yapar.
+- `codex_quality_gate` retry simulation raporu `safety_status`, `safety_reasons` ve `required_false_flags` dry-run safety alanlarini uretir.
+- `supervisor_cli.reconcile_stale_dispatch_claims()` aktif worker sahipligi olmayan stale claim'leri yeni kok gorev acmadan ayni task uzerinde retry/timeout statüsüne taşır.
 
 ## Servis Keşfi
 
