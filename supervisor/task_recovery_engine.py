@@ -78,6 +78,15 @@ def load_json(path, default):
 def save_json(path, data):
     atomic_write_json(Path(path), data)
 
+def active_queue_tasks(tasks):
+    active_statuses = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
+    return [
+        task
+        for task in tasks
+        if normalize_status(task.get("status")) in active_statuses
+        and not worker_block_reason(task)
+    ]
+
 def safe_id(value):
     out = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(value))
     return out[:120] or "TASK"
@@ -295,20 +304,22 @@ def main():
         save_json(wpath, workers)
 
     state = load_json(spath, {})
-    queue_empty = not tasks
+    active_tasks = active_queue_tasks(tasks)
+    active_remaining = len(active_tasks)
+    queue_empty = active_remaining == 0
+    ready_state = queue_empty and state.get("ready_for_new_tasks")
 
     state.update({
-        "phase": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else "step_23a_task_recovery_engine_active",
-        "system_state": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else state.get("system_state"),
-        "state": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else state.get("state"),
+        "phase": "READY_FOR_NEW_TASKS" if ready_state else "step_23a_task_recovery_engine_active",
+        "system_state": "READY_FOR_NEW_TASKS" if ready_state else "BUSY",
+        "state": "READY_FOR_NEW_TASKS" if ready_state else "BUSY",
+        "active_queue_remaining": active_remaining,
+        "ready_for_new_tasks": bool(queue_empty),
         "task_recovery_engine_active": True,
         "task_recovery_last_run": now(),
         "task_recovery_ready_for_validation_or_proposal_ready": recovered,
         "task_recovery_normalized_stale": stale,
         "task_recovery_retry_created": retry_created,
-        "production_deployed": False,
-        "repo_changes_applied": False,
-        "staging_deployed": False,
         "updated_at": now(),
     })
     save_json(spath, state)

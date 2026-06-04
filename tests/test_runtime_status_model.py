@@ -3178,6 +3178,74 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(system_state["system_state"], "READY_FOR_NEW_TASKS")
         self.assertEqual(system_state["state"], "READY_FOR_NEW_TASKS")
 
+    def test_task_recovery_marks_system_busy_when_active_queue_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            logs = runtime / "logs"
+            state.mkdir()
+            reports.mkdir()
+            logs.mkdir()
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {"id": "OLD", "status": "DEPLOYED", "risk": "low"},
+                            {"id": "ACTIVE", "status": "RUNNING", "risk": "medium", "assigned_worker": "worker-1"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "workers.json").write_text(json.dumps({"workers": []}), encoding="utf-8")
+            (state / "system_state.json").write_text(
+                json.dumps(
+                    {
+                        "phase": "READY_FOR_NEW_TASKS",
+                        "system_state": "READY_FOR_NEW_TASKS",
+                        "state": "READY_FOR_NEW_TASKS",
+                        "ready_for_new_tasks": True,
+                        "production_deployed": True,
+                        "repo_changes_applied": True,
+                        "production_github_sync": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                task_recovery_engine.APP,
+                task_recovery_engine.STATE,
+                task_recovery_engine.REPORTS,
+                task_recovery_engine.LOGS,
+            )
+            task_recovery_engine.APP = runtime
+            task_recovery_engine.STATE = state
+            task_recovery_engine.REPORTS = reports
+            task_recovery_engine.LOGS = logs
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    task_recovery_engine.main()
+            finally:
+                (
+                    task_recovery_engine.APP,
+                    task_recovery_engine.STATE,
+                    task_recovery_engine.REPORTS,
+                    task_recovery_engine.LOGS,
+                ) = originals
+
+            system_state = json.loads((state / "system_state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(system_state["phase"], "step_23a_task_recovery_engine_active")
+        self.assertEqual(system_state["system_state"], "BUSY")
+        self.assertEqual(system_state["state"], "BUSY")
+        self.assertEqual(system_state["active_queue_remaining"], 1)
+        self.assertFalse(system_state["ready_for_new_tasks"])
+        self.assertTrue(system_state["production_deployed"])
+        self.assertTrue(system_state["repo_changes_applied"])
+        self.assertTrue(system_state["production_github_sync"])
+
     def test_owner_cleanup_archives_and_empties_queue(self):
         spec = importlib.util.spec_from_file_location(
             "queue_owner_cleanup_test_module",
