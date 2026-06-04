@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-dev-center.local/schemas/telegram_asset_manifest_v1.json",
+  "title": "Telegram Asset Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_id",
+    "source",
+    "received_at",
+    "telegram",
+    "original",
+    "storage",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "asset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "const": "telegram"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "telegram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chat_id_hash",
+        "message_id",
+        "file_id_hash",
+        "file_unique_id",
+        "file_size"
+      ],
+      "properties": {
+        "chat_id_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "message_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "file_id_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "file_unique_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file_size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20971520
+        }
+      }
+    },
+    "original": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "declared_mime",
+        "detected_mime",
+        "size_bytes",
+        "sha256"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_mime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detected_mime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20971520
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "bucket",
+        "object_key",
+        "sha256"
+      ],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bucket": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_bytes",
+        "download_allowed",
+        "retention"
+      ],
+      "properties": {
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20971520
+        },
+        "download_allowed": {
+          "type": "boolean"
+        },
+        "retention": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

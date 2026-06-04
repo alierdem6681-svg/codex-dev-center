@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "asset_id": "tg_20260604_105113_too_large",
+  "source": "telegram",
+  "received_at": "2026-06-04T10:51:13Z",
+  "telegram": {
+    "chat_id_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "message_id": 12347,
+    "file_id_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "file_unique_id": "CAADBAADb6cxG4x",
+    "file_size": 20971521
+  },
+  "original": {
+    "filename": "too-large.bin",
+    "declared_mime": "application/octet-stream",
+    "detected_mime": "application/octet-stream",
+    "size_bytes": 20971521,
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "storage": {
+    "backend": "local_runtime",
+    "bucket": null,
+    "object_key": "telegram-assets/2026/06/04/tg_20260604_105113_too_large/too-large.bin",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "policy": {
+    "max_bytes": 20971521,
+    "download_allowed": true,
+    "retention": "runtime"
+  }
+}

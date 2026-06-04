@@ -555,3 +555,39 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
+## Telegram Asset Manifest Contract Apply
+
+Tarih: 2026-06-04
+Görev: CTO-APPLY-20260604-105113 / CTO-BACKLOG-20260604-102528-797374-TELEGRAM-ASSET-STORAGE-AND-MANIFEST
+Worker: worker-3
+
+Eklenenler:
+- `supervisor/telegram_asset_manifest.py` network kullanmayan manifest v1 validator.
+- `tests/fixtures/telegram_asset_manifest/` schema, valid, boundary, limit-asimi ve forbidden-field fixture setleri.
+- `tests/test_telegram_asset_manifest_contract.py` unit test kontrati.
+- `modules/telegram_asset_manifest_contract/` modül kaydı, settings ve action tanımı.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` kayıtları.
+
+Güvenlik sınırı:
+- Production deploy, staging deploy, canlı Telegram API çağrısı, runtime storage mutasyonu, secret/env/token/private key okuma veya yazma yapılmadı.
+- Repo içinde `state/` dizini yok; runtime state dosyası oluşturulmadı.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_telegram_asset_manifest_contract` PASS, 6 test.
+- `python3 -m unittest tests.test_runtime_status_model tests.test_dashboard_account_menu_markup` PASS, 139 test.
+- `python3 -m unittest tests.test_runtime_status_model tests.test_dashboard_account_menu_markup tests.test_telegram_asset_manifest_contract` PASS, 145 test.
+- JSON validation PASS.
+- `git diff --check` PASS.
+- Secret pattern scan PASS.
+
+PR durumu:
+- Local `git add` git metadata dizini read-only oldugu icin basarisiz oldu.
+- GitHub branch olusturma connector cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+Devam:
+- Sonraki küçük paket runtime asset intake'i bu kontratı kullanarak bağlamalı.
+- Dashboard asset inbox read-only DTO tasarımı ayrı pakette ele alınmalı.

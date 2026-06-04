@@ -199,3 +199,12 @@ Faz 19B-10A Model Policy
 - [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
+
+## Faz 36 - Telegram Asset Manifest Contract
+
+- [x] Telegram asset manifest schema version `1` repo fixture olarak eklendi.
+- [x] Network kullanmayan manifest validator eklendi.
+- [x] Valid, boundary, limit-asimi ve forbidden-field fixture setleri eklendi.
+- [x] `20971520` byte Telegram indirme limiti unit test ile sabitlendi.
+- [x] Raw payload, Telegram file URL ve sensitive credential-like alan redaksiyon kontrati test edildi.
+- [ ] Runtime Telegram asset intake ve dashboard inbox gorunumu sonraki kucuk paketlere birakildi.

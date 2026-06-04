@@ -1,0 +1,10 @@
+{
+  "id": "telegram_asset_manifest_contract",
+  "name": "Telegram Asset Manifest Contract",
+  "status": "active",
+  "risk": "medium",
+  "description": "Network-free schema and validator contract for Telegram asset metadata manifests.",
+  "enabled": true,
+  "dashboard_visible": true,
+  "updated_at": "2026-06-04T10:51:13+00:00"
+}

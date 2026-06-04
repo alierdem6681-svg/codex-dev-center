@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "asset_id": "tg_20260604_105113_forbidden",
+  "source": "telegram",
+  "received_at": "2026-06-04T10:51:13Z",
+  "raw": {
+    "message": "full Telegram payload must not be persisted in the manifest"
+  },
+  "telegram": {
+    "chat_id_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "message_id": 12348,
+    "file_id_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "file_unique_id": "DAADBAADb6cxG4x",
+    "file_size": 2048,
+    "file_url": "https://api.telegram.org/file/bot/redacted-path",
+    "token": "redacted-value"
+  },
+  "original": {
+    "filename": "unsafe.txt",
+    "declared_mime": "text/plain",
+    "detected_mime": "text/plain",
+    "size_bytes": 2048,
+    "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "storage": {
+    "backend": "local_runtime",
+    "bucket": null,
+    "object_key": "telegram-assets/2026/06/04/tg_20260604_105113_forbidden/unsafe.txt",
+    "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "policy": {
+    "max_bytes": 20971520,
+    "download_allowed": true,
+    "retention": "runtime"
+  }
+}
