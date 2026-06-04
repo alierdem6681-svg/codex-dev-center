@@ -60,7 +60,9 @@
     "worker_recovery_required": true,
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
-    "repo_apply_runtime_artifacts_ignored": true
+    "repo_apply_runtime_artifacts_ignored": true,
+    "repo_apply_report_diff_pipeline_summary": true,
+    "repo_apply_report_rollback_note": true
   },
   "telegram": {
     "enabled": false,
