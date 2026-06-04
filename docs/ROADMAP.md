@@ -215,3 +215,12 @@ Faz 19B-10A Model Policy
 - [x] Pipeline ana gorev expand/collapse tercihi polling ve render refresh sonrasinda korunur.
 - [x] Kullanici kapattigi aktif ana gorev otomatik tekrar acilmaz.
 - [x] Expand state davranisi dashboard pipeline flow UI regresyon testiyle sabitlendi.
+
+## Faz 38 - Dashboard Telegram Asset Inbox Backend
+
+- [x] Dashboard Telegram Asset Inbox icin read-only DTO helper eklendi.
+- [x] Ana ve legacy panel `GET /api/dashboard/telegram-assets` endpointlerini ayni guvenli payload sozlesmesine baglar.
+- [x] Liste ve detay payload'lari ham Telegram id, storage path, signed URL veya secret-like alan dondurmez.
+- [x] Filtre, cursor, single manifest ve panel server wrapper davranisi unit test ile sabitlendi.
+- [ ] Runtime Telegram asset intake akisi sonraki kucuk pakete birakildi.
+- [ ] Dashboard inbox UI tablo/detay gorunumu sonraki kucuk pakete birakildi.

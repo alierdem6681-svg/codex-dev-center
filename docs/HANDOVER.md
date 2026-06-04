@@ -636,3 +636,34 @@ Test:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
+## Dashboard Telegram Asset Inbox Backend Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-DISPATCH-20260604-111809-CTO-ACTION-20260604-102221-03-DASHBOARD-TELEGRAM-ASSET-INBOX
+Worker: worker-1
+
+Eklenenler:
+- `web_panel/telegram_asset_inbox.py` dashboard icin read-only Telegram asset inbox DTO helper'i eklendi.
+- Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `GET /api/dashboard/telegram-assets` ve `GET /api/dashboard/telegram-assets/{asset_id}` endpointlerini baglar.
+- DTO allowlist ham Telegram id, chat id, signed URL, storage path/bucket/object key ve secret-like alanlari payload disinda tutar.
+- `tests/test_telegram_asset_inbox.py` redaction, filtre/cursor, single manifest ve panel server wrapper davranisini sabitler.
+
+Test:
+- `python3 -m unittest tests.test_telegram_asset_inbox` PASS.
+- `python3 -m compileall -q web_panel tests` PASS.
+- `python3 -m unittest tests.test_telegram_asset_inbox tests.test_telegram_asset_manifest_contract tests.test_dashboard_account_menu_markup` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- JSON validation PASS.
+- `git diff --check` PASS.
+- Diff secret pattern scan PASS.
+- `/tmp` icinde bagimsiz lokal git repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS.
+
+Not:
+- Production deploy, staging deploy, canli Telegram API cagrisi, runtime asset storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+- Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+- Runtime Telegram asset intake ve dashboard UI tablo/detay gorunumu sonraki kucuk paketlere birakildi.

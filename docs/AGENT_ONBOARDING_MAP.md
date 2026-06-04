@@ -131,6 +131,12 @@ Telegram asset manifest contract notu:
 - Manifest `policy.max_bytes`, Telegram `file_size` ve original `size_bytes` alanlari `20971520` byte ustune cikarsa test/validator fail olur.
 - Manifest icinde raw payload, Telegram file URL veya sensitive credential-like alanlar kabul edilmez.
 
+Dashboard Telegram asset inbox backend notu:
+- `web_panel/telegram_asset_inbox.py` runtime `state/telegram_asset*` kaynaklarini read-only okuyarak dashboard liste/detay DTO allowlist uretir.
+- Ana ve legacy panel `GET /api/dashboard/telegram-assets` ve `GET /api/dashboard/telegram-assets/{asset_id}` endpointlerini ayni helper'a baglar.
+- Payload ham Telegram id, chat id, signed URL, storage path/bucket/object key, secret-like alan, raw message veya upstream payload dondurmemelidir.
+- POST veya mutate niyetli endpoint davranisi read-only 405 kalmalidir; runtime Telegram asset intake ve UI tablo/detay gorunumu ayri paketlerde ilerlemelidir.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:
