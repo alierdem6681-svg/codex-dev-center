@@ -3866,6 +3866,57 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(updated["github_origin_main_commit"], "new-head")
         self.assertTrue(updated["production_github_sync"])
 
+    def test_environment_manager_health_accepts_auth_required_status_api(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            for relative in [
+                "web_panel/panel_server.py",
+                "web_panel/static/index.html",
+                "supervisor/production_environment_manager.py",
+                "supervisor/production_deploy_controller.py",
+            ]:
+                path = runtime / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("ok\n", encoding="utf-8")
+            state.mkdir()
+            reports.mkdir()
+
+            def fake_http_json(port, path):
+                if path == "/health":
+                    return {"ok": True, "status": 200, "body": {"ok": True}}
+                if path == "/api/status":
+                    return {"ok": False, "status": 401, "body": {"ok": False, "login": True}}
+                return {"ok": False, "status": 404, "body": {}}
+
+            originals = (
+                production_environment_manager.ROOT,
+                production_environment_manager.STATE,
+                production_environment_manager.REPORTS,
+                production_environment_manager.http_json,
+                production_environment_manager.service_discovery,
+            )
+            production_environment_manager.ROOT = runtime
+            production_environment_manager.STATE = state
+            production_environment_manager.REPORTS = reports
+            production_environment_manager.http_json = fake_http_json
+            production_environment_manager.service_discovery = lambda: {"systemd_available": False}
+            try:
+                payload = production_environment_manager.health_check("production")
+            finally:
+                (
+                    production_environment_manager.ROOT,
+                    production_environment_manager.STATE,
+                    production_environment_manager.REPORTS,
+                    production_environment_manager.http_json,
+                    production_environment_manager.service_discovery,
+                ) = originals
+
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["status_api"]["ok"])
+        self.assertTrue(payload["status_api"]["auth_required"])
+
     def test_environment_manager_smoke_accepts_current_dashboard_labels(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)

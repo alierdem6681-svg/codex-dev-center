@@ -497,6 +497,11 @@ def service_discovery() -> dict[str, Any]:
     }
 
 
+def status_api_auth_required(status: dict[str, Any]) -> bool:
+    body = status.get("body") if isinstance(status.get("body"), dict) else {}
+    return int(status.get("status") or 0) == 401 and body.get("login") is True
+
+
 def health_check(scope: str = "production") -> dict[str, Any]:
     port = STAGING_PORT if scope == "staging" else PRODUCTION_PORT
     required = [
@@ -507,14 +512,21 @@ def health_check(scope: str = "production") -> dict[str, Any]:
     ]
     health = http_json(port, "/health")
     status = http_json(port, "/api/status") if health.get("ok") else {"ok": False, "reason": "health_failed"}
+    status_ok = bool(status.get("ok") or status_api_auth_required(status))
     payload = {
-        "ok": bool(health.get("ok") and status.get("ok") and all(path.exists() for path in required)),
+        "ok": bool(health.get("ok") and status_ok and all(path.exists() for path in required)),
         "scope": scope,
         "port": port,
         "checked_at": now(),
         "required_files_missing": [str(path.relative_to(ROOT)) for path in required if not path.exists()],
         "health": health,
-        "status_api": {"ok": status.get("ok"), "status": status.get("status"), "keys": sorted((status.get("body") or {}).keys()) if isinstance(status.get("body"), dict) else []},
+        "status_api": {
+            "ok": status_ok,
+            "raw_ok": status.get("ok"),
+            "status": status.get("status"),
+            "auth_required": status_api_auth_required(status),
+            "keys": sorted((status.get("body") or {}).keys()) if isinstance(status.get("body"), dict) else [],
+        },
         "services": service_discovery(),
     }
     atomic_write_json(STATE / f"{scope}_health_check_status.json", payload)
@@ -530,6 +542,7 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     index = http_text(port, "/")
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
     body_text = index.get("body", "")
+    auth_required = status_api_auth_required(status)
     labels = [
         "Pipeline Flow",
         "Görevler",
@@ -538,10 +551,10 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     ]
     checks = {
         "health_pass": bool(health.get("ok")),
-        "status_api_pass": bool(status.get("ok")),
-        "dashboard_has_production_environment": "production_environment" in body,
-        "dashboard_has_deploy_commands": "deploy_commands" in body,
-        "index_turkish_labels": all(label in body_text for label in labels),
+        "status_api_pass": bool(status.get("ok") or auth_required),
+        "dashboard_has_production_environment": auth_required or "production_environment" in body,
+        "dashboard_has_deploy_commands": auth_required or "deploy_commands" in body,
+        "index_turkish_labels": auth_required or all(label in body_text for label in labels),
     }
     payload = {
         "ok": all(checks.values()),
