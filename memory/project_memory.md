@@ -185,6 +185,12 @@ Simulasyon dry-run kaniti icin `production_deploy_performed=false`, `staging_dep
 
 Local git metadata dizini read-only oldugu icin commit hazirlanamadi. GitHub connector branch/PR cagrisinin iptal edilmesi nedeniyle PR acma adimi tamamlanamadi.
 
+## 2026-06-04 Quality Gate Simulation Evidence Apply
+
+Recovery quality gate/test/simulation apply paketi standart kalite raporunu sertlestirdi. `standard-report` artik simülasyon kapisini yalnizca gate PASS ve top-level non-mutating flag'lerle kabul etmez; staging/rollback icin `dry_run_non_mutating_contract`, restart/failure injection icin `static_non_mutating_contract` kaniti da gerekir.
+
+Davranis `tests/test_runtime_status_model.py` icinde kontrat kaniti eksik artefact fail senaryosuyla sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
 ## 2026-06-04 Dashboard Pipeline Flow Backend v0
 
 Dashboard icin read-only `/api/pipeline-flow` backend kontrati eklendi. `web_panel/pipeline_flow.py` runtime queue, pipeline marker, GitHub Actions marker, deploy ve smoke marker dosyalarini salt okunur okur; task statuslarini merkezi enumlardan sabit stage sirasina mapler.

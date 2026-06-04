@@ -429,6 +429,25 @@ Not:
 
 ---
 
+## Quality Gate Simulation Evidence Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-063553 / RECOVERY-20260604-062714-CTO-ACTION-20260604-062153-02-QUALITY-GATE-TEST-SIMULATION-R2
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py standard-report` simülasyon kapısında kontrat kanıtını zorunlu doğrular.
+- Staging ve rollback simülasyonları için `dry_run_non_mutating_contract` kanıtı aranır.
+- Restart ve failure injection simülasyonları için `static_non_mutating_contract` kanıtı aranır.
+- `tests/test_runtime_status_model.py` kontrat kanıtı eksik readiness artefact'inin fail olacağını sabitler.
+- `state_templates/module_settings.json` ve `state_templates/action_catalog.json` kalite raporu kontrat kanıtı şartını görünür kılar.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, repo `logs/` veya repo `reports/` mutasyonu yapılmadı.
+- Secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
 ## Dashboard Pipeline Flow Backend v0
 
 Tarih: 2026-06-04
