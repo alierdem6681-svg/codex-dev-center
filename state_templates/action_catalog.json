@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T19:22:54+00:00",
+  "updated_at": "2026-06-04T06:08:03+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -16,6 +16,18 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false
+    },
+    {
+      "id": "view_pipeline_flow",
+      "label": "Pipeline Flow Görünümü",
+      "module": "pipeline_flow",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/api/pipeline-flow",
+      "redacts_raw_messages": true,
+      "redacts_terminal_output": true
     },
     {
       "id": "panel_first_user_setup",

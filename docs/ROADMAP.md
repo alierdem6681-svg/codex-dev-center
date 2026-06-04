@@ -172,3 +172,11 @@ Faz 19B-10A Model Policy
 - [x] Queue task status normalizer case, bosluk, tire ve noktalama ayirici aliaslarini standart enumlara cevirir.
 - [x] `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED-TIMEOUT`, `FAILED.TIMEOUT`, `in-progress` ve `completed` varyantlari unit test ile sabitlendi.
 - [x] CTO router normalizasyon davranisi onboarding, handover, memory ve state template kayitlarina islendi.
+
+## Faz 33 - Dashboard Pipeline Flow Backend
+
+- [x] `/api/pipeline-flow` read-only backend kontrati eklendi.
+- [x] Gercek task status enumlari sabit pipeline stage sirasina maplenir.
+- [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
+- [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
+- [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.

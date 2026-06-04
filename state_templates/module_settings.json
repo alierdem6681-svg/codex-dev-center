@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T19:22:54+00:00",
+  "updated_at": "2026-06-04T06:08:03+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -23,7 +23,17 @@
     "show_last_smoke_run": true,
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
-    "show_controlled_execution_status": true
+    "show_controlled_execution_status": true,
+    "show_pipeline_flow": true
+  },
+  "pipeline_flow": {
+    "enabled": true,
+    "endpoint": "/api/pipeline-flow",
+    "read_only": true,
+    "include_empty_stages": true,
+    "deployed_stage_last": true,
+    "return_raw_task_messages": false,
+    "return_terminal_output": false
   },
   "panel_auth": {
     "enabled": true,

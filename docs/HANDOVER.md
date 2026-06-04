@@ -426,3 +426,39 @@ Test:
 Not:
 - Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Local `git add` işlemi git metadata dizini read-only olduğu için başarısız oldu; GitHub connector branch/PR çağrısı iptal edildiği için PR açılamadı.
+
+---
+
+## Dashboard Pipeline Flow Backend v0
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-060802 / CTO-BACKLOG-20260604-060304-761176-TELEGRAM-ACTION-COMMAND
+
+Eklenenler:
+- `web_panel/pipeline_flow.py` read-only flow builder.
+- Ana panel ve legacy panel icin `/api/pipeline-flow` endpoint'i.
+- `tests/test_runtime_status_model.py` icinde stage mapping ve guvenli payload regresyon testleri.
+
+Yeni davranis:
+- Task statuslari merkezi enumlardan sabit stage sirasina maplenir.
+- `DEPLOYED` pipeline flow'da son stage olarak kalir.
+- Bos stage'ler payload'da korunur.
+- Failed, blocked ve approval durumlari ayri stage state'i uretir.
+- Payload task raw message, uzun description, stdout/stderr, log veya terminal dump dondurmez.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- UI stage tab gorunumu sonraki kucuk pakete birakildi.
+
+Test:
+- `python3 -m json.tool` ile guncellenen state template JSON dosyalari PASS.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 91 test.
+- Gecici `/tmp` git repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- `git diff --check` PASS.
+- Secret pattern scan bulgu vermedi.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.

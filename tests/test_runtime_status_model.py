@@ -33,6 +33,7 @@ from supervisor import (  # noqa: E402
 )
 from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_APPROVAL_REQUIRED,
+    TASK_STATUS_BLOCKED,
     TASK_STATUS_DEPLOYED,
     TASK_STATUS_DONE,
     TASK_STATUS_FAILED_RETRYABLE,
@@ -43,6 +44,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
     TASK_STATUS_RUNNING,
+    TASK_STATUS_VALIDATION_FAILED,
     normalize_queue_payload,
     normalize_status,
 )
@@ -70,6 +72,8 @@ LEGACY_PANEL_SERVER_SPEC = importlib.util.spec_from_file_location(
 legacy_panel_server = importlib.util.module_from_spec(LEGACY_PANEL_SERVER_SPEC)
 assert LEGACY_PANEL_SERVER_SPEC.loader is not None
 LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
+
+import pipeline_flow  # noqa: E402
 
 
 class WorkerStatusModelTest(unittest.TestCase):
@@ -1016,6 +1020,140 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state
+
+
+class DashboardPipelineFlowTest(unittest.TestCase):
+    def write_flow_runtime(
+        self,
+        root: Path,
+        tasks: list[dict],
+        markers: dict[str, dict] | None = None,
+    ) -> Path:
+        state = root / "state"
+        state.mkdir(parents=True)
+        (state / "task_queue.json").write_text(json.dumps({"tasks": tasks}), encoding="utf-8")
+        for name, payload in (markers or {}).items():
+            (state / name).write_text(json.dumps(payload), encoding="utf-8")
+        return state
+
+    def stage_by_id(self, flow: dict, stage_id: str) -> dict:
+        return next(stage for stage in flow["stages"] if stage["id"] == stage_id)
+
+    def test_pipeline_flow_keeps_empty_stages_and_deployed_last(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(root, [])
+
+            flow = pipeline_flow.build_pipeline_flow(root, generated_at="2026-06-04T06:00:00+00:00")
+
+        self.assertTrue(flow["ok"])
+        self.assertTrue(flow["non_mutating"])
+        self.assertEqual(flow["summary"]["task_count"], 0)
+        self.assertEqual(flow["summary"]["current_stage"], None)
+        self.assertEqual(flow["summary"]["unmapped_known_statuses"], [])
+        self.assertEqual(flow["stages"][-1]["id"], "deployed")
+        self.assertEqual(flow["stages"][-1]["statuses"], [TASK_STATUS_DEPLOYED])
+        self.assertTrue(all(stage["task_count"] == 0 for stage in flow["stages"]))
+        self.assertTrue(all(stage["state"] == "empty" for stage in flow["stages"]))
+
+    def test_pipeline_flow_maps_failed_blocked_approval_and_validation_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(
+                root,
+                [
+                    {"id": "TASK-FAILED", "status": TASK_STATUS_FAILED_TIMEOUT, "risk": "medium"},
+                    {"id": "TASK-BLOCKED", "status": TASK_STATUS_BLOCKED, "risk": "medium"},
+                    {"id": "TASK-APPROVAL", "status": TASK_STATUS_APPROVAL_REQUIRED, "risk": "high"},
+                    {"id": "TASK-VALIDATION", "status": TASK_STATUS_VALIDATION_FAILED, "risk": "medium"},
+                    {"id": "TASK-DEPLOYED", "status": TASK_STATUS_DEPLOYED, "risk": "low"},
+                ],
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        failed = self.stage_by_id(flow, "failed")
+        approval = self.stage_by_id(flow, "approval")
+        validation = self.stage_by_id(flow, "validation")
+        deployed = self.stage_by_id(flow, "deployed")
+
+        self.assertEqual(failed["state"], "failed")
+        self.assertEqual({task["id"] for task in failed["tasks"]}, {"TASK-FAILED"})
+        self.assertEqual(approval["state"], "blocked")
+        self.assertEqual({task["id"] for task in approval["tasks"]}, {"TASK-BLOCKED", "TASK-APPROVAL"})
+        self.assertEqual(validation["state"], "failed")
+        self.assertEqual({task["id"] for task in validation["tasks"]}, {"TASK-VALIDATION"})
+        self.assertEqual(deployed["state"], "complete")
+        self.assertEqual(deployed["order"], max(stage["order"] for stage in flow["stages"]))
+        self.assertEqual(flow["summary"]["failed_count"], 2)
+        self.assertEqual(flow["summary"]["blocked_count"], 2)
+
+    def test_pipeline_flow_reads_safe_markers_without_raw_task_or_terminal_fields(self):
+        secret_text = "raw-secret-value-should-not-leak"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(
+                root,
+                [
+                    {
+                        "id": "TASK-SAFE",
+                        "status": TASK_STATUS_RUNNING,
+                        "risk": "medium",
+                        "title": secret_text,
+                        "description": secret_text,
+                        "message": secret_text,
+                        "stdout": secret_text,
+                    }
+                ],
+                {
+                    "pipeline_status.json": {
+                        "status": "PASS",
+                        "task_to_deploy_test": "PASS",
+                        "stdout": secret_text,
+                    },
+                    "github_actions_status.json": {
+                        "runner_name": "codex-dev-center-01",
+                        "last_deploy_status": "PASS",
+                        "stderr": secret_text,
+                    },
+                    "last_smoke_test_status.json": {
+                        "status": "PASS",
+                        "ok": True,
+                        "log": secret_text,
+                    },
+                },
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        encoded = json.dumps(flow, ensure_ascii=False)
+        self.assertNotIn(secret_text, encoded)
+        self.assertNotIn("stdout", encoded)
+        self.assertNotIn("stderr", encoded)
+        self.assertNotIn("description", encoded)
+        self.assertEqual(flow["markers"]["pipeline_status"]["task_to_deploy_test"], "PASS")
+        self.assertEqual(flow["markers"]["github_actions"]["runner_name"], "codex-dev-center-01")
+        self.assertEqual(flow["markers"]["last_smoke_test"]["status"], "PASS")
+
+    def test_pipeline_flow_payload_is_available_for_all_panel_servers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(root, [{"id": "TASK-DEPLOYED", "status": TASK_STATUS_DEPLOYED}])
+
+            originals = {
+                panel_server: panel_server.ROOT,
+                legacy_panel_server: legacy_panel_server.ROOT,
+            }
+            try:
+                for module in originals:
+                    module.ROOT = root
+                    payload = module.pipeline_flow_payload()
+                    self.assertEqual(payload["stages"][-1]["id"], "deployed")
+                    self.assertEqual(payload["summary"]["current_stage"], "deployed")
+                    self.assertEqual(self.stage_by_id(payload, "deployed")["task_count"], 1)
+            finally:
+                for module, original_root in originals.items():
+                    module.ROOT = original_root
 
 
 class DeployGateStatusModelTest(unittest.TestCase):

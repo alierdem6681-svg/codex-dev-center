@@ -184,3 +184,16 @@ Codex quality gate artik production readiness artefact'ini standart kalite rapor
 Simulasyon dry-run kaniti icin `production_deploy_performed=false`, `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` bayraklari zorunludur. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local git metadata dizini read-only oldugu icin commit hazirlanamadi. GitHub connector branch/PR cagrisinin iptal edilmesi nedeniyle PR acma adimi tamamlanamadi.
+
+## 2026-06-04 Dashboard Pipeline Flow Backend v0
+
+Dashboard icin read-only `/api/pipeline-flow` backend kontrati eklendi. `web_panel/pipeline_flow.py` runtime queue, pipeline marker, GitHub Actions marker, deploy ve smoke marker dosyalarini salt okunur okur; task statuslarini merkezi enumlardan sabit stage sirasina mapler.
+
+Guvenlik siniri:
+- Endpoint raw kullanici mesaji, uzun description, stdout/stderr, log veya terminal dump dondurmez.
+- `DEPLOYED` stage siralamasinda son stage olarak kalir.
+- Bos stage, failed, blocked ve approval davranisi unit test ile sabitlendi.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
