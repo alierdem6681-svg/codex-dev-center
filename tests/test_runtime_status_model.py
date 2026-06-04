@@ -3245,7 +3245,7 @@ class SystemRepairControlsTest(unittest.TestCase):
             }
             production_environment_manager.http_text = lambda port, path: {
                 "ok": True,
-                "body": "Pipeline Flow Görevler Ayarlar Canlıya alınanları göster",
+                "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
             }
             try:
                 payload = production_environment_manager.smoke_test("production")

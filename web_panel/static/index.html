@@ -46,10 +46,6 @@
         overflow-wrap: anywhere;
       }
       .stack { display: grid; gap: 12px; }
-      .grid { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(160px, 1fr)); }
-      .wide { display: grid; gap: 12px; grid-template-columns: 1.15fr .85fr; }
-      .three { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(180px, 1fr)); }
-      .metric { font-size: 22px; font-weight: 700; margin-top: 3px; }
       .muted { color: var(--muted); font-size: 12px; }
       .badge {
         display: inline-flex;
@@ -162,15 +158,6 @@
       }
       .menu-item:hover, .menu-item:focus { background: var(--soft); }
       .menu-item.danger { color: var(--bad); }
-      .profile-box {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid var(--line);
-        min-width: 0;
-      }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
@@ -210,18 +197,6 @@
         font-size: 12px;
         text-align: center;
       }
-      .flow-summary {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: repeat(4, minmax(130px, 1fr));
-        margin: 2px 0 8px;
-      }
-      .flow-summary > div {
-        min-width: 0;
-        border-top: 1px solid var(--line);
-        padding-top: 8px;
-      }
-      .flow-value { font-size: 17px; font-weight: 700; margin-top: 2px; }
       .flow-task {
         display: grid;
         grid-template-columns: minmax(180px, 1.2fr) minmax(140px, .8fr) minmax(120px, .6fr);
@@ -250,17 +225,6 @@
         list-style: none;
       }
       .flow-main-task summary::-webkit-details-marker { display: none; }
-      .flow-progress {
-        height: 7px;
-        border-radius: 999px;
-        background: var(--soft);
-        overflow: hidden;
-      }
-      .flow-progress span {
-        display: block;
-        height: 100%;
-        background: #2f5f73;
-      }
       .flow-child {
         display: grid;
         grid-template-columns: minmax(170px, 1.2fr) minmax(140px, .7fr) minmax(130px, .7fr);
@@ -269,7 +233,7 @@
         padding: 7px 0;
       }
       @media (max-width: 980px) {
-        .grid, .wide, .three, .controls, .flow-summary, .flow-task, .flow-main-task summary, .flow-child { grid-template-columns: 1fr; }
+        .controls, .flow-task, .flow-main-task summary, .flow-child { grid-template-columns: 1fr; }
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
@@ -286,7 +250,6 @@
         <div class="muted">Görevler, pipeline flow ve güvenli panel yönetimi</div>
       </div>
       <div class="actions header-actions">
-        <span id="clock" class="badge">Yükleniyor</span>
         <div id="accountMenu" class="account-menu">
           <button id="accountMenuButton" class="account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenuPanel" onclick="toggleAccountMenu()">
             <span id="accountAvatar" class="account-avatar">P</span>
@@ -303,7 +266,6 @@
                 <span id="accountPanelMode" class="account-role">Oturum açık</span>
               </div>
             </div>
-            <button class="menu-item" type="button" role="menuitem" onclick="scrollToAccountSettings()">Hesap ayarları</button>
             <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
           </div>
         </div>
@@ -314,45 +276,32 @@
       <section>
         <div class="section-title-row">
           <h2>Pipeline Flow</h2>
-          <div class="actions">
-            <span id="pipelineFlowUpdated" class="badge">Yükleniyor</span>
-            <span id="pipelineFlowMode" class="badge">Salt okunur</span>
-          </div>
         </div>
         <div id="pipelineFlowTabs" class="tabbar" role="tablist" aria-label="Pipeline Flow stage sekmeleri"></div>
         <div id="pipelineFlowPanel" role="tabpanel" aria-live="polite"></div>
       </section>
 
-      <div class="wide">
-        <section>
-          <h2>Görevler</h2>
-          <div class="controls">
-            <input id="search" placeholder="Ara">
-            <select id="statusFilter"><option value="">Tüm durumlar</option></select>
-            <select id="workerFilter"><option value="">Tüm çalışanlar</option></select>
-            <select id="riskFilter"><option value="">Tüm riskler</option></select>
-            <select id="sortMode">
-              <option value="newest">En yeni</option>
-              <option value="oldest">En eski</option>
-              <option value="risk">En riskli</option>
-              <option value="errors">En çok hata</option>
-            </select>
-            <label class="control-check" for="showLiveTasks">
-              <input id="showLiveTasks" type="checkbox">
-              Canlıya alınanları göster
-            </label>
-          </div>
-          <div id="tasksTable" class="desktop-table"></div>
-          <div id="tasksCards" class="mobile-list"></div>
-        </section>
-
-        <section id="accountSettings">
-          <h2>Ayarlar</h2>
-          <div id="settingsBadges"></div>
-          <h2 style="margin-top:14px">Son İşlem</h2>
-          <pre id="actionResult">Henüz işlem yok.</pre>
-        </section>
-      </div>
+      <section>
+        <h2>Görevler</h2>
+        <div class="controls">
+          <input id="search" placeholder="Ara">
+          <select id="statusFilter"><option value="">Tüm durumlar</option></select>
+          <select id="workerFilter"><option value="">Tüm çalışanlar</option></select>
+          <select id="riskFilter"><option value="">Tüm riskler</option></select>
+          <select id="sortMode">
+            <option value="newest">En yeni</option>
+            <option value="oldest">En eski</option>
+            <option value="risk">En riskli</option>
+            <option value="errors">En çok hata</option>
+          </select>
+          <label class="control-check" for="showLiveTasks">
+            <input id="showLiveTasks" type="checkbox">
+            Canlıya alınanları göster
+          </label>
+        </div>
+        <div id="tasksTable" class="desktop-table"></div>
+        <div id="tasksCards" class="mobile-list"></div>
+      </section>
     </main>
 
     <script>
@@ -514,10 +463,6 @@
         setAccountMenuOpen(false);
         if (refocus) accountMenuButton.focus();
       }
-      function scrollToAccountSettings(){
-        closeAccountMenu();
-        accountSettings.scrollIntoView({behavior:'smooth', block:'start'});
-      }
       function renderAccount(data){
         const name = accountDisplayName(data);
         const initials = accountInitials(name);
@@ -577,49 +522,19 @@
       function flowStateBadge(state){
         return badge(flowStateLabels[String(state || '').toLowerCase()] || state || '-');
       }
-      function flowProgressBar(progress){
-        const percent = Math.max(0, Math.min(100, Number(progress?.percent ?? progress ?? 0)));
-        return `<div class="flow-progress" aria-label="${esc(percent)}%"><span style="width:${esc(percent)}%"></span></div>`;
-      }
-      function compactFlowRun(run){
-        if (!run) return '-';
-        if (run.run_id) return `#${run.run_id}`;
-        if (run.url) return 'var';
-        if (run.commit) return String(run.commit).slice(0, 8);
-        return run.status || run.conclusion || '-';
-      }
       function renderFlowMainTasks(){
         const mainTasks = flowMainTasks();
         if (!mainTasks.length) return '<div class="flow-main-tasks"><div class="muted">Ana görev grubu yok.</div></div>';
         return `<div class="flow-main-tasks"><div class="muted">Ana görevler</div>${mainTasks.map((mainTask, index) => {
-          const counts = mainTask.counts || {};
-          const countsByStatus = mainTask.counts_by_status || mainTask.status_counts || {};
-          const progress = mainTask.progress || {percent: mainTask.progress_percent || 0, current_stage: mainTask.stage};
           const children = Array.isArray(mainTask.children) ? mainTask.children : [];
-          const pr = mainTask.latest_pr || null;
-          const deployRun = mainTask.latest_deploy_run || null;
-          const smokeRun = mainTask.latest_smoke_run || null;
           const childRows = children.map(child => {
             return `<div class="flow-child"><div><strong>${esc(child.id || '-')}</strong><br><span class="muted">${esc(child.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(child.status)} ${badge(child.pipeline_status || child.risk || child.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(child.updated_at || child.finished_at || child.created_at))}</div></div>`;
           }).join('') || '<div class="muted">Alt görev yok.</div>';
-          const statusRows = Object.entries(countsByStatus).map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') || badge('Boş');
           return `<details class="flow-main-task" ${index === 0 ? 'open' : ''}>
             <summary>
               <div><strong>${esc(mainTask.main_task_title || mainTask.title || mainTask.main_task_code || '-')}</strong><br><span class="muted">${esc(mainTask.main_task_code || mainTask.code || mainTask.root_task_id || '-')}</span></div>
-              <div>${badge(mainTask.overall_status || mainTask.status)} ${flowStateBadge(mainTask.state)}<br><span class="muted">${esc(counts.tasks ?? 0)} görev, ${esc(counts.children ?? 0)} alt görev</span></div>
-              <div>${flowProgressBar(progress)}<span class="muted">${esc(mainTask.progress_percent ?? progress.percent ?? 0)}% - ${esc(flowStageLabels[progress.current_stage] || progress.current_stage_label || '-')}</span></div>
+              <div>${badge(mainTask.overall_status || mainTask.status)} ${flowStateBadge(mainTask.state)}</div>
             </summary>
-            <div class="flow-marker-row">
-              ${badge(`Aktif: ${counts.active ?? 0}`)}
-              ${badge(`Bloklu: ${counts.blocked ?? 0}`)}
-              ${badge(`Hatalı: ${counts.failed ?? 0}`)}
-              ${badge(`Kapalı: ${counts.closed ?? 0}`)}
-              ${badge(`PR: ${compactFlowRun(pr)}`)}
-              ${badge(`Deploy: ${compactFlowRun(deployRun)}`)}
-              ${badge(`Smoke: ${compactFlowRun(smokeRun)}`)}
-              ${mainTask.blocked_reason ? badge(`Blok: ${mainTask.blocked_reason}`) : ''}
-            </div>
-            <div class="flow-marker-row">${statusRows}</div>
             <div>${childRows}</div>
           </details>`;
         }).join('')}</div>`;
@@ -652,10 +567,6 @@
         const stages = flowStages();
         const selected = selectedFlowStage();
         if (selected && activeFlowStage !== selected.id) activeFlowStage = selected.id;
-        const generatedAt = flowDateTime(latestFlow?.generated_at);
-        const stale = pipelineFlowError && latestFlow ? 'Son veri korunuyor' : '';
-        pipelineFlowUpdated.textContent = pipelineFlowError ? `Hata: ${pipelineFlowError}` : `Güncellendi ${generatedAt}`;
-        pipelineFlowMode.textContent = stale || (latestFlow?.non_mutating ? 'Salt okunur' : 'Kontrol ediliyor');
         pipelineFlowTabs.innerHTML = stages.map(stage => {
           const selectedAttr = selected && stage.id === selected.id ? 'true' : 'false';
           const label = flowStageLabels[stage.id] || stage.label || stage.id;
@@ -668,30 +579,11 @@
           pipelineFlowPanel.innerHTML = `<div class="muted">${esc(pipelineFlowError || 'Stage verisi yok.')}</div>`;
           return;
         }
-        const statusCounts = Object.entries(selected.status_counts || {});
-        const summary = latestFlow?.summary || {};
-        const markers = latestFlow?.markers || {};
-        const pipelineMarker = markers.pipeline_status || {};
-        const githubMarker = markers.github_actions || {};
-        const smokeMarker = markers.last_smoke_test || {};
         const tasksHtml = (selected.tasks || []).map(task => {
           return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(task.updated_at || task.finished_at || task.created_at))}</div></div>`;
         }).join('') || '<div class="muted">Bu stage içinde görev yok.</div>';
         pipelineFlowPanel.innerHTML = `
-          <div class="flow-summary">
-            <div><div class="muted">Seçili stage</div><div class="flow-value">${esc(flowStageLabels[selected.id] || selected.label || selected.id)}</div></div>
-            <div><div class="muted">Stage durumu</div><div>${flowStateBadge(selected.state)}</div></div>
-            <div><div class="muted">Toplam görev</div><div class="flow-value">${esc(summary.task_count ?? 0)}</div></div>
-            <div><div class="muted">Blok / hata</div><div>${badge(summary.blocked_count ?? 0)} ${badge(summary.failed_count ?? 0)}</div></div>
-          </div>
-          <div class="flow-marker-row">
-            ${badge(`Pipeline: ${pipelineMarker.task_to_deploy_test || pipelineMarker.status || '-'}`)}
-            ${badge(`GitHub: ${githubMarker.last_deploy_status || githubMarker.status || '-'}`)}
-            ${badge(`Smoke: ${smokeMarker.status || smokeMarker.ok || '-'}`)}
-          </div>
           ${renderFlowMainTasks()}
-          <div class="muted">Status dağılımı</div>
-          <div class="flow-marker-row">${statusCounts.length ? statusCounts.map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') : badge('Boş')}</div>
           <div>${tasksHtml}</div>
         `;
       }
@@ -737,31 +629,13 @@
       }
       function render(data){
         latest = data;
-        const controlled = data.controlled_execution || {};
-        const dashboardSettings = data.dashboard_settings?.dashboard || {};
-        clock.textContent = new Date().toLocaleTimeString();
         renderAccount(data);
-        settingsBadges.innerHTML = Object.entries({
-          'Panel modu': dashboardSettings.auth_mode || data.auth?.auth_mode || '-',
-          'Dil': dashboardSettings.language || 'tr',
-          'Kompakt mod': dashboardSettings.compact_mode,
-          'Kontrollü öneri': controlled.status || '-',
-          'Kontrollü görev': controlled.last_task || '-',
-          'Kontrollü rapor': controlled.latest_report || '-',
-          'Öneri repo değişikliği': controlled.proposal_mode_repo_mutation_allowed ? 'Açık' : 'Kapalı'
-        }).map(([k,v]) => `${esc(k)}: ${badge(v)}`).join('<br>');
         fillFilters();
         renderTasks();
       }
       async function refresh(){
         const res = await fetch('/api/status', {cache:'no-store'});
         render(await res.json());
-      }
-      async function runAction(action){
-        actionResult.textContent = 'Çalışıyor...';
-        const res = await fetch('/api/action', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action})});
-        actionResult.textContent = JSON.stringify(await res.json(), null, 2);
-        await refresh();
       }
       async function logout(){
         await fetch('/api/auth/logout', {method:'POST'});

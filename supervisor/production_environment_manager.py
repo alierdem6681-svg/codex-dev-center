@@ -533,8 +533,8 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     labels = [
         "Pipeline Flow",
         "Görevler",
-        "Ayarlar",
         "Canlıya alınanları göster",
+        "Çıkış",
     ]
     checks = {
         "health_pass": bool(health.get("ok")),

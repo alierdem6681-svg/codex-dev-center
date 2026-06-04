@@ -13,9 +13,8 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
         self.assertIn('aria-haspopup="true"', html)
         self.assertIn('aria-controls="accountMenuPanel"', html)
         self.assertIn('role="menu"', html)
-        self.assertGreaterEqual(html.count('role="menuitem"'), 2)
+        self.assertGreaterEqual(html.count('role="menuitem"'), 1)
         self.assertIn("data?.auth?.username", html)
-        self.assertIn("Hesap ayarları", html)
         self.assertIn("'/api/auth/logout'", html)
         self.assertIn("event.key === 'Escape'", html)
 
@@ -38,13 +37,25 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
             "Geri Alma Sonucu",
             "Görev Kuyruğu",
             "Çalışan / Görev Kuyruğu / Toparlama",
+            "Ayarlar",
+            "Son İşlem",
+            "Hesap ayarları",
+            "Güncellendi",
+            "Salt okunur",
+            "Seçili stage",
+            "Stage durumu",
+            "Toplam görev",
+            "Blok / hata",
+            "Status dağılımı",
+            "flow-progress",
+            "pipelineFlowUpdated",
+            "settingsBadges",
         ]
         for label in removed_labels:
             self.assertNotIn(label, html)
 
         self.assertIn("Pipeline Flow", html)
         self.assertIn("Görevler", html)
-        self.assertIn("Ayarlar", html)
 
     def test_dashboard_task_list_filters_live_tasks_and_keeps_running_first(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
