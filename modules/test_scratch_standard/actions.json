@@ -1,0 +1,14 @@
+{
+  "actions": [
+    {
+      "id": "validate_test_scratch_standard",
+      "label": "Validate Safe Test Scratch Standard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_safe_test_scratch_standard"
+    }
+  ],
+  "updated_at": "2026-06-04T13:52:42+00:00"
+}
