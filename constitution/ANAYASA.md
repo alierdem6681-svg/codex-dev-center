@@ -71,6 +71,8 @@ Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker b
 
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.
 
+Standart kalite kapısı raporu, production readiness policy içindeki tüm `required_gates` kayıtlarını da doğrulamalıdır. Policy zorunlu gate'lerinden biri eksik veya başarısızsa rapor `fail` olur ve production deploy izni sayılmaz.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

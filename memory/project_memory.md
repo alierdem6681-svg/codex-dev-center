@@ -197,3 +197,13 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Quality Gate Required Gates Full Readiness Apply
+
+Codex quality gate standart raporu artik `state_templates/production_readiness_policy.json` icindeki tum `required_gates` listesini `readiness_full` kontroluyle dogrular. `state/production_readiness_status.json.tests` icinde policy zorunlu gate'lerinden biri eksik veya `ok=true` degilse standart rapor `fail` olur.
+
+Davranis `tests/test_runtime_status_model.py` icinde tam policy artefact PASS ve eski dar artefact FAIL senaryolariyla sabitlendi. Compile, tam unit test, JSON template validation, `git diff --check`, gecici `/tmp` git repo kopyasinda production readiness suite ve standard-report PASS oldu.
+
+Bu paket production deploy, staging deploy, runtime state kalici mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. `scripts/codex_quality_report.sh` production runtime dizinine `cd` ettigi icin dogrudan calistirilmadi; esdeger Python komutu gecici `/tmp` kokte calistirildi.
+
+Local commit/PR tamamlanamadi: `git add` sandbox disindaki worktree metadata dizininde `index.lock` olusturamadigi icin read-only filesystem hatasi verdi; dogrudan git network erisimi de `github.com` DNS cozemedigi icin calismadi.

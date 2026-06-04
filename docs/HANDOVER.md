@@ -462,3 +462,37 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Quality Gate Required Gates Full Readiness Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-071044 / CTO-BACKLOG-20260604-070221-528430-RECOVERY-QUALITY-GATE-TEST-SIMULATION
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py standard-report` artık `state_templates/production_readiness_policy.json` içindeki `required_gates` listesini okur.
+- Standart kalite raporuna `readiness_full` kontrolü eklendi.
+- Policy zorunlu gate'lerinden herhangi biri `state/production_readiness_status.json.tests` içinde eksik veya `ok=true` değilse standart rapor `fail` olur.
+- `tests/test_runtime_status_model.py` tam policy gate PASS ve eski dar artefact FAIL senaryolarını doğrular.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` yeni tam readiness kontrolünü görünür kılar.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 92 test.
+- Hedef kalite raporu regresyon testleri PASS.
+- `python3 -m json.tool` ile güncellenen state template JSON dosyaları PASS.
+- Geçici `/tmp` git repo kopyasında `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- Aynı geçici kökte `python3 supervisor/codex_quality_gate.py standard-report` PASS; `lint`, `unit_test`, `integration_test`, `simulation_dry_run` ve `readiness_full` PASS.
+- `git diff --check` PASS.
+
+Not:
+- `scripts/codex_quality_report.sh` doğrudan çalıştırılmadı; script `/opt/codex-dev-center` production runtime dizinine `cd` ettiği için aynı kontrol geçici `/tmp` kökte eşdeğer Python komutuyla doğrulandı.
+- Production deploy, staging deploy, runtime state kalıcı mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply worktree içinde zorunlu `state/` okuma dosyaları bulunmadığı için runtime state dosyaları oluşturulmadı; ilgili policy karşılıkları `state_templates/` üzerinden okundu ve güncellendi.
+
+PR durumu:
+- Local `git add` sandbox dışındaki git worktree metadata dizininde `index.lock` oluşturamadığı için başarısız oldu: read-only filesystem.
+- Doğrudan `git ls-remote` GitHub DNS çözümleyemediği için başarısız oldu.
+- Bu nedenle local commit, push ve PR açma adımı bu sandbox içinde tamamlanamadı.
