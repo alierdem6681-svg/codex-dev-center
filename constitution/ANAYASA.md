@@ -71,6 +71,8 @@ Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker b
 
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.
 
+Kalite kapısı retry simülasyonu ilk deneme ve en fazla bir retry sonucunu non-blocking raporlar; bu rapor production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

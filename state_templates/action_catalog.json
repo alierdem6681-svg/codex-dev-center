@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T07:12:00+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -61,6 +61,27 @@
       "output_json": "reports/quality-gate-report.json",
       "output_summary": "reports/quality-gate-summary.md",
       "missing_artifact_fails_gate": true
+    },
+    {
+      "id": "codex_quality_retry_simulation",
+      "label": "Kalite Kapısı Retry Simülasyonu Üret",
+      "module": "codex_quality_gate",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "non_blocking": true,
+      "command": "{python} supervisor/codex_quality_gate.py retry-simulation",
+      "output_json": "reports/quality-gate-retry-simulation.json",
+      "fields": [
+        "command",
+        "attempt",
+        "exit_code",
+        "duration_seconds",
+        "result",
+        "failure_hint",
+        "retry_changed_result"
+      ]
     },
     {
       "id": "staging_deploy",

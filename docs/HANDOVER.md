@@ -429,6 +429,24 @@ Not:
 
 ---
 
+## Quality Gate Retry Simulation Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-071200 / CTO-BACKLOG-20260604-070729-327993-RETRY-QUALITY-GATE-TEST-SIMULATION
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py retry-simulation` komutu mevcut quality gate test komutlarını değiştirmeden ilk deneme ve en fazla bir retry sonucunu raporlar.
+- Retry raporu `command`, `attempt`, `exit_code`, `duration_seconds`, `result`, `failure_hint` ve `retry_changed_result` alanlarını üretir.
+- Standard quality report `retry_simulation` bölümünü non-blocking olarak gömer; retry simülasyonu standard gate `pass/fail` kararını değiştirmez.
+- Davranış `tests/test_runtime_status_model.py` içinde retry alanları ve standard report embed testiyle sabitlendi.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` yeni action ve ayarlarla güncellendi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
 ## Dashboard Pipeline Flow Backend v0
 
 Tarih: 2026-06-04

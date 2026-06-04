@@ -185,6 +185,14 @@ Simulasyon dry-run kaniti icin `production_deploy_performed=false`, `staging_dep
 
 Local git metadata dizini read-only oldugu icin commit hazirlanamadi. GitHub connector branch/PR cagrisinin iptal edilmesi nedeniyle PR acma adimi tamamlanamadi.
 
+## 2026-06-04 Quality Gate Retry Simulation Apply
+
+Codex quality gate retry simülasyonu eklendi. `supervisor/codex_quality_gate.py retry-simulation` mevcut kalite kapısı test komutlarını değiştirmeden ilk deneme ve en fazla bir retry sonucunu `reports/quality-gate-retry-simulation.json` formatında raporlar.
+
+Rapor her deneme için `command`, `attempt`, `exit_code`, `duration_seconds`, `result`, `failure_hint` ve `retry_changed_result` alanlarını üretir. `standard-report` bu artefact'i `retry_simulation` alanında non-blocking gösterir; retry simülasyonu standard kalite kapısı kararını değiştirmez.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
 ## 2026-06-04 Dashboard Pipeline Flow Backend v0
 
 Dashboard icin read-only `/api/pipeline-flow` backend kontrati eklendi. `web_panel/pipeline_flow.py` runtime queue, pipeline marker, GitHub Actions marker, deploy ve smoke marker dosyalarini salt okunur okur; task statuslarini merkezi enumlardan sabit stage sirasina mapler.
