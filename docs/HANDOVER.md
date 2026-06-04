@@ -336,6 +336,20 @@ Yeni davranış:
 - `docs/../state/task_queue.json` gibi traversal denemeleri bloklanır.
 - Apply worker production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
 
+### Controlled Apply Pipeline v1 Report Contract
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-062421 / CTO-ACTION-20260604-062153-01-CONTROLLED-APPLY-PIPELINE
+
+Eklenenler:
+- `docs/CONTROLLED_APPLY_PIPELINE.md` runbook'u repo apply akisini proposal, isolated worktree, allowlist, secret scan, local gate, PR ve rollback sozlesmesiyle tarif eder.
+- `supervisor/worker_runner.py` repo apply raporuna controlled apply checklist ve rollback note bolumleri ekler.
+- `tests/test_runtime_status_model.py` raporda patch scope, diff review, secret scan, local pipeline, production deploy yok ve rollback note alanlarinin kaldirilmamasini dogrular.
+
+Not:
+- Production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
 ---
 
 ## Staging / Rollback Readiness Apply Validation

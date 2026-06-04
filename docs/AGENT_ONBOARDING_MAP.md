@@ -87,6 +87,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/worker_runner.py içindeki controlled apply raporu patch scope, diff review, local pipeline ve rollback note bolumlerini uretir
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -94,6 +95,7 @@ Ajan şu klasörleri inceler:
 - web_panel/panel_server.py
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
+- docs/CONTROLLED_APPLY_PIPELINE.md
 - docs/worker_queue_production_sync_repair_20260604_054726.md
 
 Dashboard status API notu:
@@ -106,6 +108,7 @@ Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
+- Apply raporu patch scope, diff review, secret scan, validation status, local pipeline ve rollback note alanlarini icermelidir.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

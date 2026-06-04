@@ -69,6 +69,8 @@ Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/
 
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 
+Apply raporu patch scope, diff review, validation status, local pipeline sonucu ve rollback note alanlarini icermelidir.
+
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.
 
 ## 8. Kayıt Zorunluluğu

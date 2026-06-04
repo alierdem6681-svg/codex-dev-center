@@ -598,6 +598,44 @@ def pipeline_passed(results: list[dict[str, Any]]) -> bool:
     return bool(results) and all(item.get("ok") for item in results)
 
 
+def repo_apply_control_report_sections(
+    *,
+    risk: str,
+    branch: str,
+    commit_files: list[str],
+    unsafe_files: list[str],
+    secret_findings: list[dict[str, Any]],
+    validation_status: str,
+    pipeline_status: str,
+) -> list[str]:
+    diff_review = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
+    secret_review = "APPROVAL_REQUIRED" if secret_findings else "PASS"
+    lines = [
+        "## Controlled Apply Checklist",
+        f"- Risk: {safe_excerpt(risk, 80)}",
+        f"- Patch scope files: {len(commit_files)}",
+        f"- Diff review: {diff_review}",
+        f"- Secret scan: {secret_review}",
+        f"- Validation status: {validation_status}",
+        f"- Local pipeline: {pipeline_status}",
+        "- Production deploy: NOT_RUN",
+        "- Critical operations: blocked_by_policy",
+    ]
+    if commit_files:
+        lines.append("- Patch scope:")
+        lines.extend([f"  - {rel}" for rel in commit_files])
+    lines.extend(
+        [
+            "",
+            "## Rollback Note",
+            f"- Branch rollback: delete branch `{branch}` or revert the PR commit before merge.",
+            "- Post-merge rollback: revert the merge commit or restore the listed files from the previous commit.",
+            "- Runtime rollback: not required; this apply flow does not run production deploy or runtime state mutation.",
+        ]
+    )
+    return lines
+
+
 def create_pull_request(worktree: Path, branch: str, title: str, body: str) -> dict[str, Any]:
     if not shutil.which("gh"):
         return {"ok": False, "reason": "gh_not_found"}
@@ -849,6 +887,18 @@ Beklenen çıktı:
         "## Changed Files",
     ]
     report.extend([f"- {rel}" for rel in commit_files] or ["- Yok"])
+    report += [
+        "",
+        *repo_apply_control_report_sections(
+            risk=risk,
+            branch=branch,
+            commit_files=commit_files,
+            unsafe_files=unsafe_files,
+            secret_findings=secret_findings,
+            validation_status=validation_status,
+            pipeline_status=pipeline_status,
+        ),
+    ]
     if ignored_generated_files:
         report += ["", "## Ignored Generated Files"]
         report.extend([f"- {rel}" for rel in ignored_generated_files])
