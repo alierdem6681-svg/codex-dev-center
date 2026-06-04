@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T07:12:00+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -102,6 +102,19 @@
     "standard_report_source": "state/production_readiness_status.json",
     "standard_report_json": "reports/quality-gate-report.json",
     "standard_report_summary": "reports/quality-gate-summary.md",
+    "retry_simulation_enabled": true,
+    "retry_simulation_command": "{python} supervisor/codex_quality_gate.py retry-simulation",
+    "retry_simulation_report_json": "reports/quality-gate-retry-simulation.json",
+    "retry_simulation_non_blocking": true,
+    "retry_simulation_fields": [
+      "command",
+      "attempt",
+      "exit_code",
+      "duration_seconds",
+      "result",
+      "failure_hint",
+      "retry_changed_result"
+    ],
     "required_checks": [
       "lint",
       "unit_test",

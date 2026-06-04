@@ -242,6 +242,129 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(report_file.exists())
             self.assertTrue(summary_file.exists())
             self.assertEqual(json.loads(report_file.read_text(encoding="utf-8"))["status"], "pass")
+            self.assertEqual(report["retry_simulation"]["status"], "not_run")
+
+    def test_quality_gate_retry_simulation_records_attempt_fields(self):
+        outcomes = [
+            {
+                "ok": False,
+                "returncode": 1,
+                "duration_seconds": 0.01,
+                "stderr": "AssertionError: failed",
+                "stdout": "",
+            },
+            {
+                "ok": True,
+                "returncode": 0,
+                "duration_seconds": 0.02,
+                "stderr": "",
+                "stdout": "",
+            },
+        ]
+
+        def fake_runner(_root, _command, _timeout):
+            return outcomes.pop(0)
+
+        report = codex_quality_gate.build_quality_gate_retry_simulation_report(
+            ROOT,
+            command_specs=[
+                {
+                    "name": "unit_test",
+                    "command": ["python3", "-m", "unittest", "tests.test_runtime_status_model"],
+                    "timeout": 120,
+                }
+            ],
+            generated_at="2026-06-04T07:12:00+00:00",
+            runner=fake_runner,
+        )
+
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["flaky_commands"], ["unit_test"])
+        self.assertEqual(len(report["attempts"]), 2)
+        for attempt in report["attempts"]:
+            self.assertEqual(
+                set(attempt),
+                {
+                    "command",
+                    "attempt",
+                    "exit_code",
+                    "duration_seconds",
+                    "result",
+                    "failure_hint",
+                    "retry_changed_result",
+                },
+            )
+            self.assertTrue(attempt["retry_changed_result"])
+        self.assertEqual(report["attempts"][0]["attempt"], 1)
+        self.assertEqual(report["attempts"][0]["exit_code"], 1)
+        self.assertEqual(report["attempts"][0]["result"], "fail")
+        self.assertEqual(report["attempts"][0]["failure_hint"], "test_failure")
+        self.assertEqual(report["attempts"][1]["attempt"], 2)
+        self.assertEqual(report["attempts"][1]["exit_code"], 0)
+        self.assertEqual(report["attempts"][1]["result"], "pass")
+
+    def test_standard_quality_report_embeds_retry_simulation_non_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            reports = root / "reports"
+            state.mkdir()
+            reports.mkdir()
+            gates = [
+                "python_compile_check",
+                "json_validation",
+                "yaml_validation",
+                "secret_leakage_scan",
+                "forbidden_operation_scan",
+                "unit_test",
+                "integration_test",
+                "staging_smoke_test",
+                "rollback_simulation",
+                "restart_simulation",
+                "failure_injection_simulation",
+            ]
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (reports / "quality-gate-retry-simulation.json").write_text(
+                json.dumps(
+                    {
+                        "status": "fail",
+                        "dry_run": True,
+                        "non_blocking": True,
+                        "attempts": [
+                            {
+                                "command": "python3 supervisor/codex_quality_gate.py json-check",
+                                "attempt": 1,
+                                "exit_code": 1,
+                                "duration_seconds": 0.01,
+                                "result": "fail",
+                                "failure_hint": "nonzero_exit",
+                                "retry_changed_result": False,
+                            }
+                        ],
+                        "commands": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+            summary = codex_quality_gate.render_standard_quality_summary(report)
+
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["retry_simulation"]["status"], "fail")
+        self.assertTrue(report["retry_simulation"]["non_blocking"])
+        self.assertIn("## Retry Simulation", summary)
+        self.assertIn("python3 supervisor/codex_quality_gate.py json-check attempt 1", summary)
 
     def test_standard_quality_report_fails_when_required_artifact_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

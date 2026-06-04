@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +17,25 @@ LOGS = APP / "logs"
 STANDARD_REPORT_SOURCE = "state/production_readiness_status.json"
 STANDARD_REPORT_JSON = "quality-gate-report.json"
 STANDARD_REPORT_SUMMARY = "quality-gate-summary.md"
+RETRY_SIMULATION_REPORT_JSON = "quality-gate-retry-simulation.json"
+RETRY_SIMULATION_SOURCE = "reports/" + RETRY_SIMULATION_REPORT_JSON
+RETRY_SIMULATION_MAX_ATTEMPTS = 2
+RETRY_SIMULATION_ATTEMPT_FIELDS = [
+    "command",
+    "attempt",
+    "exit_code",
+    "duration_seconds",
+    "result",
+    "failure_hint",
+    "retry_changed_result",
+]
+RETRY_SIMULATION_COMMAND_FIELDS = [
+    "name",
+    "command",
+    "attempt_count",
+    "final_result",
+    "retry_changed_result",
+]
 
 STANDARD_REPORT_GATES = {
     "lint": [
@@ -34,6 +54,42 @@ STANDARD_REPORT_GATES = {
         "failure_injection_simulation",
     ],
 }
+
+QUALITY_GATE_TEST_COMMANDS = [
+    {
+        "name": "python_compile_check",
+        "command": ["python3", "-m", "compileall", "supervisor", "web_panel", "scripts"],
+        "timeout": 120,
+    },
+    {
+        "name": "drift_checker",
+        "command": ["python3", "supervisor/drift_checker.py"],
+        "timeout": 120,
+    },
+    {
+        "name": "json_check",
+        "command": ["python3", "supervisor/codex_quality_gate.py", "json-check"],
+        "timeout": 120,
+    },
+]
+
+QUALITY_GATE_RETRY_SIMULATION_COMMANDS = [
+    {
+        "name": "python_compile_check",
+        "command": ["python3", "-m", "compileall", "-q", "supervisor", "web_panel", "scripts"],
+        "timeout": 120,
+    },
+    {
+        "name": "json_check",
+        "command": ["python3", "supervisor/codex_quality_gate.py", "json-check"],
+        "timeout": 120,
+    },
+    {
+        "name": "unit_test",
+        "command": ["python3", "-m", "unittest", "tests.test_runtime_status_model"],
+        "timeout": 180,
+    },
+]
 
 NON_MUTATING_FLAGS = [
     "production_deploy_performed",
@@ -167,14 +223,9 @@ def preflight():
 def test_suite():
     results = []
 
-    commands = [
-        ["python3", "-m", "compileall", "supervisor", "web_panel", "scripts"],
-        ["python3", "supervisor/drift_checker.py"],
-        ["python3", "supervisor/codex_quality_gate.py", "json-check"],
-    ]
-
-    for cmd in commands:
-        r = run(cmd, timeout=120)
+    for spec in QUALITY_GATE_TEST_COMMANDS:
+        cmd = spec["command"]
+        r = run(cmd, timeout=spec["timeout"])
         results.append(r)
 
     ok = all(r["ok"] for r in results)
@@ -339,10 +390,215 @@ def _summarize_simulation_group(payload):
     check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
     return check
 
+def _command_text(command):
+    return " ".join(str(part) for part in command)
+
+def _failure_hint(command_result):
+    if command_result.get("ok"):
+        return "none"
+
+    text = " ".join(
+        str(command_result.get(key) or "")
+        for key in ("stderr", "stdout", "error", "failure_hint")
+    ).lower()
+    if "timeout" in text:
+        return "timeout"
+    if "syntaxerror" in text:
+        return "syntax_error"
+    if "modulenotfounderror" in text or "no module named" in text:
+        return "missing_dependency"
+    if "assertionerror" in text or "failed" in text:
+        return "test_failure"
+    if command_result.get("returncode") not in (0, None):
+        return "nonzero_exit"
+    return "execution_error"
+
+def _run_retry_simulation_command(root, command, timeout):
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=str(root),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+        duration = round(time.monotonic() - started, 3)
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "duration_seconds": duration,
+            "stdout": proc.stdout[-1000:],
+            "stderr": proc.stderr[-1000:],
+        }
+    except subprocess.TimeoutExpired as exc:
+        duration = round(time.monotonic() - started, 3)
+        return {
+            "ok": False,
+            "returncode": 124,
+            "duration_seconds": duration,
+            "stdout": str(exc.stdout or "")[-1000:],
+            "stderr": str(exc.stderr or "")[-1000:],
+            "failure_hint": "timeout",
+        }
+    except Exception:
+        duration = round(time.monotonic() - started, 3)
+        return {
+            "ok": False,
+            "returncode": 1,
+            "duration_seconds": duration,
+            "stdout": "",
+            "stderr": "",
+            "failure_hint": "execution_error",
+        }
+
+def _attempt_record(command_text, attempt_number, command_result):
+    result = "pass" if command_result.get("ok") else "fail"
+    return {
+        "command": command_text,
+        "attempt": attempt_number,
+        "exit_code": command_result.get("returncode"),
+        "duration_seconds": float(command_result.get("duration_seconds") or 0.0),
+        "result": result,
+        "failure_hint": _failure_hint(command_result),
+        "retry_changed_result": False,
+    }
+
+def _sanitize_retry_simulation_payload(payload):
+    attempts = []
+    for attempt in payload.get("attempts", []):
+        if isinstance(attempt, dict):
+            attempts.append({field: attempt.get(field) for field in RETRY_SIMULATION_ATTEMPT_FIELDS})
+
+    commands = []
+    for command in payload.get("commands", []):
+        if isinstance(command, dict):
+            commands.append({field: command.get(field) for field in RETRY_SIMULATION_COMMAND_FIELDS})
+
+    return {
+        "status": payload.get("status", "invalid"),
+        "artifact": RETRY_SIMULATION_SOURCE,
+        "generated_at": payload.get("generated_at"),
+        "dry_run": payload.get("dry_run"),
+        "non_blocking": True,
+        "max_attempts": payload.get("max_attempts"),
+        "attempts": attempts,
+        "commands": commands,
+        "flaky_commands": payload.get("flaky_commands") if isinstance(payload.get("flaky_commands"), list) else [],
+        "failed_commands": payload.get("failed_commands") if isinstance(payload.get("failed_commands"), list) else [],
+        "production_deploy_performed": payload.get("production_deploy_performed"),
+        "staging_deploy_performed": payload.get("staging_deploy_performed"),
+        "mutating_cloud_operations_performed": payload.get("mutating_cloud_operations_performed"),
+    }
+
+def build_quality_gate_retry_simulation_report(root=APP, command_specs=None, generated_at=None, runner=None):
+    root = Path(root)
+    command_specs = command_specs or QUALITY_GATE_RETRY_SIMULATION_COMMANDS
+    generated_at = generated_at or now()
+    runner = runner or _run_retry_simulation_command
+
+    attempts = []
+    commands = []
+    for spec in command_specs:
+        command = list(spec["command"])
+        timeout = int(spec.get("timeout") or 120)
+        command_text = _command_text(command)
+        command_attempts = []
+
+        first = runner(root, command, timeout)
+        command_attempts.append(_attempt_record(command_text, 1, first))
+
+        if not first.get("ok"):
+            retry = runner(root, command, timeout)
+            command_attempts.append(_attempt_record(command_text, 2, retry))
+
+        retry_changed = command_attempts[0]["result"] != command_attempts[-1]["result"]
+        for attempt in command_attempts:
+            attempt["retry_changed_result"] = retry_changed
+
+        final_result = command_attempts[-1]["result"]
+        attempts.extend(command_attempts)
+        commands.append(
+            {
+                "name": spec.get("name") or command_text,
+                "command": command_text,
+                "attempt_count": len(command_attempts),
+                "final_result": final_result,
+                "retry_changed_result": retry_changed,
+            }
+        )
+
+    failed_commands = [item["name"] for item in commands if item["final_result"] != "pass"]
+    flaky_commands = [
+        item["name"]
+        for item in commands
+        if item["final_result"] == "pass" and item["retry_changed_result"]
+    ]
+    status = "pass" if not failed_commands else "fail"
+    return {
+        "status": status,
+        "generated_at": generated_at,
+        "dry_run": True,
+        "non_blocking": True,
+        "max_attempts": RETRY_SIMULATION_MAX_ATTEMPTS,
+        "attempts": attempts,
+        "commands": commands,
+        "flaky_commands": flaky_commands,
+        "failed_commands": failed_commands,
+        "production_deploy_performed": False,
+        "staging_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+def write_quality_gate_retry_simulation_report(root=APP, command_specs=None):
+    root = Path(root)
+    reports = root / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    report = build_quality_gate_retry_simulation_report(root, command_specs=command_specs)
+    (reports / RETRY_SIMULATION_REPORT_JSON).write_text(
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return report
+
+def _read_retry_simulation_report(root):
+    artifact = Path(root) / RETRY_SIMULATION_SOURCE
+    if not artifact.exists():
+        return {
+            "status": "not_run",
+            "artifact": RETRY_SIMULATION_SOURCE,
+            "non_blocking": True,
+            "attempts": [],
+            "commands": [],
+            "reason": "retry_simulation_artifact_missing",
+        }
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {
+            "status": "invalid",
+            "artifact": RETRY_SIMULATION_SOURCE,
+            "non_blocking": True,
+            "attempts": [],
+            "commands": [],
+            "reason": "invalid_retry_simulation_json:" + str(exc),
+        }
+    if not isinstance(payload, dict):
+        return {
+            "status": "invalid",
+            "artifact": RETRY_SIMULATION_SOURCE,
+            "non_blocking": True,
+            "attempts": [],
+            "commands": [],
+            "reason": "retry_simulation_payload_not_object",
+        }
+    return _sanitize_retry_simulation_payload(payload)
+
 def build_standard_quality_report(root=APP, generated_at=None):
     root = Path(root)
     artifact = root / STANDARD_REPORT_SOURCE
     generated_at = generated_at or now()
+    retry_simulation = _read_retry_simulation_report(root)
 
     if not artifact.exists():
         checks = _missing_artifact_checks("missing_artifact:" + STANDARD_REPORT_SOURCE)
@@ -351,6 +607,7 @@ def build_standard_quality_report(root=APP, generated_at=None):
             "generated_at": generated_at,
             "source_artifacts": [STANDARD_REPORT_SOURCE],
             "checks": checks,
+            "retry_simulation": retry_simulation,
             "production_deploy_performed": None,
             "staging_deploy_performed": None,
             "mutating_cloud_operations_performed": None,
@@ -365,6 +622,7 @@ def build_standard_quality_report(root=APP, generated_at=None):
             "generated_at": generated_at,
             "source_artifacts": [STANDARD_REPORT_SOURCE],
             "checks": checks,
+            "retry_simulation": retry_simulation,
             "production_deploy_performed": None,
             "staging_deploy_performed": None,
             "mutating_cloud_operations_performed": None,
@@ -382,6 +640,7 @@ def build_standard_quality_report(root=APP, generated_at=None):
         "generated_at": generated_at,
         "source_artifacts": [STANDARD_REPORT_SOURCE],
         "checks": checks,
+        "retry_simulation": retry_simulation,
         "production_deploy_performed": payload.get("production_deploy_performed"),
         "staging_deploy_performed": payload.get("staging_deploy_performed"),
         "mutating_cloud_operations_performed": payload.get("mutating_cloud_operations_performed"),
@@ -398,6 +657,23 @@ def render_standard_quality_summary(report):
     ]
     for check in report["checks"]:
         lines.append(f"- {check['name']}: {check['status']} - {check['reason']} ({check['artifact']})")
+
+    retry = report.get("retry_simulation") or {}
+    lines += [
+        "",
+        "## Retry Simulation",
+        f"- Status: {retry.get('status', 'not_run')}",
+        f"- Non-blocking: {str(retry.get('non_blocking', True)).lower()}",
+        f"- Artifact: {retry.get('artifact', RETRY_SIMULATION_SOURCE)}",
+    ]
+    for attempt in retry.get("attempts", []):
+        lines.append(
+            "- "
+            + f"{attempt.get('command')} attempt {attempt.get('attempt')}: "
+            + f"{attempt.get('result')} exit={attempt.get('exit_code')} "
+            + f"retry_changed={str(attempt.get('retry_changed_result')).lower()} "
+            + f"hint={attempt.get('failure_hint')}"
+        )
     lines += [
         "",
         "## Safety",
@@ -423,12 +699,25 @@ def standard_report():
     if result["status"] != "pass":
         raise SystemExit(1)
 
+def retry_simulation():
+    result = write_quality_gate_retry_simulation_report(APP)
+    log(f"RETRY_SIMULATION status={result['status']} attempts={len(result['attempts'])}")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["preflight", "test-suite", "json-check", "diff-report", "status", "standard-report"],
+        choices=[
+            "preflight",
+            "test-suite",
+            "json-check",
+            "diff-report",
+            "status",
+            "standard-report",
+            "retry-simulation",
+        ],
     )
     args = parser.parse_args()
 
@@ -444,6 +733,8 @@ def main():
         gate_status()
     elif args.command == "standard-report":
         standard_report()
+    elif args.command == "retry-simulation":
+        retry_simulation()
 
 if __name__ == "__main__":
     main()

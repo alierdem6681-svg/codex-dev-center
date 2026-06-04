@@ -160,6 +160,7 @@ Faz 19B-10A Model Policy
 - [x] Simülasyon sözleşmeleri unit test ve state template kayıtlarıyla sabitlendi.
 - [x] Ön canlı ve geri alma dry-run çıktıları non-mutating JSON sözleşmesiyle doğrulanır.
 - [x] Production readiness artefact'inden standart `quality-gate-report.json` ve `quality-gate-summary.md` çıktısı üretilir.
+- [x] Quality gate retry simülasyonu ilk deneme, en fazla bir retry ve `retry_changed_result` alanlarını non-blocking standard rapor görünürlüğüne bağlar.
 
 ## Faz 31 - Controlled Apply Pipeline Validation
 
