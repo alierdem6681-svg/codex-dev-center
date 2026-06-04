@@ -239,3 +239,11 @@ Aktif `current_task` taşıyan worker ikinci task claim edemez. Dispatch de ayn�
 Testler repo checkout icine runtime state, cache, config, log veya output dosyasi yazmamalidir. Ortak helper `tests/safe_test_scratch.py` uzerinden scratch root sirasi `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` olarak cozulur; repo icindeki scratch root reddedilir.
 
 Her test icin `{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}` formatinda atomik benzersiz dizin olusturulur. `TMPDIR`, `TEMP`, `TMP`, `HOME`, `XDG_CACHE_HOME`, `XDG_CONFIG_HOME`, `CODEX_TEST_OUTPUT_DIR` ve `TEST_SCRATCH_ACTIVE_DIR` aktif scratch alanina yonlendirilir. `guard_repo_clean()` allowlist disi repo mutasyonlarini test fail'e cevirmek icin kullanilir.
+
+## STAGING READINESS WRAPPER CONTRACT V1
+
+Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla değil explicit staging wrapperlarıyla çağrılmalıdır:
+- `scripts/staging_health_check.sh`
+- `scripts/staging_smoke_test.sh`
+
+Bu wrapperlar `production_environment_manager.py health-check --scope staging` ve `smoke-test --scope staging` çağrılarını yapar; `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek argüman passtrough desteğini korur. Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

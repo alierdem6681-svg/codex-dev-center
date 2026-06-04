@@ -103,6 +103,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/production_environment_manager.py health/smoke yazımlarında aynı read-only/dry-run write policy helper'ını kullanır
+- scripts/staging_health_check.sh ve scripts/staging_smoke_test.sh ön canlı health/smoke kontrollerini explicit `--scope staging` ile çağırır; production varsayılan wrapperları staging kapısı için kullanılmamalıdır
 - supervisor/service_watchdog.py
 - scripts/queue_owner_cleanup.py
 - web_panel/panel_server.py
@@ -173,6 +174,12 @@ Read-only / dry-run write policy notu:
 - `CHECK_MODE` veya `CODEX_CHECK_MODE` `read_only` ya da `dry_run` ise readiness, drift ve smoke write adapter'lari state/report dosyasi olusturmaz.
 - Sonuc payload'lari `mode`, `runtime_write_status`, `write_evidence`, `write_status`, `target`, `operation`, `write_attempted`, `write_status=skipped` ve `skip_reason` alanlariyla kanit dondurur.
 - `CHECK_MODE` verilmezse davranis `write_enabled` olarak geriye uyumludur.
+
+Staging readiness wrapper notu:
+- `scripts/staging_health_check.sh` `production_environment_manager.py health-check --scope staging` calistirir.
+- `scripts/staging_smoke_test.sh` `production_environment_manager.py smoke-test --scope staging` calistirir.
+- Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur; `tests/test_staging_readiness_wrappers.py` bunu statik dogrular.
+- Bu sozlesme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
 Observed issue completion notu:
 - Drift registry/settings eksikleri `classify_module_registry_settings_candidates()` ile candidate olarak siniflandirilir; tek drift alert sinyali otomatik registry/settings eklemek icin yeterli degildir.

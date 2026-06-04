@@ -16,6 +16,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Telegram bridge/direct CTO test PASS
 - Secret leakage scan PASS
 - Forbidden operation scan PASS
+- Ön canlı health/smoke wrapper sözleşmesi PASS
 - Ön canlı smoke test PASS
 - Geri alma simulation PASS
 - Telegram güvenli sonuç raporu akışı PASS
@@ -29,6 +30,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 Restart ve failure injection kapıları canlı servis, cloud veya production deploy çalıştırmadan doğrulanır.
 
 - `staging_smoke_test` dry-run sonucunda `dry_run=true` ve `mutating_cloud_operations_performed=false` alanlarını doğrular.
+- `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` staging scope'u explicit geçirir; production scope varsayılan wrapperları ön canlı kapısı yerine kullanılmamalıdır.
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.

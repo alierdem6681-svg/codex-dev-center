@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T16:40:00+00:00",
+  "updated_at": "2026-06-04T18:05:05+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -160,6 +160,8 @@
       "actions": [
         "production_readiness_suite",
         "staging_deploy",
+        "staging_health_check",
+        "staging_smoke_test",
         "health_check",
         "smoke_test",
         "production_deploy_start",
@@ -317,9 +319,11 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Staging, production, health check, smoke test, rollback point, read-only/dry-run write evidence and safe local panel swap flow.",
+      "description": "Staging, production, explicit staging health/smoke wrappers, rollback point, read-only/dry-run write evidence and safe local panel swap flow.",
       "actions": [
         "staging_deploy",
+        "staging_health_check",
+        "staging_smoke_test",
         "health_check",
         "smoke_test",
         "rollback_simulation"

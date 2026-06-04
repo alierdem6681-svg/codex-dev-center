@@ -132,3 +132,9 @@ Quality gate retry simülasyonu dry-run safety alanlarını (`safety_status`, `s
 Worker aktif sahipliği olmayan stale dispatch claim'leri yeni kök görev açmadan aynı task üzerinde retry'a alınmalı; deneme sınırı dolarsa `FAILED_TIMEOUT` terminal statüsü verilmelidir.
 
 Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı worker state transaction lock altında tutarlı güncellenmelidir. Bir worker aynı anda yalnızca bir aktif `current_task` taşıyabilir; aktif `current_task` varken ikinci task claim edilemez.
+
+## 14. Ön Canlı Readiness Wrapper Kuralı
+
+Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
+
+Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

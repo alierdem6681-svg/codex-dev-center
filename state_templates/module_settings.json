@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T16:40:00+00:00",
+  "updated_at": "2026-06-04T18:05:05+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -242,6 +242,10 @@
     "rollback_command": "{python} supervisor/production_environment_manager.py rollback",
     "health_check_command": "{python} supervisor/production_environment_manager.py health-check --scope production",
     "smoke_test_command": "{python} supervisor/production_environment_manager.py smoke-test --scope production",
+    "staging_health_check_command": "{python} supervisor/production_environment_manager.py health-check --scope staging",
+    "staging_smoke_test_command": "{python} supervisor/production_environment_manager.py smoke-test --scope staging",
+    "staging_health_check_wrapper": "scripts/staging_health_check.sh",
+    "staging_smoke_test_wrapper": "scripts/staging_smoke_test.sh",
     "git_clean_required_for_production": true,
     "github_remote_sync_required": true,
     "rollback_point_required": true,
