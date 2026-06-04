@@ -40,16 +40,68 @@ def safe_task_id(text):
         cleaned = cleaned.replace("--", "-")
     return cleaned.strip("-")[:80]
 
-def make_task(run_id, seq, slug, title, description, worker, risk="medium"):
-    return {
-        "id": f"CTO-ACTION-{run_id}-{seq:02d}-{safe_task_id(slug)}",
-        "title": title,
-        "description": (
+IMPLEMENTATION_SIGNALS = [
+    "başla",
+    "basla",
+    "başlayalım",
+    "baslayalim",
+    "geliştirme yap",
+    "gelistirme yap",
+    "geliştirmeye başlayalım",
+    "gelistirmeye baslayalim",
+    "uygula",
+    "düzelt",
+    "duzelt",
+    "kaldır",
+    "kaldir",
+    "ekle",
+    "yap",
+    "canlıya al",
+    "canliya al",
+]
+
+PLAN_ONLY_SIGNALS = [
+    "sadece plan",
+    "plan üret",
+    "plan uret",
+    "öneri üret",
+    "oneri uret",
+    "analiz et",
+    "incele",
+    "değerlendir",
+    "degerlendir",
+]
+
+
+def wants_implementation_mode(text):
+    lowered = (text or "").lower()
+    implementation = any(signal in lowered for signal in IMPLEMENTATION_SIGNALS)
+    plan_only = any(signal in lowered for signal in PLAN_ONLY_SIGNALS)
+    return implementation and not (plan_only and not any(signal in lowered for signal in ["uygula", "düzelt", "duzelt", "yap"]))
+
+
+def make_task(run_id, seq, slug, title, description, worker, risk="medium", implementation=False):
+    if implementation:
+        task_description = (
+            description.strip()
+            + " Beklenen çıktı: plan/proposal ile durma; izole repo clone ve branch üzerinde "
+              "gerekli en küçük kod/doküman/test değişikliğini uygula, lokal gate/testleri çalıştır, "
+              "diff ve rollback notunu üret. Production deploy yapma; deploy için pipeline/finalizer bekle."
+        )
+        delivery_level = "REPO_APPLY_QUEUED"
+    else:
+        task_description = (
             description.strip()
             + " Beklenen çıktılar: PLAN.md, CHANGE_PROPOSAL.md, TEST_PLAN.md, "
               "RISK_REVIEW.md, LIVING_DOCS_CHECKLIST.md, WORKER_SUMMARY.md. "
               "Ana repo dosyalarını değiştirme. Production yapma."
-        ),
+        )
+        delivery_level = "BACKLOG"
+
+    task = {
+        "id": f"CTO-ACTION-{run_id}-{seq:02d}-{safe_task_id(slug)}",
+        "title": title,
+        "description": task_description,
         "source": "cto",
         "trigger": "direct_cto_action_mode",
         "status": TASK_STATUS_PENDING,
@@ -60,8 +112,20 @@ def make_task(run_id, seq, slug, title, description, worker, risk="medium"):
         "repo_applied": False,
         "staging_deployed": False,
         "production_deployed": False,
-        "delivery_level": "BACKLOG"
+        "delivery_level": delivery_level,
     }
+    if implementation:
+        task.update(
+            {
+                "worker_eligible": True,
+                "repo_apply_allowed": True,
+                "execution_mode": "repo_apply",
+                "dispatcher_mode": "apply",
+                "requires_pipeline_before_deploy": True,
+                "plan_only": False,
+            }
+        )
+    return task
 
 def wants_observed_issue_backlog(text):
     lowered = (text or "").lower()
@@ -75,7 +139,7 @@ def wants_observed_issue_backlog(text):
     count_requested = "10" in lowered or "on " in lowered or "on adet" in lowered
     return creation and issue_terms and count_requested
 
-def observed_issue_backlog(run_id):
+def observed_issue_backlog(run_id, implementation=False):
     items = [
         (
             "read-only-dry-run-test-mode",
@@ -139,16 +203,17 @@ def observed_issue_backlog(run_id):
         ),
     ]
     return [
-        make_task(run_id, idx, slug, title, description, worker)
+        make_task(run_id, idx, slug, title, description, worker, implementation=implementation)
         for idx, (slug, title, description, worker) in enumerate(items, 1)
     ]
 
 def build_backlog(raw_text, run_id):
     text = (raw_text or "").lower()
     tasks = []
+    implementation = wants_implementation_mode(raw_text)
 
     if wants_observed_issue_backlog(raw_text):
-        return observed_issue_backlog(run_id)
+        return observed_issue_backlog(run_id, implementation=implementation)
 
     telegram_asset_requested = "telegram" in text and any(x in text for x in [
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
@@ -168,28 +233,32 @@ def build_backlog(raw_text, run_id):
                 "telegram-asset-intake-backend",
                 "Telegram Asset Intake Backend",
                 "Telegram CTO hattinda fotoğraf, doküman ve caption gibi metin dışı mesajları güvenli şekilde algılayacak backend planını üret. Secret/token/env değeri okuma veya gösterme.",
-                "worker-1"
+                "worker-1",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 2,
                 "telegram-asset-storage-manifest",
                 "Telegram Asset Storage And Manifest",
                 "Telegram getFile indirme akışı, boyut limiti, mime/hash kaydı, runtime asset inbox dizini ve manifest sözleşmesi için güvenli plan üret. Repo içine ham dosya koyma.",
-                "worker-3"
+                "worker-3",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 3,
                 "dashboard-telegram-asset-inbox",
                 "Dashboard Telegram Asset Inbox",
                 "Dashboardda salt okunur Telegram Asset Inbox görünümü, asset metadata listesi, caption ve güvenli referans gösterimi için UI/API planı üret.",
-                "worker-2"
+                "worker-2",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 4,
                 "telegram-asset-safety-tests",
                 "Telegram Asset Safety Tests",
                 "Asset kabul, limit, manifest, secret redaction, Telegram simulator, dashboard smoke ve hata durumları için test planı ve risk raporu üret.",
-                "worker-4"
+                "worker-4",
+                implementation=implementation,
             ),
         ]
         return tasks
@@ -201,21 +270,24 @@ def build_backlog(raw_text, run_id):
                 "dashboard-pipeline-expand-state-root-cause",
                 "Dashboard Pipeline Expand State Root Cause",
                 "Pipeline Flow ana görev/alt görev expand-collapse durumunun live polling sonrası kendi kendine açılıp kapanmasının kök nedenini incele. UI state key, selected stage, polling refresh ve DOM render etkisini ayıran değişiklik önerisi üret.",
-                "worker-2"
+                "worker-2",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 2,
                 "dashboard-pipeline-expand-state-tests",
                 "Dashboard Pipeline Expand State Tests",
                 "Ana görev tıklanınca alt görevlerin kullanıcı tercihini koruması, aktif ana görevde kapanınca tekrar açılmaması ve kapalı stage kayıtlarında birkaç saniye sonra kapanma/açılma olmaması için test planı üret.",
-                "worker-4"
+                "worker-4",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 3,
                 "dashboard-pipeline-live-polling-contract",
                 "Dashboard Pipeline Live Polling Contract",
                 "Pipeline Flow API/live polling sözleşmesinde kullanıcı UI state'inin server refresh ile ezilmemesi için küçük güvenli backend/frontend kontrat önerisi üret.",
-                "worker-1"
+                "worker-1",
+                implementation=implementation,
             ),
         ]
         return tasks
@@ -233,28 +305,32 @@ def build_backlog(raw_text, run_id):
                 "queue-status-normalizer",
                 "Queue / Status Normalizer",
                 "Queue ve status alanlarını normalize et. RUNNING ama worker IDLE olan işleri tespit et. DONE, PROPOSAL_DONE, FAILED_NO_PROPOSAL ayrımını netleştir. queued/QUEUED, risk/risk_level, approval_requests/approvals alanlarını standartlaştırma planı üret.",
-                "worker-1"
+                "worker-1",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 2,
                 "action-watcher-race-fix",
                 "Action Watcher Race Fix",
                 "Action watcher ve worker kapanışları arasındaki race condition için çözüm planı üret. Worker logu FAILED iken queue RUNNING kalmasın. Stale RUNNING cleaner ve reconcile akışını planla.",
-                "worker-3"
+                "worker-3",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 3,
                 "deterministic-proposal-artifacts",
                 "Deterministic Proposal Artifacts",
                 "Her proposal görevinde PLAN, CHANGE_PROPOSAL, TEST_PLAN, RISK_REVIEW, LIVING_DOCS_CHECKLIST ve WORKER_SUMMARY dosyalarının deterministik üretilmesini sağlayacak planı çıkar. Timeout/retry davranışını iyileştir.",
-                "worker-4"
+                "worker-4",
+                implementation=implementation,
             ),
             make_task(
                 run_id, 4,
                 "quality-dashboard-living-docs-sync",
                 "Quality Gate / Dashboard / Living Docs Sync",
                 "Quality gate kayıtlarını, dashboard delivery level görünürlüğünü ve living docs/module settings eksiklerini senkronize edecek plan üret.",
-                "worker-2"
+                "worker-2",
+                implementation=implementation,
             ),
         ]
         return tasks
@@ -266,35 +342,40 @@ def build_backlog(raw_text, run_id):
             "controlled-apply-pipeline",
             "Controlled Apply Pipeline v1",
             "Proposal seviyesinden gerçek repo değişikliğine kontrollü geçiş için pipeline planı üret. Patch planı, test, diff, report ve rollback notu aşamalarını netleştir.",
-            "worker-1"
+            "worker-1",
+            implementation=implementation,
         ),
         make_task(
             run_id, 2,
             "quality-gate-test-simulation",
             "Quality Gate / Test / Simulation",
             "Quality gate, smoke test, simülasyon, kod kalite kontrolü ve diff kontrolü için plan üret.",
-            "worker-4"
+            "worker-4",
+            implementation=implementation,
         ),
         make_task(
             run_id, 3,
             "worker-dispatch-v2",
             "Worker Dispatch v2",
             "Worker rol eşleme, görev dağıtımı, retry, hata denetimi ve takip mantığı için plan üret.",
-            "worker-2"
+            "worker-2",
+            implementation=implementation,
         ),
         make_task(
             run_id, 4,
             "dashboard-pipeline-tracking",
             "Dashboard Pipeline Tracking",
             "Dashboardda pipeline, worker, delivery level, quality gate, staging, approval ve production readiness alanları için plan üret.",
-            "worker-2"
+            "worker-2",
+            implementation=implementation,
         ),
         make_task(
             run_id, 5,
             "staging-rollback-readiness",
             "Staging / Rollback / Production Readiness",
             "Staging health, smoke test, rollback planı, production readiness ve Telegram sonuç raporu akışı için plan üret.",
-            "worker-3"
+            "worker-3",
+            implementation=implementation,
         ),
     ]
     return tasks
@@ -378,10 +459,26 @@ def run_action_mode(raw_text):
     lines += [
         "",
         "Production başlatılmadı.",
-        "İşler proposal/plan aşamasında, güvenli worker akışına verildi."
+        (
+            "İşler implementation/apply akışına verildi; plan-only kapanış kabul edilmeyecek."
+            if wants_implementation_mode(raw_text)
+            else "İşler proposal/plan aşamasında, güvenli worker akışına verildi."
+        )
     ]
 
     return "\n".join(lines)
 
 if __name__ == "__main__":
-    print(run_action_mode("manual"))
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Queue Direct CTO action tasks.")
+    parser.add_argument("text", nargs="*", help="Action text. If omitted, stdin is used when available.")
+    args = parser.parse_args()
+    raw = " ".join(args.text).strip()
+    if not raw and not sys.stdin.isatty():
+        raw = sys.stdin.read().strip()
+    if not raw:
+        parser.print_help()
+        raise SystemExit(0)
+    print(run_action_mode(raw))

@@ -911,6 +911,7 @@ Eklenenler:
 - `supervisor/task_status_constants.py` atomic JSON state/tmp audit helper'i ekler.
 - `supervisor/production_readiness_suite.py` uzun dry-run JSON stdout'unu kesmeden okur ve prefixed JSON payload'lari toleransli parse eder.
 - `supervisor/cto_autonomous_delivery.py` superseded/cancelled/final-reconciled duplicate parent task'larindan backlog continuation uretmez.
+- `supervisor/direct_cto_action_mode.py` "basla/uygula/gelistirme yap" sinyalli Direct CTO islerini plan-only backlog yerine repo apply odakli task olarak acar; CLI `--help` artik yanlislikla gorev acmaz.
 - `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, anayasa, roadmap ve memory kayitlari guncellendi.
 
 Test:

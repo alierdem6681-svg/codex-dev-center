@@ -1342,6 +1342,8 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             ],
         )
         self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-1", "worker-3", "worker-2", "worker-4"])
+        self.assertTrue(all(task.get("repo_apply_allowed") is True for task in tasks))
+        self.assertTrue(all(task.get("execution_mode") == "repo_apply" for task in tasks))
 
     def test_dashboard_pipeline_expand_action_mode_builds_specific_backlog(self):
         tasks = direct_cto_action_mode.build_backlog(
@@ -1360,6 +1362,30 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             ],
         )
         self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-2", "worker-4", "worker-1"])
+        self.assertTrue(all(task.get("repo_apply_allowed") is True for task in tasks))
+        self.assertTrue(all(task.get("delivery_level") == "REPO_APPLY_QUEUED" for task in tasks))
+
+    def test_action_mode_development_prompt_creates_apply_tasks(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "geliştirmeye başlayalım",
+            "20260604-TEST",
+        )
+
+        self.assertTrue(tasks)
+        self.assertTrue(all(task.get("repo_apply_allowed") is True for task in tasks))
+        self.assertTrue(all(task.get("execution_mode") == "repo_apply" for task in tasks))
+        self.assertTrue(all(task.get("delivery_level") == "REPO_APPLY_QUEUED" for task in tasks))
+        self.assertTrue(all("plan/proposal ile durma" in task.get("description", "") for task in tasks))
+
+    def test_action_mode_plan_prompt_stays_proposal_only(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "sadece plan üret",
+            "20260604-TEST",
+        )
+
+        self.assertTrue(tasks)
+        self.assertTrue(all(not task.get("repo_apply_allowed") for task in tasks))
+        self.assertTrue(all(task.get("delivery_level") == "BACKLOG" for task in tasks))
 
     def test_long_task_routes_to_async_before_local_reply(self):
         result = telegram_direct_cto_simulator.simulate_case(
