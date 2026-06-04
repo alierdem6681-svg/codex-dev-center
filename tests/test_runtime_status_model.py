@@ -3291,6 +3291,68 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertTrue(system_state["repo_changes_applied"])
         self.assertTrue(system_state["production_github_sync"])
 
+    def test_task_recovery_does_not_downgrade_proposal_done_with_apply_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            logs = runtime / "logs"
+            workspace = runtime / "workspaces" / "worker_worker-1_PARENT_20260604_000000"
+            state.mkdir()
+            reports.mkdir()
+            logs.mkdir()
+            workspace.mkdir(parents=True)
+            for name in task_recovery_engine.EXPECTED[:4]:
+                (workspace / name).write_text("# ok\n", encoding="utf-8")
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "PARENT",
+                                "status": TASK_STATUS_PROPOSAL_DONE,
+                                "risk": "medium",
+                                "workspace": str(workspace),
+                                "repo_apply_child": "APPLY",
+                                "result": "validated_worker_proposal_ready_for_apply",
+                                "delivery_level": TASK_STATUS_PROPOSAL_DONE,
+                            },
+                            {"id": "APPLY", "status": TASK_STATUS_RUNNING, "risk": "medium", "worker_eligible": True},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "workers.json").write_text(json.dumps({"workers": []}), encoding="utf-8")
+            (state / "system_state.json").write_text(json.dumps({"ready_for_new_tasks": True}), encoding="utf-8")
+
+            originals = (
+                task_recovery_engine.APP,
+                task_recovery_engine.STATE,
+                task_recovery_engine.REPORTS,
+                task_recovery_engine.LOGS,
+            )
+            task_recovery_engine.APP = runtime
+            task_recovery_engine.STATE = state
+            task_recovery_engine.REPORTS = reports
+            task_recovery_engine.LOGS = logs
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    task_recovery_engine.main()
+            finally:
+                (
+                    task_recovery_engine.APP,
+                    task_recovery_engine.STATE,
+                    task_recovery_engine.REPORTS,
+                    task_recovery_engine.LOGS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
+        self.assertEqual(queue["tasks"][0]["result"], "validated_worker_proposal_ready_for_apply")
+        self.assertEqual(queue["tasks"][0]["delivery_level"], TASK_STATUS_PROPOSAL_DONE)
+
     def test_owner_cleanup_archives_and_empties_queue(self):
         spec = importlib.util.spec_from_file_location(
             "queue_owner_cleanup_test_module",

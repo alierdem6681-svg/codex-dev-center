@@ -210,6 +210,11 @@ def main():
             active = task_has_process(tid)
 
             if len(files) >= 4:
+                if status == TASK_STATUS_PROPOSAL_DONE or task.get("repo_apply_child"):
+                    task["workspace"] = workspace
+                    task["updated_at"] = now()
+                    details.append(f"{tid}|SKIP_READY_DOWNGRADE|status={status}")
+                    continue
                 task["status"] = TASK_STATUS_READY_FOR_VALIDATION
                 task["result"] = "worker_output_ready_for_validation_not_done"
                 task["delivery_level"] = TASK_STATUS_READY_FOR_VALIDATION
