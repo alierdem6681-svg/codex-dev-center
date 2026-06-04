@@ -227,3 +227,11 @@ Dashboard Gorevler listesi artik render oncesinde deterministik comparator kulla
 Canli gorev algisi `DEPLOYED`, `isLive`, `liveAt`, `deployment_status`, `delivery_level=DEPLOYED` ve `production_deployed` sinyallerini okur. Filtre option'lari runtime yenilemelerinde gereksiz yeniden yazilmaz, secili filtre korunur.
 
 Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Telegram Asset Safety Tests Apply
+
+Telegram asset guvenligi icin saf sozlesme modulu eklendi: `supervisor/telegram_asset_safety.py`. Modul asset kabul, MIME/uzanti, boyut/adet/toplam paket, caption limiti, manifest schema/version/checksum/path/duplicate, secret redaction, Telegram simulator ve dashboard smoke davranislarini dis servis cagirmadan kapsar.
+
+Davranis `tests.test_runtime_status_model.TelegramAssetSafetyTest` ile sabitlendi. Dashboard summary salt okunur, redacted ve raw dosya icerigi olmadan uretilir. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Production readiness dashboard route smoke testi de onceki sade dashboard markup sozlesmesiyle hizalandi; eski kaldirilmis operasyonel bolum basliklari artik readiness blocker degildir.

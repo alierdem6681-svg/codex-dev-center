@@ -90,6 +90,7 @@ Ajan şu klasörleri inceler:
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/telegram_asset_safety.py
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -120,6 +121,11 @@ Queue/status normalizer notu:
 - Worker claim akışı `worker_id` ve `claimed_at` yazar; bu görünürlük production deploy veya runtime state dışı mutasyon yetkisi vermez.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
 - 2026-06-04 owner repair sonrasinda runtime queue bilincli olarak bosaltildi. Snapshot `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup` altindadir; yeni gorevler temiz queue uzerinden alinmalidir.
+
+Telegram asset safety notu:
+- `supervisor/telegram_asset_safety.py` saf sozlesme moduludur; Telegram API'ye cikmaz, dosya indirmez ve runtime asset yazmaz.
+- Kabul, limit, manifest, redaction, simulator, dashboard smoke ve hata davranisi `tests.test_runtime_status_model.TelegramAssetSafetyTest` ile sabitlenir.
+- Dashboard ozeti salt okunur ve redacted kalmalidir; raw dosya icerigi, secret/env/token/private key veya teknik dump payload'a eklenmemelidir.
 
 ## Servis Keşfi
 

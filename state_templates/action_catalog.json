@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:41:29+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -190,6 +190,27 @@
       "requires_exact_path_allowlist": true,
       "requires_secret_scan": true,
       "requires_control_report": true
+    },
+    {
+      "id": "validate_telegram_asset_safety",
+      "label": "Telegram Asset Safety Sözleşme Testi",
+      "module": "telegram_asset_safety",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "simulator_only": true,
+      "external_telegram_api_call": false,
+      "command": "{python} -m unittest tests.test_runtime_status_model.TelegramAssetSafetyTest",
+      "covers": [
+        "asset_acceptance",
+        "limits",
+        "manifest_contract",
+        "secret_redaction",
+        "telegram_simulator",
+        "dashboard_smoke",
+        "error_paths"
+      ]
     }
   ]
 }

@@ -198,3 +198,11 @@ Faz 19B-10A Model Policy
 - [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
+
+## Faz 36 - Telegram Asset Safety Tests
+
+- [x] Telegram asset kabul, limit ve manifest sozlesmeleri saf Python modulunde sabitlendi.
+- [x] Secret redaction; log/error/dashboard/simulator payload testleriyle dogrulandi.
+- [x] Telegram simulator basari, rate limit, unauthorized, timeout ve rejected path davranisini dis API cagirmadan kapsar.
+- [x] Dashboard asset summary salt okunur, redacted ve raw dosya icerigi olmadan uretilir.
+- [ ] Gercek Telegram asset intake/storage/backend paketleri tamamlaninca bu sozlesmeler ilgili akisa baglanacak.

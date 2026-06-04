@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:41:29+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -75,6 +75,35 @@
     "send_diff_outputs": false,
     "token_configured": false,
     "smoke_test_required": true
+  },
+  "telegram_asset_safety": {
+    "enabled": true,
+    "manifest_version": 1,
+    "max_asset_count": 10,
+    "max_manifest_entries": 10,
+    "max_single_asset_bytes": 10485760,
+    "max_total_package_bytes": 26214400,
+    "max_caption_chars": 1024,
+    "allowed_mime_extensions": {
+      "image/jpeg": [
+        ".jpg",
+        ".jpeg"
+      ],
+      "image/png": [
+        ".png"
+      ],
+      "application/pdf": [
+        ".pdf"
+      ],
+      "text/plain": [
+        ".txt"
+      ]
+    },
+    "simulator_only": true,
+    "external_telegram_api_call": false,
+    "dashboard_summary_read_only": true,
+    "redact_sensitive_payload_fields": true,
+    "raw_file_content_in_dashboard": false
   },
   "cto_router": {
     "enabled": true,

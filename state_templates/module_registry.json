@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:41:29+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -89,6 +89,19 @@
         "connect_telegram",
         "test_telegram",
         "toggle_telegram_notifications"
+      ]
+    },
+    {
+      "id": "telegram_asset_safety",
+      "name": "Telegram Asset Safety Contracts",
+      "status": "test_contract_ready",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Telegram asset intake icin kabul, limit, manifest, redaction, simulator ve dashboard smoke sozlesmelerini dis servis cagirmadan test eder.",
+      "actions": [
+        "validate_telegram_asset_safety"
       ]
     },
     {

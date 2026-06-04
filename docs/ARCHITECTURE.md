@@ -4,6 +4,7 @@
 
 Telegram
 → Telegram Bridge
+→ Telegram Asset Safety Contracts
 → CTO/Supervisor
 → Task Queue
 → 4 Worker
@@ -63,3 +64,8 @@ reports/
 
 backups/
 - Yedekler
+
+## Telegram Asset Safety Contracts
+
+`supervisor/telegram_asset_safety.py` Telegram asset akisi icin dis API cagirmayan, dosya indirmeyen ve runtime asset yazmayan sozlesme katmanidir.
+Kabul, limit, manifest, redaction, simulator ve dashboard smoke davranislari unit testlerle sabitlenir.

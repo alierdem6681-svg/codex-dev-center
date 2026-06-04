@@ -223,19 +223,14 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
 def dashboard_test(results: dict[str, Any]) -> None:
     index = (ROOT / "web_panel/static/index.html").read_text(encoding="utf-8", errors="replace")
     required_text = [
-        "Canlıya Alma Durumu",
-        "Ön Canlı Sonucu",
-        "Geri Alma",
-        "Yayına Alma",
-        "Görev Kuyruğu",
-        "Toparlama",
-        "Deploy Komutları",
-        "Kalite Kapıları",
+        "Görevler",
+        "Pipeline Flow",
         "Çıkış",
-        "Pipeline Gözlemi",
-        "Runner",
-        "Run ID",
-        "Telegram CTO işleri",
+        "Canlıya alınanları göster",
+        "metricActiveQueue",
+        "metricWorkers",
+        "accountMenuButton",
+        "showLiveTasks",
     ]
     missing = [item for item in required_text if item not in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")

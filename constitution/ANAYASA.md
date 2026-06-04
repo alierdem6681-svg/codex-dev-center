@@ -25,6 +25,8 @@ Hiçbir agent doğrudan kontrolsüz canlı değişiklik yapamaz.
 
 Kullanıcının Telegram mesajları Codex'e aynen iletilir. Kod çıktısı, uzun terminal çıktısı, diff, stack trace ve log dump Telegram'a gönderilmez; teknik çıktı log dosyasına kaydedilir.
 
+Telegram asset akisi icin kabul, limit, manifest, redaction, simulator ve dashboard smoke davranisi dis servis cagirmayan sozlesme testleriyle sabitlenir. Raw dosya icerigi, secret/env/token/private key veya teknik dump dashboard/Telegram payload'ina eklenemez.
+
 ## 5. Çalışan Kuralı
 
 Başlangıç rolleri:

@@ -156,6 +156,10 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## TELEGRAM ASSET SAFETY CONTRACTS V1
+
+Telegram asset kabul, limit, manifest, secret redaction, simulator, dashboard smoke ve hata durumlari `supervisor/telegram_asset_safety.py` saf sozlesme modulunde test edilir. Bu modul Telegram API'ye cikmaz, dosya indirmez, runtime asset yazmaz ve dashboard ozeti raw dosya icerigi veya secret/env/token/private key dondurmez.
+
 ## WORKER DISPATCH CONTRACT V1
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.

@@ -32,6 +32,7 @@ from supervisor import (  # noqa: E402
     task_recovery_engine,
     task_validation_engine,
     telegram_bridge,
+    telegram_asset_safety,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
     telegram_health_watcher,
@@ -724,6 +725,171 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertNotIn("progress_watchdog", queue["tasks"][0])
         self.assertEqual(workers["workers"][0]["status"], "IDLE")
         self.assertIsNone(workers["workers"][0]["current_task"])
+
+
+class TelegramAssetSafetyTest(unittest.TestCase):
+    def asset(self, **overrides):
+        base = {
+            "id": "asset-1",
+            "path": "telegram/asset-1.png",
+            "mime_type": "image/png",
+            "size_bytes": 128,
+            "sha256": "a" * 64,
+            "caption": "safe caption",
+        }
+        base.update(overrides)
+        return base
+
+    def manifest(self, *assets, **overrides):
+        payload = {
+            "version": telegram_asset_safety.MANIFEST_VERSION,
+            "assets": [
+                {
+                    "id": asset["id"],
+                    "path": asset["path"],
+                    "mime_type": asset["mime_type"],
+                    "size_bytes": asset["size_bytes"],
+                    "sha256": asset["sha256"],
+                }
+                for asset in assets
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    def error_codes(self, result):
+        return {item["code"] for item in result["errors"]}
+
+    def test_accepts_safe_asset_package_at_configured_single_file_limit(self):
+        policy = telegram_asset_safety.DEFAULT_POLICY
+        asset = self.asset(size_bytes=policy.max_single_asset_bytes)
+        result = telegram_asset_safety.validate_asset_package([asset], self.manifest(asset))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["asset_count"], 1)
+        self.assertEqual(result["total_size_bytes"], policy.max_single_asset_bytes)
+        self.assertFalse(result["external_call_performed"])
+
+    def test_rejects_asset_count_size_caption_and_package_limit_violations(self):
+        policy = telegram_asset_safety.DEFAULT_POLICY
+        too_many_assets = [
+            self.asset(
+                id=f"asset-{index}",
+                path=f"telegram/asset-{index}.png",
+                size_bytes=policy.max_total_package_bytes,
+            )
+            for index in range(policy.max_asset_count + 1)
+        ]
+        oversized = self.asset(id="oversized", size_bytes=policy.max_single_asset_bytes + 1)
+        long_caption = self.asset(
+            id="caption",
+            path="telegram/caption.png",
+            caption="x" * (policy.max_caption_chars + 1),
+        )
+
+        result = telegram_asset_safety.validate_asset_package(
+            too_many_assets + [oversized, long_caption],
+            self.manifest(*(too_many_assets + [oversized, long_caption])),
+        )
+
+        codes = self.error_codes(result)
+        self.assertIn("asset_count_limit_exceeded", codes)
+        self.assertIn("asset_size_limit_exceeded", codes)
+        self.assertIn("caption_limit_exceeded", codes)
+        self.assertIn("package_size_limit_exceeded", codes)
+
+    def test_rejects_manifest_schema_duplicates_paths_and_checksum_mismatches(self):
+        first = self.asset()
+        duplicate = self.asset(path="../secret.png", sha256="b" * 64)
+        manifest = self.manifest(first, duplicate)
+        manifest["unexpected"] = True
+        manifest["assets"][0]["extra"] = "not allowed"
+        manifest["assets"][0]["sha256"] = "c" * 64
+
+        result = telegram_asset_safety.validate_asset_package([first, duplicate], manifest)
+
+        codes = self.error_codes(result)
+        self.assertIn("duplicate_asset_id", codes)
+        self.assertIn("unsafe_asset_path", codes)
+        self.assertIn("manifest_unknown_field", codes)
+        self.assertIn("manifest_entry_unknown_field", codes)
+        self.assertIn("manifest_sha256_mismatch", codes)
+
+    def test_rejects_mime_extension_mismatch_and_unsupported_types(self):
+        mismatch = self.asset(id="mismatch", path="telegram/mismatch.pdf", mime_type="image/png")
+        unsupported = self.asset(id="unsupported", path="telegram/archive.zip", mime_type="application/zip")
+
+        result = telegram_asset_safety.validate_asset_package(
+            [mismatch, unsupported],
+            self.manifest(mismatch, unsupported),
+        )
+
+        codes = self.error_codes(result)
+        self.assertIn("mime_extension_mismatch", codes)
+        self.assertIn("unsupported_mime_type", codes)
+
+    def test_invalid_size_is_rejected_without_dashboard_crash(self):
+        invalid = self.asset(id="invalid-size", size_bytes="not-a-number")
+        result = telegram_asset_safety.validate_asset_package([invalid], self.manifest(invalid))
+        summary = telegram_asset_safety.dashboard_asset_summary([invalid], result)
+
+        self.assertIn("asset_empty_or_invalid_size", self.error_codes(result))
+        self.assertEqual(summary["assets"][0]["size_bytes"], 0)
+
+    def test_redacts_secrets_in_logs_errors_dashboard_and_simulator_payloads(self):
+        asset = self.asset(caption="password=fake-secret-value")
+        validation = telegram_asset_safety.validate_asset_package([asset], self.manifest(asset))
+        dashboard = telegram_asset_safety.dashboard_asset_summary([asset], validation)
+        rejected = telegram_asset_safety.simulate_telegram_asset_send(
+            {
+                "ok": False,
+                "asset_count": 1,
+                "errors": [
+                    {
+                        "code": "telegram_error",
+                        "message": "token=fake-token-value",
+                        "bot_token": "fake-token-value",
+                    }
+                ],
+            }
+        )
+        dumped = json.dumps({"dashboard": dashboard, "rejected": rejected}, ensure_ascii=False)
+
+        self.assertNotIn("fake-secret-value", dumped)
+        self.assertNotIn("fake-token-value", dumped)
+        self.assertIn("[REDACTED_SECRET]", dumped)
+
+    def test_simulator_covers_success_retry_auth_timeout_and_rejected_paths(self):
+        asset = self.asset()
+        validation = telegram_asset_safety.validate_asset_package([asset], self.manifest(asset))
+
+        success = telegram_asset_safety.simulate_telegram_asset_send(validation, "success")
+        rate_limit = telegram_asset_safety.simulate_telegram_asset_send(validation, "rate_limit")
+        unauthorized = telegram_asset_safety.simulate_telegram_asset_send(validation, "unauthorized")
+        timeout = telegram_asset_safety.simulate_telegram_asset_send(validation, "timeout")
+        rejected = telegram_asset_safety.simulate_telegram_asset_send({"ok": False, "errors": []}, "success")
+
+        self.assertTrue(success["ok"])
+        self.assertFalse(success["external_call_performed"])
+        self.assertEqual(rate_limit["status"], "rate_limited")
+        self.assertTrue(rate_limit["retryable"])
+        self.assertEqual(unauthorized["status"], "unauthorized")
+        self.assertFalse(unauthorized["retryable"])
+        self.assertEqual(timeout["status"], "timeout")
+        self.assertTrue(timeout["retryable"])
+        self.assertEqual(rejected["status"], "rejected")
+
+    def test_dashboard_summary_is_read_only_and_omits_raw_content(self):
+        asset = self.asset(caption="short note")
+        validation = telegram_asset_safety.validate_asset_package([asset], self.manifest(asset))
+
+        summary = telegram_asset_safety.dashboard_asset_summary([asset], validation)
+
+        self.assertTrue(summary["read_only"])
+        self.assertFalse(summary["raw_file_content_included"])
+        self.assertFalse(summary["external_call_performed"])
+        self.assertEqual(summary["assets"][0]["sha256_prefix"], asset["sha256"][:12])
+        self.assertNotIn(asset["sha256"], json.dumps(summary, ensure_ascii=False))
 
 
 class ProgressAwareRunnerTest(unittest.TestCase):

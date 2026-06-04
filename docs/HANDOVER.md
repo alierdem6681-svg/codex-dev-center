@@ -537,3 +537,32 @@ Test:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
+## Telegram Asset Safety Tests Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-103358 / CTO-ACTION-20260604-102221-04-TELEGRAM-ASSET-SAFETY-TESTS
+
+Eklenenler:
+- `supervisor/telegram_asset_safety.py` saf sozlesme modulunu ekledi.
+- Asset kabul, MIME/uzanti, tekil/toplam boyut, asset sayisi, caption limiti, manifest schema/version/checksum/path/duplicate kontrolleri eklendi.
+- Redaction helper log/error/dashboard/simulator payload'larinda secret/env/token/private key benzeri alanlari maskeleyerek test edildi.
+- Telegram simulator basari, rate limit, unauthorized, timeout ve rejected path davranisini dis API cagirmadan kapsar.
+- Dashboard asset summary salt okunur, redacted, checksum prefixli ve raw dosya icerigi olmadan uretilir.
+- Production readiness dashboard route smoke testi mevcut sade dashboard markup sozlesmesine hizalandi.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` icinde `telegram_asset_safety` kayitlari eklendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.TelegramAssetSafetyTest` PASS, 8 test.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 140 test.
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS, 4 test.
+- Geçici `/tmp` repo kopyasında `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0; production deploy ve mutating cloud operation yapılmadı.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; state template dosyalari guncellendi.
