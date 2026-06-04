@@ -242,6 +242,12 @@ Panel `/health` commit ozeti de deploy marker dosyalarini `system_state.json` co
 
 Davranis `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ve health commit summary regresyon testiyle sabitlendi.
 
+## 2026-06-04 Read-Only Analysis Write Tolerance
+
+Direct CTO read-only sandbox icinde `drift_checker.py` ve `production_readiness_suite.py` rapor/state yazamadiginda artik crash etmez. Suite JSON sonucu uretmeye devam eder ve yazma sonucunu `runtime_write_status` altinda `read_only` olarak raporlar.
+
+Davranis `tests/test_runtime_status_model.py` icindeki read-only write tolerance regresyon testleriyle sabitlendi.
+
 ## 2026-06-04 Telegram Asset Manifest Contract Apply
 
 Telegram asset storage backlog icin ilk repo/app degisikligi olarak manifest v1 sozlesmesi sabitlendi. `supervisor/telegram_asset_manifest.py` network kullanmadan manifest alanlarini, SHA-256 formatini, MIME/storage metadata alanlarini, `20971520` byte limitini ve forbidden raw/file URL/sensitive field kontrollerini dogrular.

@@ -2,12 +2,14 @@ import sys
 import tempfile
 import unittest
 import importlib.util
+import errno
 import json
 import contextlib
 import io
 import os
 import time
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +24,7 @@ from supervisor import (  # noqa: E402
     cto_task_router,
     direct_cto_action_mode,
     direct_cto_job_recovery,
+    drift_checker,
     lifecycle_manager,
     production_deploy_controller,
     production_environment_manager,
@@ -1729,6 +1732,36 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
             results["rollback_simulation"]["details"]["contract"]["flag_mismatches"],
             ["git_reset_performed"],
         )
+
+    def test_readiness_writes_are_best_effort_in_read_only_runtime(self):
+        exc = OSError(errno.EROFS, "Read-only file system")
+        self.assertTrue(production_readiness_suite.read_only_write_error(exc))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state" / "payload.json"
+            with mock.patch.object(Path, "write_text", side_effect=exc):
+                text_result = production_readiness_suite.write_text_best_effort(path, "payload\n")
+                json_result = production_readiness_suite.atomic_write_json(path, {"ok": True})
+
+        self.assertFalse(text_result["ok"])
+        self.assertTrue(text_result["read_only"])
+        self.assertFalse(json_result["ok"])
+        self.assertTrue(json_result["read_only"])
+
+    def test_drift_checker_writes_are_best_effort_in_read_only_runtime(self):
+        exc = OSError(errno.EROFS, "Read-only file system")
+        self.assertTrue(drift_checker.read_only_write_error(exc))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state" / "drift_report.json"
+            with mock.patch.object(Path, "write_text", side_effect=exc):
+                text_result = drift_checker.write_text_best_effort(path, "payload\n")
+                json_result = drift_checker.write_json(path, {"ok": True})
+
+        self.assertFalse(text_result["ok"])
+        self.assertTrue(text_result["read_only"])
+        self.assertFalse(json_result["ok"])
+        self.assertTrue(json_result["read_only"])
 
 
 class DirectCtoJobRecoveryTest(unittest.TestCase):

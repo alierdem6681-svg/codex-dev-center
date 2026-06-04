@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import errno
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,14 +38,34 @@ def read_json(path, default):
         pass
     return default
 
+def read_only_write_error(exc):
+    return isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.EROFS
+
+def write_text_best_effort(path, text, encoding="utf-8"):
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding=encoding)
+        return {"ok": True, "path": str(path)}
+    except OSError as exc:
+        return {
+            "ok": False,
+            "path": str(path),
+            "error": type(exc).__name__,
+            "errno": getattr(exc, "errno", None),
+            "read_only": read_only_write_error(exc),
+        }
+
 def write_json(path, data):
     data["updated_at"] = now()
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    return write_text_best_effort(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 def log(msg):
-    LOGS.mkdir(parents=True, exist_ok=True)
-    with (LOGS / "drift_checker.log").open("a", encoding="utf-8") as f:
-        f.write(f"{now()} {msg}\n")
+    try:
+        LOGS.mkdir(parents=True, exist_ok=True)
+        with (LOGS / "drift_checker.log").open("a", encoding="utf-8") as f:
+            f.write(f"{now()} {msg}\n")
+    except OSError:
+        pass
 
 def run_check():
     issues = []
@@ -119,24 +140,25 @@ def run_check():
         "checked_at": now(),
     }
 
-    write_json(STATE / "drift_report.json", result)
+    result["runtime_write_status"] = {
+        "drift_report": write_json(STATE / "drift_report.json", result),
+    }
 
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    (REPORTS / "DRIFT_CHECK_REPORT.md").write_text(
+    result["runtime_write_status"]["report"] = write_text_best_effort(
+        REPORTS / "DRIFT_CHECK_REPORT.md",
         "# DRIFT CHECK REPORT\n\n"
         f"Tarih: {result['checked_at']}\n\n"
         f"Status: {status}\n\n"
         f"Score: {score}\n\n"
         "Issues:\n" + "\n".join([f"- {x}" for x in issues] or ["- Yok"]) + "\n\n"
         "Warnings:\n" + "\n".join([f"- {x}" for x in warnings] or ["- Yok"]) + "\n",
-        encoding="utf-8"
     )
 
     system_state = read_json(STATE / "system_state.json", {})
     system_state["drift_control_implemented"] = True
     system_state["last_drift_check_status"] = status
     system_state["last_drift_check_score"] = score
-    write_json(STATE / "system_state.json", system_state)
+    result["runtime_write_status"]["system_state"] = write_json(STATE / "system_state.json", system_state)
 
     log(f"DRIFT_CHECK status={status} score={score} issues={len(issues)} warnings={len(warnings)}")
     print(json.dumps(result, indent=2, ensure_ascii=False))

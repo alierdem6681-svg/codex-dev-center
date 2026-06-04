@@ -571,6 +571,17 @@ Eklenenler:
 
 ---
 
+## Read-Only Analysis Write Tolerance
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- `supervisor/drift_checker.py` ve `supervisor/production_readiness_suite.py`, Direct CTO read-only sandbox icinde runtime `state/` veya `reports/` yazamadiginda crash etmeden JSON sonucunu uretmeye devam eder.
+- Yazma sonucu `runtime_write_status` icinde `read_only` bilgisiyle raporlanir.
+- Read-only write tolerance davranisi `tests/test_runtime_status_model.py` regresyon testleriyle sabitlendi.
+
+---
+
 ## Dashboard Pipeline Expand State Apply
 
 Tarih: 2026-06-04

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import importlib.util
 import json
 import os
@@ -40,6 +41,25 @@ def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def read_only_write_error(exc: BaseException) -> bool:
+    return isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.EROFS
+
+
+def write_text_best_effort(path: Path, text: str, encoding: str = "utf-8") -> dict[str, Any]:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding=encoding)
+        return {"ok": True, "path": str(path)}
+    except OSError as exc:
+        return {
+            "ok": False,
+            "path": str(path),
+            "error": type(exc).__name__,
+            "errno": getattr(exc, "errno", None),
+            "read_only": read_only_write_error(exc),
+        }
+
+
 def read_json(path: Path, default: Any) -> Any:
     try:
         if path.exists():
@@ -49,12 +69,27 @@ def read_json(path: Path, default: Any) -> Any:
     return default
 
 
-def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def atomic_write_json(path: Path, data: dict[str, Any]) -> dict[str, Any]:
     data["updated_at"] = now()
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
+        return {"ok": True, "path": str(path)}
+    except OSError as exc:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+        return {
+            "ok": False,
+            "path": str(path),
+            "error": type(exc).__name__,
+            "errno": getattr(exc, "errno", None),
+            "read_only": read_only_write_error(exc),
+        }
 
 
 def run_cmd(cmd: list[str], timeout: int = 120) -> dict[str, Any]:
@@ -387,20 +422,19 @@ def staging_and_rollback(results: dict[str, Any]) -> None:
     )
 
     report = REPORTS / "rollback_simulation_last_report.md"
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(
+    report_write = write_text_best_effort(
+        report,
         "# Geri Alma Simulasyonu\n\n"
         f"Tarih: {now()}\n\n"
         "- Sonuc: PASS\n"
         "- Mod: dry-run\n"
         "- Canli komut calistirilmadi.\n",
-        encoding="utf-8",
     )
     record(
         results,
         "rollback_simulation",
-        report.exists() and rollback_contract["ok"],
-        {"report": str(report.relative_to(ROOT)), "result": rollback, "contract": rollback_contract},
+        rollback_contract["ok"] and (report_write["ok"] or report_write.get("read_only")),
+        {"report": str(report.relative_to(ROOT)), "report_write": report_write, "result": rollback, "contract": rollback_contract},
     )
 
 
@@ -573,13 +607,14 @@ def run_suite() -> dict[str, Any]:
         "staging_deploy_performed": False,
         "mutating_cloud_operations_performed": False,
     }
-    atomic_write_json(STATE / "production_readiness_status.json", payload)
-    write_report(payload)
+    payload["runtime_write_status"] = {
+        "state": atomic_write_json(STATE / "production_readiness_status.json", payload),
+    }
+    payload["runtime_write_status"]["report"] = write_report(payload)
     return payload
 
 
-def write_report(payload: dict[str, Any]) -> None:
-    REPORTS.mkdir(parents=True, exist_ok=True)
+def write_report(payload: dict[str, Any]) -> dict[str, Any]:
     lines = [
         "# Production Readiness Last Report",
         "",
@@ -598,7 +633,7 @@ def write_report(payload: dict[str, Any]) -> None:
         "- Staging deploy performed: false",
         "- Mutating cloud operations performed: false",
     ]
-    (REPORTS / "production_readiness_last_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return write_text_best_effort(REPORTS / "production_readiness_last_report.md", "\n".join(lines) + "\n")
 
 
 def main() -> None:
