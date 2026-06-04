@@ -188,7 +188,9 @@
       "command": "{python} supervisor/cto_doctor.py --json",
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
-      "dispatch_contract_metadata_required": true
+      "dispatch_contract_metadata_required": true,
+      "stale_claim_retry_dispatch_enabled": true,
+      "stale_claim_terminal_status": "FAILED_TIMEOUT"
     },
     {
       "id": "cto_doctor_fix",
@@ -200,7 +202,9 @@
       "command": "{python} supervisor/cto_doctor.py --fix --json",
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
-      "dispatch_contract_metadata_required": true
+      "dispatch_contract_metadata_required": true,
+      "stale_claim_retry_dispatch_enabled": true,
+      "stale_claim_terminal_status": "FAILED_TIMEOUT"
     },
     {
       "id": "classify_telegram_asset_intake",

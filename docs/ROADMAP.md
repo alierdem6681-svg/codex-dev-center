@@ -190,7 +190,9 @@ Faz 19B-10A Model Policy
 - [x] Queue task normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini varsayilanlar.
 - [x] Worker claim akisi `worker_id` ve `claimed_at` alanlarini task kaydina yazar.
 - [x] Router subtask dispatch contract ve worker claim metadata davranisi unit test ile sabitlendi.
-- [ ] Retry attempt increment ve stale claim timeout re-dispatch davranisi sonraki kucuk pakete birakildi.
+- [x] Stale `ASSIGNED/RUNNING` claim timeout durumunda aktif worker sahipligi yoksa `attempt` artirilarak yeniden dispatch edilir.
+- [x] `max_attempts` doldugunda stale claim terminal `FAILED_TIMEOUT` olur ve yeniden worker-eligible sayilmaz.
+- [x] Aktif worker ayni `current_task` uzerinde calisiyorsa eski `claimed_at` tek basina redispatch tetiklemez.
 
 ## Faz 35 - Dashboard Gorev Listesi Duzeni
 

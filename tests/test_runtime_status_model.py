@@ -3780,6 +3780,233 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(worker_map["worker-3"]["current_task"], "TASK-PENDING")
         self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-BUSY")
 
+    def test_dispatch_requeues_stale_claim_and_increments_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "ERROR", "current_task": "TASK-STALE"},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STALE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 2,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(result["stale_requeued"][0]["task"], "TASK-STALE")
+        self.assertEqual(task["status"], "ASSIGNED")
+        self.assertEqual(task["assigned_worker"], "worker-2")
+        self.assertEqual(task["worker_id"], "worker-2")
+        self.assertEqual(task["attempt"], 2)
+        self.assertEqual(task["max_attempts"], 2)
+        self.assertEqual(task["last_error_code"], "stale_claim_timeout")
+        self.assertEqual(task["previous_worker_id"], "worker-1")
+        self.assertIsNone(task["claimed_at"])
+        self.assertEqual(worker_map["worker-1"]["current_task"], None)
+        self.assertEqual(worker_map["worker-2"]["current_task"], "TASK-STALE")
+
+    def test_dispatch_marks_stale_claim_terminal_after_max_attempts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-2", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-STALE-DONE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 1,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        self.assertEqual(result["assignments"], [])
+        self.assertEqual(result["stale_terminal"][0]["task"], "TASK-STALE-DONE")
+        self.assertEqual(task["status"], TASK_STATUS_FAILED_TIMEOUT)
+        self.assertEqual(task["last_error_code"], "stale_claim_timeout")
+        self.assertEqual(task["result"], "stale_claim_timeout_max_attempts_reached")
+        self.assertTrue(task["finished_at"])
+        self.assertIsNone(workers["workers"][0]["current_task"])
+
+    def test_dispatch_keeps_active_stale_claim_on_current_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "RUNNING", "current_task": "TASK-ACTIVE"},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-ACTIVE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                                "worker_id": "worker-1",
+                                "claimed_at": "2000-01-01T00:00:00+00:00",
+                                "attempt": 1,
+                                "max_attempts": 2,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+                supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS = 1
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                    supervisor_cli.DISPATCH_STALE_CLAIM_SECONDS,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        task = queue["tasks"][0]
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(result["assignments"], [])
+        self.assertEqual(result["stale_requeued"], [])
+        self.assertEqual(task["status"], "RUNNING")
+        self.assertEqual(task["assigned_worker"], "worker-1")
+        self.assertEqual(task["worker_id"], "worker-1")
+        self.assertEqual(task["attempt"], 1)
+        self.assertEqual(worker_map["worker-2"]["current_task"], None)
+
     def test_wake_now_dispatches_before_starting_worker_services(self):
         calls = []
         originals = (

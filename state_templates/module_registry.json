@@ -68,7 +68,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "worker-1..4 servisleri, görev işleme, dispatch claim metadata, controlled repo apply path validation, control report ve log üretimi.",
+      "description": "worker-1..4 servisleri, görev işleme, dispatch claim metadata, stale claim retry dispatch, controlled repo apply path validation, control report ve log üretimi.",
       "actions": [
         "start_worker",
         "stop_worker",

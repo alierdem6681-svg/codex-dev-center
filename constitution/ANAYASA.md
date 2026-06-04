@@ -36,6 +36,8 @@ Başlangıç rolleri:
 
 Worker dispatch sözleşmesi izlenebilir olmalıdır: queue task kayıtları `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını taşımalı; terminal task statusları yeniden worker kuyruğuna alınmamalıdır.
 
+Stale claim retry kurali kontrolludur: aktif worker state'i ayni task'i sahipleniyorsa dispatcher yeniden atama yapmaz; aktif sahiplik yoksa yalniz `attempt < max_attempts` durumunda ayni task retry dispatch alir, limit doldugunda terminal timeout kaydi olusur.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.

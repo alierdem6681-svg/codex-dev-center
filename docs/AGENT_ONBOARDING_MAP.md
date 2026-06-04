@@ -77,7 +77,7 @@ Ajan şu klasörleri inceler:
 
 Önemli dosyalar:
 
-- supervisor/supervisor_cli.py
+- supervisor/supervisor_cli.py dispatch akisi idle worker atamadan once stale `ASSIGNED/RUNNING` claim timeoutlarini aktif worker sahipligi ve `attempt/max_attempts` siniriyle reconcile eder
 - supervisor/lifecycle_manager.py
 - supervisor/drift_checker.py
 - supervisor/codex_task_executor.py
@@ -138,6 +138,7 @@ Queue/status normalizer notu:
 - Status aliaslari case farki ve yaygin ayirici varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED TIMEOUT` ve `FAILED.TIMEOUT` gibi girdiler standart enumlara cevrilir.
 - Queue normalizasyonu dispatch contract alanlarını da tamamlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
 - Worker claim akışı `worker_id` ve `claimed_at` yazar; bu görünürlük production deploy veya runtime state dışı mutasyon yetkisi vermez.
+- Stale claim retry akisi aktif worker `current_task` sahipligini korur; aktif sahiplik yoksa `attempt < max_attempts` icin ayni task yeniden dispatch edilir, limit doldugunda `FAILED_TIMEOUT` terminal sonucuna iner.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
 - 2026-06-04 owner repair sonrasinda runtime queue bilincli olarak bosaltildi. Snapshot `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup` altindadir; yeni gorevler temiz queue uzerinden alinmalidir.
 

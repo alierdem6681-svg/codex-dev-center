@@ -170,6 +170,8 @@ Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi 
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
 
+Stale `ASSIGNED/RUNNING` claim timeout durumunda dispatcher once worker state'inde ayni `current_task` icin aktif sahiplik olup olmadigini kontrol eder. Aktif sahiplik yoksa `attempt < max_attempts` icin ayni task `attempt + 1` ile yeniden dagitilir; limit dolduysa task `FAILED_TIMEOUT` terminal sonucuna iner.
+
 ## QUALITY GATE STANDARD REPORT V1
 
 `supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

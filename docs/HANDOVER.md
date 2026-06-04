@@ -920,3 +920,33 @@ Test:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Worker Dispatch v2 Stale Claim Retry Apply
+
+Tarih: 2026-06-04
+Görev: CTO-ACTION-20260604-144354-03-WORKER-DISPATCH-V2
+Worker: worker-2
+
+Eklenenler:
+- `supervisor_cli dispatch` idle worker atamadan once stale `ASSIGNED/RUNNING` claim kayitlarini reconcile eder.
+- Aktif worker state'i ayni `current_task` uzerinde `ASSIGNED/RUNNING/REVIEWING` gorunuyorsa eski `claimed_at` tek basina redispatch tetiklemez.
+- Aktif sahiplik yoksa ve `attempt < max_attempts` ise ayni task `attempt + 1` ile `PENDING` olur ve mevcut dispatch dongusunde idle workera atanabilir.
+- Retry limiti dolduysa task `FAILED_TIMEOUT` terminal sonucuna iner, `last_error_code=stale_claim_timeout` ve `finished_at` yazilir.
+- `state_templates`, AGENTS, Anayasa, onboarding ve roadmap dispatch retry kontratina hizalandi.
+
+Test:
+- `python3 -m py_compile supervisor/supervisor_cli.py tests/test_runtime_status_model.py` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest` PASS, 36 test.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 178 test.
+- `python3 -m unittest discover -s tests` PASS, 205 test.
+- `CHECK_MODE=dry_run python3 supervisor/production_readiness_suite.py --json` PASS; state/report yazimlari `write-skipped`.
+- JSON validation PASS: `state_templates/module_settings.json`, `state_templates/action_catalog.json`, `state_templates/module_registry.json`.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; repo template karsiliklari guncellendi.
+- Rollback: bu branch revert edilirse dispatch stale claim retry davranisi onceki metadata-only hale doner; runtime queue icin ek migration gerekmez.
