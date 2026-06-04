@@ -77,6 +77,86 @@
       button.primary { background: #dcebf0; border-color: #c8dce5; }
       .controls { display: grid; gap: 8px; grid-template-columns: 1.3fr repeat(4, minmax(120px, .6fr)); margin-bottom: 10px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .header-actions { align-items: center; position: relative; }
+      .account-menu { position: relative; }
+      .account-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        max-width: min(280px, 48vw);
+        padding: 5px 9px 5px 6px;
+      }
+      .account-avatar {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 28px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #2f5f73;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .account-copy { min-width: 0; text-align: left; }
+      .account-name {
+        display: block;
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--ink);
+        font-weight: 650;
+      }
+      .account-role { display: block; color: var(--muted); font-size: 11px; }
+      .account-panel {
+        position: absolute;
+        z-index: 10;
+        top: calc(100% + 8px);
+        right: 0;
+        width: min(280px, calc(100vw - 28px));
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 14px 30px rgba(32, 36, 44, .16);
+        padding: 10px;
+      }
+      .account-panel[hidden] { display: none; }
+      .account-summary {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 3px 2px 10px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+        min-width: 0;
+      }
+      .account-summary strong {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .menu-item {
+        width: 100%;
+        display: flex;
+        justify-content: flex-start;
+        margin-top: 4px;
+        background: #fff;
+        color: var(--ink);
+      }
+      .menu-item:hover, .menu-item:focus { background: var(--soft); }
+      .menu-item.danger { color: var(--bad); }
+      .profile-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+        min-width: 0;
+      }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
@@ -87,6 +167,9 @@
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
+        .header-actions { width: 100%; justify-content: space-between; }
+        .account-trigger { max-width: calc(100vw - 160px); }
+        .account-panel { left: auto; right: 0; }
       }
     </style>
   </head>
@@ -96,9 +179,29 @@
         <h1>Codex Dev Center Yönetim Paneli</h1>
         <div class="muted">Canlıya alma, görevler, çalışanlar, toparlama ve güvenli GitHub akışı</div>
       </div>
-      <div class="actions">
+      <div class="actions header-actions">
         <span id="clock" class="badge">Yükleniyor</span>
-        <button onclick="logout()">Çıkış</button>
+        <div id="accountMenu" class="account-menu">
+          <button id="accountMenuButton" class="account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenuPanel" onclick="toggleAccountMenu()">
+            <span id="accountAvatar" class="account-avatar">P</span>
+            <span class="account-copy">
+              <span id="accountName" class="account-name">Panel</span>
+              <span class="account-role">Hesap</span>
+            </span>
+          </button>
+          <div id="accountMenuPanel" class="account-panel" role="menu" aria-labelledby="accountMenuButton" hidden>
+            <div class="account-summary">
+              <span id="accountPanelAvatar" class="account-avatar">P</span>
+              <div class="account-copy">
+                <strong id="accountPanelUsername">Panel kullanıcısı</strong>
+                <span id="accountPanelMode" class="account-role">Oturum açık</span>
+              </div>
+            </div>
+            <button class="menu-item" type="button" role="menuitem" onclick="scrollToProfile()">Profil</button>
+            <button class="menu-item" type="button" role="menuitem" onclick="scrollToAccountSettings()">Hesap ayarları</button>
+            <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -169,7 +272,15 @@
           <div id="tasksCards" class="mobile-list"></div>
         </section>
 
-        <section>
+        <section id="accountSettings">
+          <h2 id="profileHeading">Profil</h2>
+          <div id="profileBox" class="profile-box">
+            <span id="profileAvatar" class="account-avatar">P</span>
+            <div class="account-copy">
+              <strong id="profileUsername">Panel kullanıcısı</strong>
+              <div id="profileMeta" class="muted">Oturum açık</div>
+            </div>
+          </div>
           <h2>Ayarlar</h2>
           <div id="settingsBadges"></div>
           <h2 style="margin-top:14px">Son İşlem</h2>
@@ -240,6 +351,52 @@
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
       function tasks(){ return ((latest.tasks || latest.queue || {}).tasks || []).slice(); }
       function workers(){ return ((latest.workers || {}).workers || []).slice(); }
+      function accountDisplayName(data){
+        return String(data?.auth?.username || 'Panel kullanıcısı');
+      }
+      function accountInitials(name){
+        const cleaned = String(name || 'Panel').trim();
+        const parts = cleaned.split(/\s+/).filter(Boolean);
+        const initials = parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : cleaned.slice(0, 2);
+        return (initials || 'P').toLocaleUpperCase('tr-TR');
+      }
+      function setAccountMenuOpen(open, focusMenu = false){
+        accountMenuPanel.hidden = !open;
+        accountMenuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && focusMenu) {
+          const firstItem = accountMenuPanel.querySelector('[role="menuitem"]');
+          if (firstItem) firstItem.focus();
+        }
+      }
+      function toggleAccountMenu(){
+        setAccountMenuOpen(accountMenuPanel.hidden, true);
+      }
+      function closeAccountMenu(refocus = false){
+        if (accountMenuPanel.hidden) return;
+        setAccountMenuOpen(false);
+        if (refocus) accountMenuButton.focus();
+      }
+      function scrollToProfile(){
+        closeAccountMenu();
+        profileHeading.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+      function scrollToAccountSettings(){
+        closeAccountMenu();
+        accountSettings.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+      function renderAccount(data){
+        const name = accountDisplayName(data);
+        const initials = accountInitials(name);
+        const mode = data?.auth?.auth_mode === 'username_password' ? 'Panel hesabı' : 'Panel oturumu';
+        accountName.textContent = name;
+        accountAvatar.textContent = initials;
+        accountPanelUsername.textContent = name;
+        accountPanelAvatar.textContent = initials;
+        accountPanelMode.textContent = mode;
+        profileUsername.textContent = name;
+        profileAvatar.textContent = initials;
+        profileMeta.textContent = mode;
+      }
       function fillFilters(){
         const allTasks = tasks();
         const allWorkers = workers();
@@ -292,6 +449,7 @@
         const ops = data.operations || {};
         const directJobs = data.direct_cto_jobs || {};
         clock.textContent = new Date().toLocaleTimeString();
+        renderAccount(data);
         deployMetric.textContent = actionsState.last_deploy_status || runtime.status || deploy.status || 'Bekliyor';
         stagingMetric.textContent = staging.status || (deploy.staging_deploy_performed ? 'PASS' : 'Bekliyor');
         rollbackMetric.textContent = rollback.status || (deploy.rollback_performed ? 'PASS' : 'Bekliyor');
@@ -401,6 +559,35 @@
         await fetch('/api/auth/logout', {method:'POST'});
         location.href = '/login';
       }
+      document.addEventListener('click', event => {
+        if (!accountMenu.contains(event.target)) closeAccountMenu();
+      });
+      accountMenuButton.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setAccountMenuOpen(true, true);
+        }
+      });
+      accountMenuPanel.addEventListener('keydown', event => {
+        const items = [...accountMenuPanel.querySelectorAll('[role="menuitem"]')];
+        const index = items.indexOf(document.activeElement);
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeAccountMenu(true);
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          items[(index + 1) % items.length]?.focus();
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          items[(index - 1 + items.length) % items.length]?.focus();
+        } else if (event.key === 'Home') {
+          event.preventDefault();
+          items[0]?.focus();
+        } else if (event.key === 'End') {
+          event.preventDefault();
+          items[items.length - 1]?.focus();
+        }
+      });
       [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
       refresh();
       setInterval(refresh, 5000);

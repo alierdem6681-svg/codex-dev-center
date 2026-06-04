@@ -102,6 +102,7 @@ Dashboard status API notu:
 - Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
 - Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
 - `/api/pipeline-flow` ana ve legacy panelde read-only pipeline stage payload'u dondurur; raw mesaj, uzun description, stdout/stderr, log veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalmalidir.
+- Dashboard header profile/account menu mevcut `auth.username` degerini kullanir; profil, hesap ayarlari ve cikis aksiyonlari yeni secret veya auth state mutasyonu gerektirmeden `web_panel/static/index.html` icinde tutulur.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.

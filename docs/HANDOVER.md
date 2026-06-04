@@ -497,3 +497,21 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Dashboard Profile / Account Menu Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-083001 / CTO-TASK-20260604-082503-842096-DASHBOARD-PROFILE-ACCOUNT-MENU
+
+Eklenenler:
+- Dashboard header içindeki tekil çıkış butonu erişilebilir profile/account menüsüne taşındı.
+- Menü mevcut `/api/status` `auth.username` bilgisini gösterir; profil, hesap ayarları ve çıkış aksiyonları sunar.
+- Profil özeti dashboard ayarlar alanına eklendi; yeni secret/env/token/private key veya auth storage değişikliği yapılmadı.
+- Menü dış tık, Escape ve ok tuşlarıyla kapanma/gezinti davranışı içerir.
+- `tests/test_dashboard_account_menu_markup.py` içinde account menu markup ve logout endpoint regresyon testi eklendi.
+
+Not:
+- Production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

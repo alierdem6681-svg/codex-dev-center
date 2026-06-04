@@ -37,7 +37,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Username/password login, signed session cookie and safe first-user setup for the management panel.",
+      "description": "Username/password login, signed session cookie, dashboard profile/account menu and safe first-user setup for the management panel.",
       "actions": [
         "panel_login",
         "panel_logout",

@@ -211,3 +211,9 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Dashboard Profile / Account Menu Apply
+
+Dashboard header icindeki tek cikis butonu profile/account menusu olarak genisletildi. Menu mevcut `/api/status` `auth.username` bilgisini kullanir, profil ozeti ve hesap ayarlari kisayollariyla ayni dashboard icinde kalir ve cikis islemini mevcut `/api/auth/logout` endpointine bagli tutar.
+
+Bu paket auth/session backend davranisini, secret/env/token/private key degerlerini veya runtime auth state dosyalarini degistirmedi. Production deploy, staging deploy, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

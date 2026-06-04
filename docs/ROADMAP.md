@@ -182,3 +182,11 @@ Faz 19B-10A Model Policy
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
 - [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+
+## Faz 34 - Dashboard Profile / Account Menu
+
+- [x] Dashboard header cikis butonu profile/account menu icine tasindi.
+- [x] Menu mevcut auth username bilgisini gosterir.
+- [x] Profil, hesap ayarlari ve cikis aksiyonlari dashboard icinde erisilebilir hale getirildi.
+- [x] Klavye/dış tık kapatma davranisi statik markup testiyle sabitlendi.
+- [ ] Ayrı profil/hesap ayarları sayfası gerekiyorsa sonraki kucuk pakete birakildi.
