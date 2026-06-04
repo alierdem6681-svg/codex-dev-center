@@ -18,6 +18,7 @@ from supervisor import (  # noqa: E402
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
+    cto_task_router,
     direct_cto_job_recovery,
     lifecycle_manager,
     production_deploy_controller,
@@ -104,6 +105,36 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual([change["id"] for change in changes], ["TASK-READY", "TASK-DONE"])
         self.assertEqual(changes[0]["to_status"], TASK_STATUS_READY_FOR_VALIDATION)
         self.assertEqual(changes[1]["to_status"], TASK_STATUS_DONE)
+
+    def test_router_subtasks_get_dispatch_contract_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Worker Dispatch v2",
+                message="worker queue pipeline",
+                risk="medium",
+                split=True,
+            )
+
+        parent = result["task"]
+        subtasks = result["subtasks"]
+
+        self.assertEqual(parent["root_task_id"], parent["id"])
+        self.assertEqual(parent["dispatch_id"], parent["id"])
+        self.assertEqual(parent["attempt"], 1)
+        self.assertEqual(parent["max_attempts"], 1)
+        self.assertIsNone(parent["claimed_at"])
+        self.assertIsNone(parent["finished_at"])
+        self.assertEqual(len(subtasks), 3)
+        for subtask in subtasks:
+            self.assertEqual(subtask["root_task_id"], parent["id"])
+            self.assertEqual(subtask["dispatch_id"], subtask["id"])
+            self.assertEqual(subtask["attempt"], 1)
+            self.assertEqual(subtask["max_attempts"], 1)
+            self.assertEqual(subtask["last_error_code"], "")
+            self.assertIsNone(subtask["claimed_at"])
+            self.assertIsNone(subtask["finished_at"])
 
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
@@ -516,6 +547,77 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertIsNone(claimed)
         self.assertEqual(payload["tasks"][0]["status"], "RUNNING")
         self.assertEqual(payload["tasks"][1]["status"], "PENDING")
+
+    def test_worker_does_not_claim_terminal_dispatch_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-TERMINAL",
+                                "status": TASK_STATUS_READY_FOR_VALIDATION,
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                                "worker_eligible": True,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                claimed = worker_runner.claim_task("worker-1")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(claimed)
+        self.assertEqual(payload["tasks"][0]["status"], TASK_STATUS_READY_FOR_VALIDATION)
+
+    def test_worker_claim_records_dispatch_claim_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-CLAIM",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            try:
+                claimed = worker_runner.claim_task("worker-2")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIsNotNone(claimed)
+        self.assertEqual(claimed["status"], TASK_STATUS_RUNNING)
+        self.assertEqual(claimed["assigned_worker"], "worker-2")
+        self.assertEqual(claimed["worker_id"], "worker-2")
+        self.assertEqual(claimed["root_task_id"], "TASK-CLAIM")
+        self.assertEqual(claimed["dispatch_id"], "TASK-CLAIM")
+        self.assertEqual(claimed["attempt"], 1)
+        self.assertEqual(claimed["max_attempts"], 1)
+        self.assertTrue(claimed["claimed_at"])
+        self.assertEqual(claimed["claimed_at"], claimed["started_at"])
+        self.assertEqual(payload["tasks"][0]["worker_id"], "worker-2")
+        self.assertEqual(payload["tasks"][0]["claimed_at"], claimed["claimed_at"])
 
     def test_late_progress_update_does_not_reopen_finished_task(self):
         with tempfile.TemporaryDirectory() as tmp:

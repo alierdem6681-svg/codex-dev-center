@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:30:51+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -61,7 +61,8 @@
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_report_checklist": true,
-    "repo_apply_runtime_artifacts_ignored": true
+    "repo_apply_runtime_artifacts_ignored": true,
+    "worker_claim_writes_dispatch_metadata": true
   },
   "telegram": {
     "enabled": false,
@@ -85,6 +86,17 @@
     "standard_statuses_required": true,
     "status_alias_space_hyphen_normalization": true,
     "status_alias_separator_normalization": true,
+    "dispatch_contract_metadata_required": true,
+    "dispatch_contract_fields": [
+      "root_task_id",
+      "dispatch_id",
+      "worker_id",
+      "attempt",
+      "max_attempts",
+      "last_error_code",
+      "claimed_at",
+      "finished_at"
+    ],
     "telegram_parent_tasks_worker_eligible": false,
     "worker_subtasks_source": "cto",
     "audit_log": "logs/cto_audit.ndjson",

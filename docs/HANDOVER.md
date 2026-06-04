@@ -497,3 +497,20 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Worker Dispatch v2 Apply Retry - Dispatch Contract Metadata
+
+Tarih: 2026-06-04
+
+Görev: CTO-DISPATCH-20260604-082648-CTO-TASK-20260604-082503-854382-WORKER-DISPATCH-V2
+
+Eklenenler:
+- Queue task normalizasyonu dispatch contract alanlarını varsayılanlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
+- Worker claim akışı task'i `RUNNING` yaparken `worker_id` ve `claimed_at` alanlarını yazar.
+- Router subtask metadata ve worker claim metadata davranışı unit test ile sabitlendi.
+- AGENTS, Anayasa, onboarding, roadmap, memory ve state template kayıtları güncellendi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
