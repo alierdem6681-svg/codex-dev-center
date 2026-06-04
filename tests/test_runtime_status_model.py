@@ -29,6 +29,7 @@ from supervisor import (  # noqa: E402
     supervisor_cli,
     task_recovery_engine,
     task_validation_engine,
+    telegram_bridge,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
     telegram_health_watcher,
@@ -682,6 +683,24 @@ class ProgressAwareRunnerTest(unittest.TestCase):
 
 
 class TelegramAsyncRoutingTest(unittest.TestCase):
+    def test_legacy_telegram_bridge_polling_disabled_when_direct_cto_owns_bot(self):
+        config = {"direct_cto_mode": True, "old_bridge_disabled": True}
+
+        self.assertFalse(
+            telegram_bridge.bridge_polling_enabled(config=config, module_settings={}, env={})
+        )
+
+    def test_legacy_telegram_bridge_polling_env_can_override_for_manual_maintenance(self):
+        config = {"direct_cto_mode": True, "old_bridge_disabled": True}
+
+        self.assertTrue(
+            telegram_bridge.bridge_polling_enabled(
+                config=config,
+                module_settings={},
+                env={"CODEX_TELEGRAM_BRIDGE_POLLING_ENABLED": "1"},
+            )
+        )
+
     def test_direct_cto_async_job_has_progress_paths(self):
         self.assertTrue(hasattr(direct_cto_async_job, "REPORTS"))
         self.assertTrue(hasattr(direct_cto_async_job, "JOBS"))

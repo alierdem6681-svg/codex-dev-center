@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import json
+import os
 import time
 import urllib.parse
 import urllib.request
@@ -13,6 +14,10 @@ STATE = APP / "state"
 LOGS = APP / "logs"
 
 OFFSET_FILE = STATE / "telegram_update_offset.txt"
+
+
+def truthy(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -65,6 +70,38 @@ def read_json(path, default):
     except Exception:
         pass
     return default
+
+
+def bridge_polling_enabled(config=None, module_settings=None, env=None):
+    env = os.environ if env is None else env
+    override = str(env.get("CODEX_TELEGRAM_BRIDGE_POLLING_ENABLED", "")).strip()
+    if override:
+        return truthy(override)
+
+    if config is None:
+        config = read_json(STATE / "telegram_config.json", {})
+    if module_settings is None:
+        module_settings = read_json(
+            STATE / "module_settings.json",
+            read_json(APP / "state_templates/module_settings.json", {}),
+        )
+
+    telegram_settings = {}
+    if isinstance(module_settings, dict):
+        telegram_settings = module_settings.get("telegram", {}) or {}
+
+    if config.get("old_bridge_disabled") is True or telegram_settings.get("old_bridge_disabled") is True:
+        return False
+    if config.get("direct_cto_mode") is True or telegram_settings.get("direct_cto_mode") is True:
+        return False
+    return True
+
+
+def idle_when_direct_cto_owns_polling():
+    with (LOGS / "telegram_bridge.log").open("a", encoding="utf-8") as f:
+        f.write(f"{now()} telegram bridge polling disabled; direct_cto_owns_polling=true\n")
+    while True:
+        time.sleep(60)
 
 def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +193,9 @@ def handle_message(token, expected_chat_id, msg):
 def main():
     STATE.mkdir(parents=True, exist_ok=True)
     LOGS.mkdir(parents=True, exist_ok=True)
+
+    if not bridge_polling_enabled():
+        idle_when_direct_cto_owns_polling()
 
     token = secret_value("codex-telegram-bot-token")
     chat_id = secret_value("codex-telegram-chat-id")
