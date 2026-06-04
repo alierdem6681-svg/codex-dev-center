@@ -3079,16 +3079,16 @@ class TaskValidationEngineTest(unittest.TestCase):
         )
         return runtime
 
-    def test_ready_proposal_becomes_proposal_done_only_with_pipeline_pass(self):
+    def test_ready_proposal_becomes_proposal_done_without_pipeline_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runtime = self.write_ready_runtime(tmp, pipeline_status="PASS")
+            runtime = self.write_ready_runtime(tmp, pipeline_status="FAIL")
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
         self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
-        self.assertEqual(queue["tasks"][0]["pipeline_status"], "PASS")
+        self.assertEqual(queue["tasks"][0]["pipeline_status"], "NOT_REQUIRED")
         self.assertEqual(queue["tasks"][0]["deployment_status"], "APPLY_REQUIRED")
         self.assertFalse(queue["tasks"][0]["production_deployed"])
 
@@ -3106,11 +3106,15 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_DONE)
         self.assertEqual(queue["tasks"][0]["deployment_status"], "READY_FOR_DEPLOY")
 
-    def test_pipeline_failure_does_not_mark_task_done(self):
+    def test_pipeline_failure_does_not_mark_repo_applied_task_done(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.write_ready_runtime(tmp, pipeline_status="FAIL")
+            queue_path = runtime / "state" / "task_queue.json"
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            queue["tasks"][0]["repo_applied"] = True
+            queue_path.write_text(json.dumps(queue), encoding="utf-8")
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
-            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
         self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PIPELINE_FAILED)

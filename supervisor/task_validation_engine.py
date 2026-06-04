@@ -357,6 +357,24 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
             "critical_operation_findings": findings,
         }
 
+    repo_applied = bool(
+        task.get("repo_applied")
+        or task.get("branch_merged")
+        or str(task.get("delivery_level") or "").upper() in {"READY_FOR_DEPLOY", "MERGED", "DEPLOYED"}
+    )
+
+    if not repo_applied:
+        return {
+            "task_id": task_id,
+            "target_status": TASK_STATUS_PROPOSAL_DONE,
+            "result": "validated_worker_proposal_ready_for_apply",
+            "validation_status": "PASS",
+            "pipeline_status": "NOT_REQUIRED",
+            "workspace": str(workspace) if workspace else "",
+            "created_files": files,
+            "critical_operation_findings": [],
+        }
+
     if pipeline.get("status") != "PASS":
         target_status = None
         result = "pipeline_gate_not_passed"
@@ -374,15 +392,10 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
             "critical_operation_findings": [],
         }
 
-    repo_applied = bool(
-        task.get("repo_applied")
-        or task.get("branch_merged")
-        or str(task.get("delivery_level") or "").upper() in {"READY_FOR_DEPLOY", "MERGED", "DEPLOYED"}
-    )
     return {
         "task_id": task_id,
-        "target_status": TASK_STATUS_DONE if repo_applied else TASK_STATUS_PROPOSAL_DONE,
-        "result": "validated_repo_change_pipeline_passed" if repo_applied else "validated_worker_proposal_ready_for_apply",
+        "target_status": TASK_STATUS_DONE,
+        "result": "validated_repo_change_pipeline_passed",
         "validation_status": "PASS",
         "pipeline_status": "PASS",
         "workspace": str(workspace) if workspace else "",
