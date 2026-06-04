@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:42:01+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -28,6 +28,21 @@
       "endpoint": "/api/pipeline-flow",
       "redacts_raw_messages": true,
       "redacts_terminal_output": true
+    },
+    {
+      "id": "telegram_asset_manifest_contract",
+      "label": "Telegram Asset Manifest Sözleşmesi",
+      "module": "telegram",
+      "risk": "medium",
+      "enabled": false,
+      "requires_approval": false,
+      "runtime_mutating": true,
+      "production_deploy_required": false,
+      "runtime_inbox_env": "RUNTIME_ASSET_INBOX_DIR",
+      "manifest_schema_version": 1,
+      "max_bytes": 20971520,
+      "stores_bot_token_or_download_url": false,
+      "stores_raw_asset_in_repo": false
     },
     {
       "id": "panel_first_user_setup",

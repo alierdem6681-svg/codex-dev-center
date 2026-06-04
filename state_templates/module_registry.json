@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:42:01+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -84,11 +84,12 @@
       "settings_enabled": true,
       "actions_enabled": false,
       "dashboard_visible": true,
-      "description": "Raw input passthrough ve non-mutating output guard ile Telegram bağlantısı.",
+      "description": "Raw input passthrough, non-mutating output guard ve runtime-only asset manifest sözleşmesi ile Telegram bağlantısı.",
       "actions": [
         "connect_telegram",
         "test_telegram",
-        "toggle_telegram_notifications"
+        "toggle_telegram_notifications",
+        "telegram_asset_manifest_contract"
       ]
     },
     {

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:42:01+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -68,6 +68,16 @@
     "enabled": false,
     "raw_input_passthrough": true,
     "non_mutating_output_guard": true,
+    "asset_storage_enabled": false,
+    "asset_runtime_inbox_env": "RUNTIME_ASSET_INBOX_DIR",
+    "asset_default_runtime_inbox": "state/telegram_assets/inbox",
+    "asset_manifest_schema_version": 1,
+    "asset_max_bytes": 20971520,
+    "asset_telegram_bot_api_max_bytes": 20971520,
+    "asset_hash_chat_id_in_manifest": true,
+    "asset_store_file_path_in_manifest": false,
+    "asset_store_bot_token_or_download_url": false,
+    "asset_allowed_mime_env": "TELEGRAM_ASSET_ALLOWED_MIME",
     "health_auto_report_enabled": false,
     "health_report_manual_only": true,
     "send_long_code_outputs": false,

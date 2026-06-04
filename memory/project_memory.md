@@ -227,3 +227,17 @@ Dashboard Gorevler listesi artik render oncesinde deterministik comparator kulla
 Canli gorev algisi `DEPLOYED`, `isLive`, `liveAt`, `deployment_status`, `delivery_level=DEPLOYED` ve `production_deployed` sinyallerini okur. Filtre option'lari runtime yenilemelerinde gereksiz yeniden yazilmaz, secili filtre korunur.
 
 Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Telegram Asset Storage And Manifest Apply
+
+Telegram asset storage icin `supervisor/telegram_asset_store.py` eklendi. Modul Telegram document/photo/audio/video/voice/animation gibi asset metadata'sini alabilir, runtime-only inbox altina blob yazar ve `manifest.json` schema v1 uretir.
+
+Guvenlik sozlesmesi:
+- Ham asset repo icine yazilmaz.
+- Bot token, Telegram download URL'i, Telegram `file_path`, raw dosya byte'i ve raw kullanici mesaji manifest/log kapsaminda tutulmaz.
+- `chat_id` manifestte SHA-256 hash olarak saklanir.
+- `TELEGRAM_ASSET_MAX_BYTES` 20 MB Bot API ust limitinin uzerine cikamaz.
+
+Davranis `tests/test_runtime_status_model.py` icinde basarili blob/manifest, declared size limit, Content-Length limit, stream limit cleanup, photo secimi ve sanitizer testleriyle sabitlendi. Bu paket mevcut Telegram polling akisini canli asset indirmeye baglamadi; production deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+Production readiness suite dashboard route smoke metinleri scenic dashboard shell sonrasindaki guncel panel sinyalleriyle hizalandi. Full unit test ve readiness suite PASS oldu; staging/production deploy calistirilmadi.

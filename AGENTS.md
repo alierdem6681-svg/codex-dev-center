@@ -44,6 +44,11 @@ Ancak şunlar Telegram'a gönderilmemelidir:
 
 Bu teknik çıktılar logs/ ve reports/ altına yazılmalıdır.
 
+Telegram asset kuralı:
+- Ham Telegram dosyası repo içine yazılmaz.
+- Bot token, Telegram download URL'i, raw dosya byte'ı ve raw kullanıcı mesajı manifest/log/Telegram cevabına yazılmaz.
+- Asset storage sadece runtime-only inbox ve manifest sözleşmesi üzerinden ilerler.
+
 ## Canlı Ortam Kuralı
 
 Sistem canlıya alma hazırlığı yapabilir. Production deploy sadece GitHub Actions `Deploy to VM` workflow'u üzerinden yapılır. VM'ye doğrudan SSH ile bağlanma, production runtime dosyalarına elle müdahale etme ve terminalden production deploy çalıştırma yasaktır.

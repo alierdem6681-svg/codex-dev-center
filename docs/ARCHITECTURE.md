@@ -63,3 +63,7 @@ reports/
 
 backups/
 - Yedekler
+
+## Telegram Asset Storage
+
+Telegram dosya/fotoğraf assetleri repo içine yazılmaz. `supervisor/telegram_asset_store.py` runtime-only inbox altında `telegram/YYYY/MM/DD/<asset_id>/blob` ve `manifest.json` üretir. Manifest v1 sözleşmesi `docs/TELEGRAM_ASSET_MANIFEST.md` içindedir; bot token, download URL, raw dosya byte'ı ve raw kullanıcı mesajı manifest veya loglara yazılmaz.

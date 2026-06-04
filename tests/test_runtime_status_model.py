@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 import importlib.util
+import hashlib
 import json
 import contextlib
 import io
@@ -31,6 +32,7 @@ from supervisor import (  # noqa: E402
     supervisor_cli,
     task_recovery_engine,
     task_validation_engine,
+    telegram_asset_store,
     telegram_bridge,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
@@ -946,6 +948,153 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             ],
         )
         self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-1", "worker-3", "worker-2", "worker-4"])
+
+    def test_telegram_asset_store_writes_blob_and_manifest_without_path_or_token_leakage(self):
+        class Response:
+            def __init__(self, payload):
+                self.payload = io.BytesIO(payload)
+                self.headers = {"Content-Length": str(len(payload))}
+
+            def read(self, size=-1):
+                return self.payload.read(size)
+
+        data = b"%PDF-1.4\nasset fixture\n"
+        metadata = telegram_asset_store.TelegramAssetMetadata(
+            kind="document",
+            file_id="FILE-ID-1",
+            file_unique_id="UNIQUE-ID-1",
+            file_name="../../customer/file.pdf",
+            declared_mime="application/pdf",
+            file_size=len(data),
+            chat_id="123456",
+            message_id=99,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = telegram_asset_store.RuntimeAssetStore(
+                inbox_root=Path(tmp),
+                policy=telegram_asset_store.AssetLimitPolicy(max_bytes=1024),
+                clock=lambda: "2026-06-04T10:22:55Z",
+                asset_id_factory=lambda: "ASSET-TEST-1",
+            )
+            stored = store.store_stream(metadata, Response(data), file_path_present=True)
+            manifest = json.loads(stored.manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(stored.blob_path.read_bytes(), data)
+            self.assertEqual(stored.blob_path.relative_to(Path(tmp)).as_posix(), "telegram/2026/06/04/ASSET-TEST-1/blob")
+            self.assertNotIn("customer", stored.blob_path.as_posix())
+            self.assertEqual(manifest["schema_version"], 1)
+            self.assertEqual(manifest["telegram"]["file_id"], "FILE-ID-1")
+            self.assertEqual(manifest["telegram"]["file_path_present"], True)
+            self.assertNotIn("file_path", manifest["telegram"])
+            self.assertTrue(manifest["telegram"]["chat_id"].startswith("sha256:"))
+            self.assertNotEqual(manifest["telegram"]["chat_id"], "123456")
+            self.assertEqual(manifest["original"]["detected_mime"], "application/pdf")
+            self.assertEqual(manifest["original"]["size_bytes"], len(data))
+            self.assertEqual(manifest["original"]["sha256"], hashlib.sha256(data).hexdigest())
+            self.assertEqual(telegram_asset_store.manifest_schema_errors(manifest), [])
+
+    def test_telegram_asset_ingest_rejects_declared_oversize_before_getfile(self):
+        message = {
+            "message_id": 7,
+            "chat": {"id": "123"},
+            "document": {
+                "file_id": "FILE-ID-2",
+                "file_unique_id": "UNIQUE-ID-2",
+                "file_name": "large.bin",
+                "mime_type": "application/octet-stream",
+                "file_size": 50,
+            },
+        }
+
+        def fail_get_file(_token, _file_id):
+            raise AssertionError("getFile must not be called for declared oversize assets")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_token = "123456789:" + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
+            with self.assertRaises(telegram_asset_store.AssetRejected) as ctx:
+                telegram_asset_store.ingest_telegram_asset(
+                    message,
+                    fake_token,
+                    inbox_root=Path(tmp),
+                    policy=telegram_asset_store.AssetLimitPolicy(max_bytes=10),
+                    get_file_call=fail_get_file,
+                )
+
+        self.assertEqual(ctx.exception.reason, "file_size_limit_exceeded")
+
+    def test_telegram_asset_store_rejects_content_length_without_manifest(self):
+        class Response:
+            headers = {"Content-Length": "11"}
+
+            def read(self, _size=-1):
+                raise AssertionError("stream must not be read when Content-Length exceeds policy")
+
+        metadata = telegram_asset_store.TelegramAssetMetadata(kind="document", file_id="FILE-ID-3")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = telegram_asset_store.RuntimeAssetStore(
+                inbox_root=Path(tmp),
+                policy=telegram_asset_store.AssetLimitPolicy(max_bytes=10),
+                clock=lambda: "2026-06-04T10:22:55Z",
+                asset_id_factory=lambda: "ASSET-TEST-2",
+            )
+            with self.assertRaises(telegram_asset_store.AssetRejected) as ctx:
+                store.store_stream(metadata, Response(), file_path_present=True)
+
+            self.assertEqual(ctx.exception.reason, "content_length_limit_exceeded")
+            self.assertEqual(list(Path(tmp).rglob("manifest.json")), [])
+            self.assertEqual(list(Path(tmp).rglob("blob")), [])
+
+    def test_telegram_asset_store_cleans_part_file_on_stream_limit_rejection(self):
+        class Response:
+            headers = {}
+
+            def __init__(self):
+                self.payload = io.BytesIO(b"123456")
+
+            def read(self, size=-1):
+                return self.payload.read(size)
+
+        metadata = telegram_asset_store.TelegramAssetMetadata(kind="document", file_id="FILE-ID-4")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = telegram_asset_store.RuntimeAssetStore(
+                inbox_root=Path(tmp),
+                policy=telegram_asset_store.AssetLimitPolicy(max_bytes=5),
+                clock=lambda: "2026-06-04T10:22:55Z",
+                asset_id_factory=lambda: "ASSET-TEST-3",
+            )
+            with self.assertRaises(telegram_asset_store.AssetRejected) as ctx:
+                store.store_stream(metadata, Response(), file_path_present=True, chunk_size=2)
+
+            self.assertEqual(ctx.exception.reason, "stream_size_limit_exceeded")
+            self.assertEqual(list(Path(tmp).rglob("*.part")), [])
+            self.assertEqual(list(Path(tmp).rglob("manifest.json")), [])
+            self.assertEqual(list(Path(tmp).rglob("blob")), [])
+
+    def test_telegram_asset_helpers_select_largest_photo_and_redact_download_url(self):
+        message = {
+            "message_id": 8,
+            "chat": {"id": "123"},
+            "photo": [
+                {"file_id": "SMALL", "file_unique_id": "U1", "file_size": 10, "width": 10, "height": 10},
+                {"file_id": "LARGE", "file_unique_id": "U2", "file_size": 20, "width": 100, "height": 100},
+            ],
+        }
+
+        metadata = telegram_asset_store.extract_telegram_asset(message)
+        self.assertEqual(metadata.file_id, "LARGE")
+        self.assertEqual(metadata.declared_mime, "image/jpeg")
+
+        fake_token = "123456789:" + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
+        raw_error = (
+            "failed https://api.telegram.org/file/bot" + fake_token + "/docs/file.pdf "
+            "token=" + fake_token
+        )
+        redacted = telegram_asset_store.sanitize_telegram_asset_error(raw_error)
+        self.assertNotIn("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef", redacted)
+        self.assertIn("[TELEGRAM_FILE_URL_REDACTED]", redacted)
 
     def test_dashboard_pipeline_expand_action_mode_builds_specific_backlog(self):
         tasks = direct_cto_action_mode.build_backlog(

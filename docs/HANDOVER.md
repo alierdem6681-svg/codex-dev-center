@@ -537,3 +537,33 @@ Test:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
+## Telegram Asset Storage And Manifest Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-103216 / CTO-ACTION-20260604-102221-02-TELEGRAM-ASSET-STORAGE-MANIFEST
+
+Eklenenler:
+- `supervisor/telegram_asset_store.py` runtime-only Telegram asset storage modülü.
+- `docs/TELEGRAM_ASSET_MANIFEST.md` manifest v1 sözleşmesi.
+- `tests/test_runtime_status_model.py` içinde blob/manifest, size limit, cleanup ve sanitizer regresyonları.
+- Telegram module state template kayıtlarında asset storage ayarları.
+- `supervisor/production_readiness_suite.py` dashboard route smoke metinleri mevcut scenic dashboard shell ile hizalandı.
+
+Yeni davranış:
+- Telegram asset blob'u `${RUNTIME_ASSET_INBOX_DIR}/telegram/YYYY/MM/DD/<asset_id>/blob` altında tutulur.
+- `manifest.json` SHA-256, declared/detected MIME, size, hashlenmiş `chat_id` ve `file_path_present` içerir.
+- Telegram `file_path`, bot token, download URL, raw dosya byte'ı ve raw kullanıcı mesajı manifestte tutulmaz.
+- Declared size, HTTP `Content-Length` ve stream byte sayacı 20 MB Bot API üst limitine göre kontrol edilir.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model tests.test_dashboard_account_menu_markup` PASS, 140 test.
+- `python3 supervisor/production_readiness_suite.py --json` PASS, production/staging deploy yapılmadı.
+
+Not:
+- Modül mevcut Telegram polling/handler akışına bağlanmadı; canlı Telegram asset indirme bu paketle aktif edilmedi.
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

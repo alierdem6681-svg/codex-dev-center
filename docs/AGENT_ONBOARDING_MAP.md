@@ -90,6 +90,7 @@ Ajan şu klasörleri inceler:
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/telegram_asset_store.py Telegram dosya/fotoğraf assetleri için runtime-only blob + manifest v1 storage sözleşmesini uygular
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -97,6 +98,7 @@ Ajan şu klasörleri inceler:
 - web_panel/panel_server.py
 - docs/STAGING_ROLLBACK_READINESS_PLAN.md
 - docs/PRODUCTION_READINESS_GATE.md
+- docs/TELEGRAM_ASSET_MANIFEST.md
 - docs/worker_queue_production_sync_repair_20260604_054726.md
 
 Dashboard status API notu:
@@ -112,6 +114,11 @@ Controlled apply notu:
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
+
+Telegram asset notu:
+- Runtime asset inbox repo dışı/generated kabul edilir; ham asset dosyaları commit edilmez.
+- Manifest v1 `schema_version=1`, `asset_id`, Telegram metadata, declared/detected MIME, size, SHA-256 ve policy alanlarını taşır.
+- Manifest/log/Telegram cevabı bot token, download URL, raw dosya byte'ı, raw kullanıcı mesajı veya Telegram `file_path` değerini içermemelidir.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

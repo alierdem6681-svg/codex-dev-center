@@ -198,3 +198,12 @@ Faz 19B-10A Model Policy
 - [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
+
+## Faz 36 - Telegram Asset Storage And Manifest
+
+- [x] Runtime-only Telegram asset store modülü eklendi.
+- [x] Blob + `manifest.json` v1 sözleşmesi dokümante edildi.
+- [x] 20 MB Bot API üst limiti, declared size, `Content-Length` ve stream byte sayacı kontrolü testle sabitlendi.
+- [x] Manifestte SHA-256, declared/detected MIME, hashlenmiş `chat_id` ve `file_path_present` alanları tutulur.
+- [x] Bot token, download URL, raw dosya byte'ı ve raw kullanıcı mesajı manifest/log kapsamı dışında bırakıldı.
+- [ ] Telegram intake backend bu store modülünü canlı mesaj akışına sonraki küçük pakette bağlayacak.
