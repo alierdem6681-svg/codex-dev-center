@@ -100,15 +100,18 @@
     "enabled": true,
     "standard_report_enabled": true,
     "standard_report_source": "state/production_readiness_status.json",
+    "standard_readiness_policy_source": "state_templates/production_readiness_policy.json",
     "standard_report_json": "reports/quality-gate-report.json",
     "standard_report_summary": "reports/quality-gate-summary.md",
     "required_checks": [
       "lint",
       "unit_test",
       "integration_test",
-      "simulation_dry_run"
+      "simulation_dry_run",
+      "readiness_full"
     ],
     "missing_artifact_fails_gate": true,
+    "policy_required_gates_must_pass": true,
     "simulation_requires_non_mutating_flags": true
   },
   "production_environment_manager": {

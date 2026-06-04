@@ -203,7 +203,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Codex çalışmadan önce preflight, test suite, diff ve standart kalite kapısı raporu üretir.",
+      "description": "Codex çalışmadan önce preflight, test suite, diff ve readiness policy zorunlu gate'lerini doğrulayan standart kalite kapısı raporu üretir.",
       "actions": [
         "codex_preflight",
         "codex_test_suite",

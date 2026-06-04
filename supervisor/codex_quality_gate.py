@@ -14,6 +14,7 @@ REPORTS = APP / "reports"
 LOGS = APP / "logs"
 
 STANDARD_REPORT_SOURCE = "state/production_readiness_status.json"
+STANDARD_READINESS_POLICY_SOURCE = "state_templates/production_readiness_policy.json"
 STANDARD_REPORT_JSON = "quality-gate-report.json"
 STANDARD_REPORT_SUMMARY = "quality-gate-summary.md"
 
@@ -34,6 +35,8 @@ STANDARD_REPORT_GATES = {
         "failure_injection_simulation",
     ],
 }
+STANDARD_READINESS_FULL_CHECK = "readiness_full"
+STANDARD_REPORT_CHECK_NAMES = [*STANDARD_REPORT_GATES.keys(), STANDARD_READINESS_FULL_CHECK]
 
 NON_MUTATING_FLAGS = [
     "production_deploy_performed",
@@ -281,8 +284,28 @@ def _missing_artifact_checks(reason):
             "reason": reason,
             "artifact": STANDARD_REPORT_SOURCE,
         }
-        for name in STANDARD_REPORT_GATES
+        for name in STANDARD_REPORT_CHECK_NAMES
     ]
+
+def _read_required_readiness_gates(root):
+    policy = Path(root) / STANDARD_READINESS_POLICY_SOURCE
+    if not policy.exists():
+        return [], "missing_policy:" + STANDARD_READINESS_POLICY_SOURCE
+
+    try:
+        payload = json.loads(policy.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return [], "invalid_policy_json:" + str(exc)
+
+    required_gates = payload.get("required_gates")
+    if not isinstance(required_gates, list) or not required_gates:
+        return [], "missing_policy_required_gates"
+
+    invalid = [item for item in required_gates if not isinstance(item, str) or not item.strip()]
+    if invalid:
+        return [], "invalid_policy_required_gates"
+
+    return required_gates, None
 
 def _summarize_gate_group(payload, check_name, gate_names):
     tests = payload.get("tests")
@@ -339,6 +362,25 @@ def _summarize_simulation_group(payload):
     check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
     return check
 
+def _summarize_readiness_full(root, payload):
+    required_gates, error = _read_required_readiness_gates(root)
+    if error:
+        return {
+            "name": STANDARD_READINESS_FULL_CHECK,
+            "status": "missing" if error.startswith("missing_policy:") else "fail",
+            "reason": error,
+            "artifact": STANDARD_REPORT_SOURCE,
+            "policy_artifact": STANDARD_READINESS_POLICY_SOURCE,
+            "gates": required_gates,
+        }
+
+    check = _summarize_gate_group(payload, STANDARD_READINESS_FULL_CHECK, required_gates)
+    check["policy_artifact"] = STANDARD_READINESS_POLICY_SOURCE
+    check["required_gate_count"] = len(required_gates)
+    if check["status"] == "pass":
+        check["reason"] = "all_policy_required_readiness_gates_passed"
+    return check
+
 def build_standard_quality_report(root=APP, generated_at=None):
     root = Path(root)
     artifact = root / STANDARD_REPORT_SOURCE
@@ -349,7 +391,7 @@ def build_standard_quality_report(root=APP, generated_at=None):
         return {
             "status": "fail",
             "generated_at": generated_at,
-            "source_artifacts": [STANDARD_REPORT_SOURCE],
+            "source_artifacts": [STANDARD_REPORT_SOURCE, STANDARD_READINESS_POLICY_SOURCE],
             "checks": checks,
             "production_deploy_performed": None,
             "staging_deploy_performed": None,
@@ -363,7 +405,7 @@ def build_standard_quality_report(root=APP, generated_at=None):
         return {
             "status": "fail",
             "generated_at": generated_at,
-            "source_artifacts": [STANDARD_REPORT_SOURCE],
+            "source_artifacts": [STANDARD_REPORT_SOURCE, STANDARD_READINESS_POLICY_SOURCE],
             "checks": checks,
             "production_deploy_performed": None,
             "staging_deploy_performed": None,
@@ -375,12 +417,13 @@ def build_standard_quality_report(root=APP, generated_at=None):
         _summarize_gate_group(payload, "unit_test", STANDARD_REPORT_GATES["unit_test"]),
         _summarize_gate_group(payload, "integration_test", STANDARD_REPORT_GATES["integration_test"]),
         _summarize_simulation_group(payload),
+        _summarize_readiness_full(root, payload),
     ]
     status = "pass" if all(item["status"] == "pass" for item in checks) else "fail"
     return {
         "status": status,
         "generated_at": generated_at,
-        "source_artifacts": [STANDARD_REPORT_SOURCE],
+        "source_artifacts": [STANDARD_REPORT_SOURCE, STANDARD_READINESS_POLICY_SOURCE],
         "checks": checks,
         "production_deploy_performed": payload.get("production_deploy_performed"),
         "staging_deploy_performed": payload.get("staging_deploy_performed"),

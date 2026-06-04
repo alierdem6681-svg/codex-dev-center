@@ -76,6 +76,50 @@ LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 import pipeline_flow  # noqa: E402
 
 
+STANDARD_READINESS_REQUIRED_GATES = [
+    "python_compile_check",
+    "json_validation",
+    "yaml_validation",
+    "import_smoke_test",
+    "unit_test",
+    "integration_test",
+    "regression_test",
+    "worker_queue_recovery_test",
+    "dashboard_route_api_test",
+    "telegram_bridge_direct_cto_test",
+    "deploy_script_command_check",
+    "secret_leakage_scan",
+    "forbidden_operation_scan",
+    "staging_smoke_test",
+    "rollback_simulation",
+    "restart_simulation",
+    "failure_injection_simulation",
+]
+
+STANDARD_REPORT_GROUP_GATES = [
+    "python_compile_check",
+    "json_validation",
+    "yaml_validation",
+    "secret_leakage_scan",
+    "forbidden_operation_scan",
+    "unit_test",
+    "integration_test",
+    "staging_smoke_test",
+    "rollback_simulation",
+    "restart_simulation",
+    "failure_injection_simulation",
+]
+
+
+def write_standard_readiness_policy(root: Path, gates: list[str] | None = None) -> None:
+    policy_dir = root / "state_templates"
+    policy_dir.mkdir(exist_ok=True)
+    (policy_dir / "production_readiness_policy.json").write_text(
+        json.dumps({"required_gates": gates or STANDARD_READINESS_REQUIRED_GATES}),
+        encoding="utf-8",
+    )
+
+
 class WorkerStatusModelTest(unittest.TestCase):
     def test_task_status_normalizer_accepts_case_space_hyphen_and_separator_variants(self):
         self.assertEqual(normalize_status("ready for validation"), TASK_STATUS_READY_FOR_VALIDATION)
@@ -208,23 +252,11 @@ class WorkerStatusModelTest(unittest.TestCase):
             root = Path(tmp)
             state = root / "state"
             state.mkdir()
-            gates = [
-                "python_compile_check",
-                "json_validation",
-                "yaml_validation",
-                "secret_leakage_scan",
-                "forbidden_operation_scan",
-                "unit_test",
-                "integration_test",
-                "staging_smoke_test",
-                "rollback_simulation",
-                "restart_simulation",
-                "failure_injection_simulation",
-            ]
+            write_standard_readiness_policy(root)
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
                     {
-                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in STANDARD_READINESS_REQUIRED_GATES},
                         "production_deploy_performed": False,
                         "staging_deploy_performed": False,
                         "mutating_cloud_operations_performed": False,
@@ -243,6 +275,32 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(summary_file.exists())
             self.assertEqual(json.loads(report_file.read_text(encoding="utf-8"))["status"], "pass")
 
+    def test_standard_quality_report_fails_when_policy_required_gate_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir()
+            write_standard_readiness_policy(root)
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in STANDARD_REPORT_GROUP_GATES},
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+
+        readiness_full = next(check for check in report["checks"] if check["name"] == "readiness_full")
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(readiness_full["status"], "missing")
+        self.assertIn("missing_gates:import_smoke_test", readiness_full["reason"])
+        self.assertIn("deploy_script_command_check", readiness_full["reason"])
+
     def test_standard_quality_report_fails_when_required_artifact_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = codex_quality_gate.build_standard_quality_report(
@@ -259,23 +317,11 @@ class WorkerStatusModelTest(unittest.TestCase):
             root = Path(tmp)
             state = root / "state"
             state.mkdir()
-            gates = [
-                "python_compile_check",
-                "json_validation",
-                "yaml_validation",
-                "secret_leakage_scan",
-                "forbidden_operation_scan",
-                "unit_test",
-                "integration_test",
-                "staging_smoke_test",
-                "rollback_simulation",
-                "restart_simulation",
-                "failure_injection_simulation",
-            ]
+            write_standard_readiness_policy(root)
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
                     {
-                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in STANDARD_READINESS_REQUIRED_GATES},
                         "production_deploy_performed": False,
                         "staging_deploy_performed": True,
                         "mutating_cloud_operations_performed": False,
