@@ -1048,3 +1048,31 @@ Eklenenler:
 Not:
 - Bu recovery, worker servis restart'i nedeniyle `FAILED_RETRYABLE` kalan iki apply workspace'inin kod/test ciktisini current main uzerine elle entegre etti.
 - Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu commit icinde yapilmadi.
+
+---
+
+## Staging Readiness Wrapper Apply
+
+Tarih: 2026-06-04
+Görev: CTO-APPLY-20260604-180132 / CTO-BACKLOG-20260604-175722-222601-PRODUCTION-READINESS-ANALIZI
+Worker: worker-1
+
+Eklenenler:
+- `scripts/staging_health_check.sh` eklendi; `production_environment_manager.py health-check --scope staging` çağırır.
+- `scripts/staging_smoke_test.sh` eklendi; `production_environment_manager.py smoke-test --scope staging` çağırır.
+- `supervisor/production_readiness_suite.py` deploy script statik kontrolü staging wrapper dosyalarını ve policy komut anahtarlarını da arar.
+- `tests/test_staging_readiness_wrappers.py` wrapperların executable bit, `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON`, staging scope ve `"$@"` passtrough sözleşmesini doğrular.
+- Deploy policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_staging_readiness_wrappers` PASS, 2 test.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 193 test.
+- `python3 -m unittest discover -s tests` PASS, 222 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazımları read-only modda `write-skipped`.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+- Commit/PR tamamlanamadı: lokal `.git/index.lock` yazımı read-only filesystem nedeniyle başarısız oldu; GitHub MCP branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.

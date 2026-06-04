@@ -30,7 +30,9 @@
     "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
     "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
     "CODEX_HEALTH_CHECK_COMMAND": "{python} supervisor/production_environment_manager.py health-check --scope production",
-    "CODEX_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope production"
+    "CODEX_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope production",
+    "CODEX_STAGING_HEALTH_CHECK_COMMAND": "{python} supervisor/production_environment_manager.py health-check --scope staging",
+    "CODEX_STAGING_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope staging"
   },
   "environment_defaults": {
     "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
@@ -59,5 +61,5 @@
   "billing_change_requires_approval": true,
   "google_ads_mutate_requires_approval": true,
   "live_customer_data_loss_risk_requires_approval": true,
-  "updated_at": "2026-06-02T00:00:00+00:00"
+  "updated_at": "2026-06-04T18:05:05+00:00"
 }

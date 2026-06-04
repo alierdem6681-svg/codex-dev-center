@@ -343,3 +343,11 @@ Faz 19B-10A Model Policy
 - [x] Sleep karari pending ve aktif worker task sayisi sifir olmadan verilmez.
 - [x] Delivery finalizer aktif worker task varken deploy/local fallback denemez.
 - [x] Runtime status regresyon testleri paralel child creation, wake/sleep guard ve delivery guard davranislarini kapsar.
+
+## Faz 54 - Staging Readiness Wrapper Apply
+
+- [x] `scripts/staging_health_check.sh` explicit `--scope staging` health wrapper olarak eklendi.
+- [x] `scripts/staging_smoke_test.sh` explicit `--scope staging` smoke wrapper olarak eklendi.
+- [x] Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur.
+- [x] Statik wrapper kontrati `tests/test_staging_readiness_wrappers.py` ile sabitlendi.
+- [x] Deploy policy, module registry/settings/action catalog ve onboarding dokumanlari staging wrapper sozlesmesine hizalandi.

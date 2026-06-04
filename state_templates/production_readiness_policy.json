@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:48:58+00:00",
+  "updated_at": "2026-06-04T18:05:05+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -38,6 +38,13 @@
     "requires_staging_health_smoke_status": true,
     "requires_rollback_plan_status": true,
     "requires_production_deploy_not_performed": true
+  },
+  "staging_readiness_wrappers": {
+    "health_wrapper": "scripts/staging_health_check.sh",
+    "smoke_wrapper": "scripts/staging_smoke_test.sh",
+    "health_command": "{python} supervisor/production_environment_manager.py health-check --scope staging",
+    "smoke_command": "{python} supervisor/production_environment_manager.py smoke-test --scope staging",
+    "production_scope_allowed": false
   },
   "dry_run_non_mutating_contracts": {
     "staging_smoke_test": {

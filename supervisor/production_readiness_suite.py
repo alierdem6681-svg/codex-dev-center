@@ -527,6 +527,8 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
         ROOT / "scripts/rollback_production.sh",
         ROOT / "scripts/health_check.sh",
         ROOT / "scripts/smoke_test.sh",
+        ROOT / "scripts/staging_health_check.sh",
+        ROOT / "scripts/staging_smoke_test.sh",
     ]
     policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
     commands = policy.get("commands", {}) if isinstance(policy, dict) else {}
@@ -537,6 +539,8 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
         "CODEX_ROLLBACK_COMMAND",
         "CODEX_HEALTH_CHECK_COMMAND",
         "CODEX_SMOKE_TEST_COMMAND",
+        "CODEX_STAGING_HEALTH_CHECK_COMMAND",
+        "CODEX_STAGING_SMOKE_TEST_COMMAND",
     ]
     missing_commands = [key for key in required_commands if not commands.get(key)]
     execute_default = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", ""))

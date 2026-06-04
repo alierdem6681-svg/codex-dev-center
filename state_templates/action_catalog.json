@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T16:40:00+00:00",
+  "updated_at": "2026-06-04T18:05:05+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -126,6 +126,38 @@
       "enabled": true,
       "requires_approval": false,
       "command": "{python} supervisor/production_environment_manager.py staging-deploy"
+    },
+    {
+      "id": "staging_health_check",
+      "label": "Ön Canlı Sağlık Kontrolü",
+      "module": "production_environment_manager",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py health-check --scope staging",
+      "wrapper": "scripts/staging_health_check.sh",
+      "supports_check_modes": [
+        "read_only",
+        "dry_run",
+        "write_enabled"
+      ],
+      "write_skipped_evidence": true
+    },
+    {
+      "id": "staging_smoke_test",
+      "label": "Ön Canlı Duman Testi",
+      "module": "production_environment_manager",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "command": "{python} supervisor/production_environment_manager.py smoke-test --scope staging",
+      "wrapper": "scripts/staging_smoke_test.sh",
+      "supports_check_modes": [
+        "read_only",
+        "dry_run",
+        "write_enabled"
+      ],
+      "write_skipped_evidence": true
     },
     {
       "id": "health_check",
