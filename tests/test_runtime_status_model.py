@@ -3218,6 +3218,50 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(updated["github_origin_main_commit"], "new-head")
         self.assertTrue(updated["production_github_sync"])
 
+    def test_environment_manager_smoke_accepts_current_dashboard_labels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            state.mkdir()
+            reports.mkdir()
+
+            originals = (
+                production_environment_manager.ROOT,
+                production_environment_manager.STATE,
+                production_environment_manager.REPORTS,
+                production_environment_manager.health_check,
+                production_environment_manager.http_json,
+                production_environment_manager.http_text,
+            )
+            production_environment_manager.ROOT = runtime
+            production_environment_manager.STATE = state
+            production_environment_manager.REPORTS = reports
+            production_environment_manager.health_check = lambda scope="production": {"ok": True}
+            production_environment_manager.http_json = lambda port, path: {
+                "ok": True,
+                "status": 200,
+                "body": {"production_environment": {}, "deploy_commands": {}},
+            }
+            production_environment_manager.http_text = lambda port, path: {
+                "ok": True,
+                "body": "Pipeline Flow Görevler Ayarlar Canlıya alınanları göster",
+            }
+            try:
+                payload = production_environment_manager.smoke_test("production")
+            finally:
+                (
+                    production_environment_manager.ROOT,
+                    production_environment_manager.STATE,
+                    production_environment_manager.REPORTS,
+                    production_environment_manager.health_check,
+                    production_environment_manager.http_json,
+                    production_environment_manager.http_text,
+                ) = originals
+
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["checks"]["index_turkish_labels"])
+
     def test_telegram_health_watcher_suppresses_auto_report_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)

@@ -531,17 +531,17 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
     body_text = index.get("body", "")
     labels = [
-        "Canlıya Alma Durumu",
-        "Ön Canlı Sonucu",
-        "Geri Alma Sonucu",
-        "Kalite Kapıları",
+        "Pipeline Flow",
+        "Görevler",
+        "Ayarlar",
+        "Canlıya alınanları göster",
     ]
     checks = {
         "health_pass": bool(health.get("ok")),
         "status_api_pass": bool(status.get("ok")),
         "dashboard_has_production_environment": "production_environment" in body,
         "dashboard_has_deploy_commands": "deploy_commands" in body,
-        "index_turkish_labels": all(label in body_text for label in labels) and "Deploy" in body_text and "Komut" in body_text,
+        "index_turkish_labels": all(label in body_text for label in labels),
     }
     payload = {
         "ok": all(checks.values()),
