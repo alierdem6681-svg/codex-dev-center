@@ -136,6 +136,34 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertIsNone(subtask["claimed_at"])
             self.assertIsNone(subtask["finished_at"])
 
+    def test_dashboard_cleanup_request_is_not_split_into_readiness_subtasks(self):
+        message = (
+            "dashboarddaki Raporlar, GitHub Senkronizasyonu, Profil, Kalite Kapıları, "
+            "Deploy Komutları, Pipeline Gözlemi ve Production Pipeline alanlarını kaldıralım."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="telegram",
+                title="Dashboard Alan Temizliği",
+                message=message,
+                risk="medium",
+                split=None,
+            )
+
+        self.assertEqual(result["subtasks"], [])
+
+    def test_telegram_dashboard_cleanup_metadata_uses_dashboard_title(self):
+        message = (
+            "dashboarddaki Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, "
+            "Production Pipeline ve Görev Kuyruğu alanlarını kaldıralım."
+        )
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Dashboard Alan Temizliği")
+        self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
             [

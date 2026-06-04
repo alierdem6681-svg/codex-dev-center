@@ -90,7 +90,16 @@ def classify_risk(text: str, requested: str | None = None) -> str:
     return "low"
 
 
+def is_dashboard_cleanup_request(text: str) -> bool:
+    lowered = (text or "").lower()
+    dashboard_terms = ["dashboard", "navbar", "panel", "menü", "menu", "ui"]
+    cleanup_terms = ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"]
+    return any(term in lowered for term in dashboard_terms) and any(term in lowered for term in cleanup_terms)
+
+
 def should_split(text: str) -> bool:
+    if is_dashboard_cleanup_request(text):
+        return False
     lowered = (text or "").lower()
     return any(
         word in lowered

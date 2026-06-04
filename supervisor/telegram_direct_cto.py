@@ -349,7 +349,18 @@ def classify_job_metadata(text):
     lowered = (text or "").lower()
     length = len(text or "")
 
-    if any(x in lowered for x in ["production", "canlı", "canli", "deploy", "staging", "rollback"]):
+    dashboard_cleanup = (
+        any(x in lowered for x in ["dashboard", "navbar", "panel", "menü", "menu", "ui"])
+        and any(x in lowered for x in ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"])
+    )
+
+    if dashboard_cleanup:
+        name = "Dashboard Alan Temizliği"
+        eta = "5-10 dakika"
+        first_update = "yaklaşık 1 dakika içinde"
+        interval = 180
+        risk = "düşük/orta"
+    elif any(x in lowered for x in ["production", "canlı", "canli", "deploy", "staging", "rollback"]):
         name = "Production Readiness Analizi"
         eta = "10-20 dakika"
         first_update = "yaklaşık 2 dakika içinde"
