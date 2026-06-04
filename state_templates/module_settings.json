@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T09:33:05+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -18,13 +18,27 @@
     "theme": "soft_neutral",
     "auth_mode": "username_password",
     "token_login_enabled": false,
-    "show_runner_status": true,
-    "show_last_deploy_run": true,
-    "show_last_smoke_run": true,
-    "show_backup_status": true,
-    "show_task_to_deploy_status": true,
+    "show_runner_status": false,
+    "show_last_deploy_run": false,
+    "show_last_smoke_run": false,
+    "show_backup_status": false,
+    "show_task_to_deploy_status": false,
     "show_controlled_execution_status": true,
-    "show_pipeline_flow": true
+    "show_pipeline_flow": true,
+    "hidden_sections": [
+      "reports",
+      "last_error_recommendation",
+      "github_sync",
+      "profile",
+      "last_checks",
+      "quality_gates",
+      "deploy_commands",
+      "pipeline_observation",
+      "production_pipeline",
+      "operational_flow",
+      "deployment_metrics",
+      "worker_queue_recovery"
+    ]
   },
   "pipeline_flow": {
     "enabled": true,

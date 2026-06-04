@@ -223,25 +223,40 @@ def worker_queue_recovery(results: dict[str, Any]) -> None:
 def dashboard_test(results: dict[str, Any]) -> None:
     index = (ROOT / "web_panel/static/index.html").read_text(encoding="utf-8", errors="replace")
     required_text = [
+        "Codex Dev Center Yönetim Paneli",
+        "Pipeline Flow",
+        "Görevler",
+        "Hesap ayarları",
+        "Çıkış",
+    ]
+    removed_text = [
         "Canlıya Alma Durumu",
         "Ön Canlı Sonucu",
-        "Geri Alma",
-        "Yayına Alma",
+        "Geri Alma Sonucu",
         "Görev Kuyruğu",
-        "Toparlama",
+        "Operasyonel Akış",
+        "Production Pipeline",
+        "Pipeline Gözlemi",
         "Deploy Komutları",
         "Kalite Kapıları",
-        "Çıkış",
-        "Pipeline Gözlemi",
-        "Runner",
-        "Run ID",
-        "Telegram CTO işleri",
+        "Son Kontroller",
+        "Profil",
+        "Çalışan / Görev Kuyruğu / Toparlama",
+        "GitHub Senkronizasyonu",
+        "Son Hata ve Çözüm Önerisi",
+        "Raporlar",
     ]
     missing = [item for item in required_text if item not in index]
+    unexpected = [item for item in removed_text if item in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
     login_required = ["Kullanıcı adı", "Şifre", "Giriş Yap", "İlk kullanıcıyı oluştur"]
     login_missing = [item for item in login_required if item not in login]
-    record(results, "dashboard_route_api_test", not missing and not login_missing, {"missing_text": missing, "login_missing_text": login_missing})
+    record(
+        results,
+        "dashboard_route_api_test",
+        not missing and not unexpected and not login_missing,
+        {"missing_text": missing, "unexpected_text": unexpected, "login_missing_text": login_missing},
+    )
 
 
 def telegram_test(results: dict[str, Any]) -> None:
@@ -534,7 +549,14 @@ def unit_and_integration(results: dict[str, Any]) -> None:
     record(results, "unit_test", ok, {"scope": "production_policy", "deploy_channel": policy.get("production_deploy_channel")})
     registry = read_json(ROOT / "state_templates/module_registry.json", {"modules": []})
     active = [m.get("id") for m in registry.get("modules", []) if m.get("dashboard_visible")]
-    record(results, "integration_test", "deploy_pipeline" in active, {"dashboard_visible_modules": active})
+    required_visible = {"dashboard", "pipeline_flow", "panel_auth"}
+    hidden_after_cleanup = {"deploy_pipeline", "production_readiness", "production_environment_manager", "github_safe_flow", "workers"}
+    record(
+        results,
+        "integration_test",
+        required_visible.issubset(set(active)) and not (hidden_after_cleanup & set(active)),
+        {"dashboard_visible_modules": active, "required_visible": sorted(required_visible), "hidden_after_cleanup": sorted(hidden_after_cleanup)},
+    )
 
 
 def run_suite() -> dict[str, Any]:

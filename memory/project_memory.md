@@ -2,6 +2,12 @@
 
 Bu sistem Denizkan Bey'in projelerini Codex/CTO/worker mimarisi ile geliştirmek için kurulmaktadır.
 
+## 2026-06-04 Dashboard Alan Temizliği Apply
+
+Dashboard ana ekranı sadeleştirildi. Görünür ekrandan Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, alt Profil bölümü, Son Kontroller, Kalite Kapıları, Deploy Komutları, Pipeline Gözlemi, Production Pipeline, Operasyonel Akış, canlı/ön canlı/geri alma/görev kuyruğu metrikleri ve çalışan/görev kuyruğu/toparlama alanı kaldırıldı.
+
+Kalan ana görünüm Pipeline Flow, Görevler ve Ayarlar / Son İşlem alanlarıdır. Backend status/action payload'ları geriye dönük uyumluluk için korunur; production deploy veya kritik altyapı işlemi yapılmadı.
+
 Kullanıcı teknik bilmediğini açıkça belirtmiştir. Bu nedenle sistem:
 - Kendi dokümantasyonunu tutmalı
 - Kaldığı yerden devam edebilmeli

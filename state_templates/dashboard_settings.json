@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T09:33:05+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
@@ -35,17 +35,31 @@
     "normal_app_deploy_allowed_when_all_gates_pass": true,
     "max_parallel_tasks_until_stable": 4,
     "stable_successful_low_risk_deploy_threshold": 3,
-    "show_deploy_command_status": true,
-    "show_runner_status": true,
-    "show_last_deploy_run": true,
-    "show_last_smoke_run": true,
-    "show_backup_status": true,
-    "show_task_to_deploy_status": true,
+    "show_deploy_command_status": false,
+    "show_runner_status": false,
+    "show_last_deploy_run": false,
+    "show_last_smoke_run": false,
+    "show_backup_status": false,
+    "show_task_to_deploy_status": false,
     "show_controlled_execution_status": true,
     "show_pipeline_flow": true,
-    "show_last_health_check": true,
-    "show_last_smoke_test": true,
-    "show_last_error_recommendation": true
+    "show_last_health_check": false,
+    "show_last_smoke_test": false,
+    "show_last_error_recommendation": false,
+    "hidden_dashboard_sections": [
+      "reports",
+      "last_error_recommendation",
+      "github_sync",
+      "profile",
+      "last_checks",
+      "quality_gates",
+      "deploy_commands",
+      "pipeline_observation",
+      "production_pipeline",
+      "operational_flow",
+      "deployment_metrics",
+      "worker_queue_recovery"
+    ]
   },
   "cto_router": {
     "enabled": true,

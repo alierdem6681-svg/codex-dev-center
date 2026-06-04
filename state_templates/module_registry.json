@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T09:33:05+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -9,7 +9,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Canlı izleme, pipeline tracking, ayarlar ve kontrol paneli.",
+      "description": "Sade görev görünümü, read-only pipeline flow, ayarlar ve kontrol paneli.",
       "actions": [
         "refresh_dashboard",
         "update_dashboard_settings",
@@ -66,7 +66,7 @@
       "risk": "medium",
       "settings_enabled": true,
       "actions_enabled": true,
-      "dashboard_visible": true,
+      "dashboard_visible": false,
       "description": "worker-1..4 servisleri, görev işleme, dispatch claim metadata, controlled repo apply path validation, control report ve log üretimi.",
       "actions": [
         "start_worker",
@@ -113,7 +113,7 @@
       "risk": "critical",
       "settings_enabled": true,
       "actions_enabled": true,
-      "dashboard_visible": true,
+      "dashboard_visible": false,
       "description": "Ön canlı, test kapıları, GitHub Actions manuel canlı yayına alma ve geri alma denetleyicisi.",
       "actions": [
         "production_readiness_suite",
@@ -261,7 +261,7 @@
       "risk": "medium",
       "settings_enabled": true,
       "actions_enabled": true,
-      "dashboard_visible": true,
+      "dashboard_visible": false,
       "description": "Compile, JSON, import, test, güvenlik, ön canlı, geri alma, dry-run non-mutating ve simülasyon sözleşmesi kapılarını çalıştırır.",
       "actions": [
         "production_readiness_suite"
@@ -274,7 +274,7 @@
       "risk": "medium",
       "settings_enabled": true,
       "actions_enabled": true,
-      "dashboard_visible": true,
+      "dashboard_visible": false,
       "description": "Staging, production, health check, smoke test, rollback point and safe local panel swap flow.",
       "actions": [
         "staging_deploy",
@@ -290,7 +290,7 @@
       "risk": "medium",
       "settings_enabled": true,
       "actions_enabled": true,
-      "dashboard_visible": true,
+      "dashboard_visible": false,
       "description": "Git temizliği, branch/remote uyumu, secret scan, diff özeti, commit ve push akışını yönetir.",
       "actions": [
         "github_safe_flow_dry_run"

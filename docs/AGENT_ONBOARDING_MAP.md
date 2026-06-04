@@ -101,9 +101,10 @@ Ajan şu klasörleri inceler:
 
 Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
-- Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
+- Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari geriye dönük uyumluluk için `github_actions` ve `pipeline_status` alanlarini dondurur; sade dashboard artik bu marker'lari ayrı `Pipeline Gözlemi` kartında göstermez.
 - Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
 - `/api/pipeline-flow` ana ve legacy panelde read-only pipeline stage payload'u dondurur; raw mesaj, uzun description, stdout/stderr, log veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalmalidir.
+- 2026-06-04 Dashboard Alan Temizliği sonrasında ana görünür ekran Pipeline Flow, Görevler ve Ayarlar / Son İşlem alanlarıyla sınırlıdır. Production Pipeline, Deploy Komutları, Kalite Kapıları, GitHub Senkronizasyonu, Raporlar, Son Hata ve Çözüm Önerisi, alt Profil, operasyonel akış, deploy metrikleri ve worker queue/recovery panelleri ana dashboard'da görünmez.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.

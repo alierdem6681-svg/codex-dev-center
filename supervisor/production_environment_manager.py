@@ -531,17 +531,35 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
     body_text = index.get("body", "")
     labels = [
+        "Codex Dev Center Yönetim Paneli",
+        "Pipeline Flow",
+        "Görevler",
+        "Hesap ayarları",
+    ]
+    removed_labels = [
         "Canlıya Alma Durumu",
         "Ön Canlı Sonucu",
         "Geri Alma Sonucu",
+        "Görev Kuyruğu",
+        "Operasyonel Akış",
+        "Production Pipeline",
+        "Pipeline Gözlemi",
+        "Deploy Komutları",
         "Kalite Kapıları",
+        "Son Kontroller",
+        "Profil",
+        "Çalışan / Görev Kuyruğu / Toparlama",
+        "GitHub Senkronizasyonu",
+        "Son Hata ve Çözüm Önerisi",
+        "Raporlar",
     ]
     checks = {
         "health_pass": bool(health.get("ok")),
         "status_api_pass": bool(status.get("ok")),
         "dashboard_has_production_environment": "production_environment" in body,
         "dashboard_has_deploy_commands": "deploy_commands" in body,
-        "index_turkish_labels": all(label in body_text for label in labels) and "Deploy" in body_text and "Komut" in body_text,
+        "index_core_labels": all(label in body_text for label in labels),
+        "index_removed_operational_labels_absent": not any(label in body_text for label in removed_labels),
     }
     payload = {
         "ok": all(checks.values()),

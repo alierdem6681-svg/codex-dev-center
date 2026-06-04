@@ -156,6 +156,12 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## DASHBOARD ALAN TEMİZLİĞİ V1
+
+Dashboard ana ekranı sade görünüm sözleşmesine sahiptir. Görünür ana ekran Pipeline Flow, Görevler ve Ayarlar / Son İşlem alanlarıyla sınırlıdır. Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, alt Profil bölümü, Son Kontroller, Kalite Kapıları, Deploy Komutları, Pipeline Gözlemi, Production Pipeline, Operasyonel Akış, canlı/ön canlı/geri alma/görev kuyruğu metrikleri ve çalışan/görev kuyruğu/toparlama panelleri ana dashboard'da gösterilmez.
+
+Bu temizlik yalnızca görünür dashboard alanlarını kapsar; `/api/status`, `/api/pipeline-flow`, production readiness, deploy controller ve güvenlik kapıları backend uyumluluğu için korunur. Bu görünürlük değişikliği production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## WORKER DISPATCH CONTRACT V1
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.

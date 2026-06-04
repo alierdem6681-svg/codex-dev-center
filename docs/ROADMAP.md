@@ -1,5 +1,12 @@
 # ROADMAP
 
+## 2026-06-04 Dashboard Alan Temizliği Apply
+
+- [x] Dashboard ana ekranındaki rapor, hata önerisi, GitHub senkronizasyonu, profil, kalite kapısı, deploy komutu, pipeline gözlemi, production pipeline, operasyonel akış, deploy metrikleri ve worker queue/recovery panelleri kaldırıldı.
+- [x] Kalan görünür ana ekran Pipeline Flow, Görevler ve Ayarlar / Son İşlem olarak sadeleştirildi.
+- [x] Dashboard markup testi, production readiness dashboard testi ve environment smoke label sözleşmesi sade dashboard'a göre güncellendi.
+- [ ] PR merge sonrası canlı dashboard görsel smoke doğrulaması GitHub Actions deploy akışıyla yapılacak.
+
 ## 2026-06-04 Owner Queue Repair And Production Sync
 
 - [x] VM/runtime/service path discovery completed.

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T09:33:05+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -45,6 +45,7 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "non_mutating": true,
       "simulation_contracts_required": true,
       "dry_run_non_mutating_contracts_required": true
@@ -90,6 +91,7 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/production_environment_manager.py staging-deploy"
     },
     {
@@ -99,6 +101,7 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/production_environment_manager.py health-check --scope production"
     },
     {
@@ -108,6 +111,7 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/production_environment_manager.py smoke-test --scope production"
     },
     {
@@ -117,6 +121,7 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "github_actions_only": true,
       "workflow_name": "Deploy to VM",
       "confirm_phrase": "DEPLOY-CODEX-VM",
@@ -132,6 +137,7 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/production_environment_manager.py rollback --dry-run",
       "dry_run_non_mutating_contract_required": true
     },
@@ -141,7 +147,8 @@
       "module": "github_safe_flow",
       "risk": "medium",
       "enabled": true,
-      "requires_approval": false
+      "requires_approval": false,
+      "dashboard_visible": false
     },
     {
       "id": "cto_doctor_check",
@@ -150,6 +157,7 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/cto_doctor.py --json",
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
@@ -162,6 +170,7 @@
       "risk": "medium",
       "enabled": true,
       "requires_approval": false,
+      "dashboard_visible": false,
       "command": "{python} supervisor/cto_doctor.py --fix --json",
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,

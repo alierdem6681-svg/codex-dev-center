@@ -4,6 +4,21 @@
 
 VM oluşturuldu ve temel Codex Dev Center dizin yapısı kuruldu.
 
+## 2026-06-04 Dashboard Alan Temizliği Apply
+
+Görev: `CTO-TASK-20260604-092420-737557-DASHBOARD-ALAN-TEMIZLIĞI`
+
+Dashboard ana ekranı sadeleştirildi. `web_panel/static/index.html` içinden Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, alt Profil bölümü, Son Kontroller, Kalite Kapıları, Deploy Komutları, Pipeline Gözlemi, Production Pipeline, Operasyonel Akış, canlı/ön canlı/geri alma/görev kuyruğu metrikleri ve çalışan/görev kuyruğu/toparlama alanı kaldırıldı.
+
+Kalan görünür ana ekran:
+- Pipeline Flow
+- Görevler
+- Ayarlar / Son İşlem
+
+Backend `/api/status`, action endpointleri ve read-only `/api/pipeline-flow` korunur; bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
+
+Yerel doğrulama: compile, dashboard markup/unit testleri, runtime status unit testleri, JSON/diff/secret kontrolleri ve `/tmp` git metadata kopyasında production readiness suite PASS. Commit/PR adımı bu sandbox'ta tamamlanamadı: local git worktree metadata yolu read-only, GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` döndürdü.
+
 ## 2026-06-04 Owner Queue Repair And Production Sync
 
 Owner-directed emergency repair started on VM `codex-dev-center-01`.

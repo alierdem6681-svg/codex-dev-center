@@ -69,6 +69,8 @@ Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy p
 
 Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/api/pipeline-flow` payload'larında task stage akışını göstermek raw kullanıcı mesajı, uzun açıklama, stdout/stderr, log, terminal dump, production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 
+Dashboard sade görünüm sözleşmesi salt okunur/görünürlük düzeyindedir. Ana ekranda Pipeline Flow, Görevler ve Ayarlar / Son İşlem alanları tutulur; production pipeline, deploy komutları, kalite kapıları, pipeline gözlemi, GitHub senkronizasyonu, raporlar, hata önerisi, profil, operasyonel akış, deploy metrikleri ve worker queue/recovery panellerinin gizlenmesi backend deploy veya kritik altyapı yetkisi vermez.
+
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notu içermelidir.
 
