@@ -17,6 +17,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
 
 import auth as panel_auth
 from pipeline_flow import build_pipeline_flow
+from quality_gate_view import build_quality_gate_view
 from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
 
 
@@ -336,14 +337,18 @@ def status_payload():
     system_state = read_json(STATE / "system_state.json", {})
     workers_payload = read_json(STATE / "workers.json", {"workers": []})
     tasks_payload = read_json(STATE / "task_queue.json", {"tasks": []})
+    production_readiness = read_json(STATE / "production_readiness_status.json", {})
     production_deploy = read_json(STATE / "production_deploy_status.json", {})
     github_actions = read_json(STATE / "github_actions_status.json", {})
     pipeline_status = read_json(STATE / "pipeline_status.json", {})
+    last_health_check = read_json(STATE / "last_health_check_status.json", {})
+    legacy_quality_gate = read_json(STATE / "quality_gate_status.json", {})
     return {
         "ok": True,
         "time": now(),
         "system_state": system_state,
         "controlled_execution": controlled_execution_summary(system_state),
+        "qualityGateView": build_quality_gate_view(production_readiness, last_health_check, legacy_quality_gate),
         "workers": workers_payload,
         "tasks": tasks_payload,
         "operations": queue_diagnostics(tasks_payload, workers_payload, system_state, production_deploy, github_actions),
@@ -355,7 +360,7 @@ def status_payload():
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
         "cto_delivery": read_json(STATE / "cto_delivery_state.json", read_json(ROOT / "state_templates/cto_delivery_policy.json", {})),
         "auth": panel_auth.public_auth_state(),
-        "production_readiness": read_json(STATE / "production_readiness_status.json", {}),
+        "production_readiness": production_readiness,
         "production_deploy": production_deploy,
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
@@ -365,7 +370,7 @@ def status_payload():
         "direct_cto_jobs": direct_cto_jobs_summary(),
         "rollback": read_json(STATE / "rollback_status.json", {}),
         "rollback_point": read_json(STATE / "rollback_point.json", {}),
-        "last_health_check": read_json(STATE / "last_health_check_status.json", {}),
+        "last_health_check": last_health_check,
         "last_smoke_test": read_json(STATE / "last_smoke_test_status.json", {}),
         "deploy_commands": deploy_commands(),
         "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),

@@ -111,6 +111,7 @@ Dashboard status API notu:
 - `web_panel/static/index.html` Pipeline Flow ana gorev expand/collapse state'ini stable main task key ile tutar; polling refresh selected stage veya kullanici toggle state'ini resetlememelidir.
 - Expand state regresyonu `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ile stable key, click-intent handler ve refresh state merge sozlesmesini kontrol eder.
 - `/api/pipeline-flow` live polling kontrati `serverRevision`, `resetToken`, `requiresUiReset`, `mergePolicy` ve `initialUiDefaults` alanlarini dondurur. Frontend eski veya ayni revision refresh'lerini uygulamaz; reset token degismedikce client-owned stage/expand/filter/scroll state korunmalidir.
+- `/api/status` ana ve legacy panelde `qualityGateView` alanini dondurur; dashboard kalite kapisi badge, renk, filtre ve ozet karari icin sadece bu kontrati kullanmalidir. `quality_gate_status` legacy diagnostik bilgi olarak `legacy_quality_gate_status` altinda tasinir ve pozitif READY karari uretmez.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 

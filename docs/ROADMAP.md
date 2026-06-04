@@ -249,3 +249,11 @@ Faz 19B-10A Model Policy
 - [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
 - [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
 - [x] Metadata kontrati unit test ile sabitlendi.
+
+## Faz 42 - Dashboard Quality Gate Status Contract
+
+- [x] Ana ve legacy `/api/status` payload'u `qualityGateView` kontrat v1 alanini dondurur.
+- [x] Readiness + health kaynaklari tek merkezi mapper ile `READY`, `DEGRADED`, `NOT_READY`, `UNKNOWN` durumlarina iner.
+- [x] Legacy `quality_gate_status` sadece `legacy_quality_gate_status` diagnostik alanina tasinir; pozitif READY fallback kaynagi olmaz.
+- [x] Missing/stale readiness veya health kaynaklari `UNKNOWN` sonucuna baglandi.
+- [x] Kontrat davranisi runtime status unit testleriyle sabitlendi.

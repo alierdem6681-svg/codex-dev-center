@@ -311,3 +311,11 @@ Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task ç
 Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
 
 Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
+
+## 2026-06-04 Dashboard Quality Gate Status Contract Apply
+
+Dashboard kalite kapisi karari icin tek kaynakli `qualityGateView` sozlesmesi eklendi. Ana ve legacy panel `/api/status` payload'u readiness ve health kaynaklarini merkezi mapper ile `READY`, `DEGRADED`, `NOT_READY`, `UNKNOWN` durumlarina indirger.
+
+Legacy `quality_gate_status` artik dashboard karari icin tek basina kullanilmamali; payload icinde sadece `legacy_quality_gate_status` diagnostik alani olarak tasinir. Eksik veya stale readiness/health kaynagi `UNKNOWN` olur ve legacy fallback pozitif READY iddiasi uretmez.
+
+Davranis `tests/test_runtime_status_model.py` icindeki quality gate view kontrat testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
