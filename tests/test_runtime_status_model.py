@@ -1730,6 +1730,58 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertTrue(updated["local_vm_deploy_fallback_used"])
         self.assertEqual(updated["deploy_run_id"], "local-test")
 
+    def test_requested_local_vm_fallback_skips_workflow_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-FORCED-LOCAL-FALLBACK")
+            original_dispatch = cto_autonomous_delivery.dispatch_workflow
+            original_local = cto_autonomous_delivery.run_local_deploy_fallback
+            original_env = os.environ.copy()
+
+            def fail_dispatch(_workflow, wait=False):
+                raise AssertionError("workflow dispatch must be skipped when local fallback is requested")
+
+            def fake_local(_task):
+                return {
+                    "ok": True,
+                    "status": "LOCAL_VM_FALLBACK_DEPLOYED",
+                    "controller": {"ok": True, "status": "PASS"},
+                    "run": {
+                        "databaseId": "local-forced",
+                        "url": "",
+                        "headSha": "local-sha",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "local_vm_fallback": True,
+                        "controller_status": "PASS",
+                    },
+                }
+
+            cto_autonomous_delivery.dispatch_workflow = fail_dispatch
+            cto_autonomous_delivery.run_local_deploy_fallback = fake_local
+            os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    base_policy = cto_autonomous_delivery.policy
+                    cto_autonomous_delivery.policy = lambda: {
+                        **base_policy(),
+                        "local_vm_deploy_fallback_enabled": True,
+                        "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
+                    }
+                    try:
+                        result = cto_autonomous_delivery.deploy_task("TASK-FORCED-LOCAL-FALLBACK", execute=True, wait=True, smoke=True)
+                    finally:
+                        cto_autonomous_delivery.policy = base_policy
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.dispatch_workflow = original_dispatch
+                cto_autonomous_delivery.run_local_deploy_fallback = original_local
+                os.environ.clear()
+                os.environ.update(original_env)
+
+        self.assertEqual(result["status"], "DEPLOYED")
+        self.assertEqual(result["deployment_path"], "local_vm_fallback_requested")
+        self.assertEqual(queue["tasks"][0]["deploy_run_id"], "local-forced")
+
     def test_root_cause_mode_blocks_backlog_creation_for_deploy_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
             retry = self.deployable_task("TASK-DEPLOY-RETRY")

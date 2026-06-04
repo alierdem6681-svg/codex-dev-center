@@ -909,6 +909,34 @@ def run_local_deploy_fallback(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def deploy_with_local_fallback(task_id: str, task: dict[str, Any], evaluation: dict[str, Any], readiness: dict[str, Any], in_progress: dict[str, Any], reason: str) -> dict[str, Any]:
+    local_fallback = run_local_deploy_fallback(task)
+    if local_fallback.get("ok"):
+        marked = mark_task_deployed(task_id, local_fallback.get("run", {}), None)
+        return {
+            "ok": True,
+            "status": "DEPLOYED",
+            "deployment_path": reason,
+            "evaluation": evaluation,
+            "readiness": readiness,
+            "local_deploy_fallback": local_fallback,
+            "in_progress": in_progress,
+            "marked": marked,
+        }
+    failure_status = str(local_fallback.get("status") or "LOCAL_DEPLOY_FALLBACK_FAILED")
+    marked = mark_task_deploy_retry(task_id, failure_status)
+    return {
+        "ok": False,
+        "status": failure_status,
+        "deployment_path": reason,
+        "evaluation": evaluation,
+        "readiness": readiness,
+        "local_deploy_fallback": local_fallback,
+        "in_progress": in_progress,
+        "marked": marked,
+    }
+
+
 def set_task_approval_required(task_id: str, findings: list[str]) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
@@ -963,36 +991,29 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
         return {"ok": False, "status": "SMOKE_REQUIRED_FOR_DEPLOYED", "evaluation": evaluation, "readiness": readiness, "marked": marked}
 
     in_progress = mark_task_deploy_in_progress(task_id)
+    if task_flag({"env": os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")}, "env") and local_deploy_fallback_enabled():
+        return deploy_with_local_fallback(
+            task_id,
+            task,
+            evaluation,
+            readiness,
+            in_progress,
+            "local_vm_fallback_requested",
+        )
     deploy = dispatch_workflow(DEPLOY_WORKFLOW, wait=wait)
     deploy_record = record_task_workflow_run(task_id, "deploy", deploy.get("run", {}), deploy.get("status", "")) if deploy.get("run") else {}
     if not deploy["ok"]:
-        local_fallback = run_local_deploy_fallback(task)
-        if local_fallback.get("ok"):
-            marked = mark_task_deployed(task_id, local_fallback.get("run", {}), None)
-            return {
-                "ok": True,
-                "status": "DEPLOYED",
-                "deployment_path": "local_vm_fallback_after_workflow_failure",
-                "evaluation": evaluation,
-                "readiness": readiness,
-                "deploy": deploy,
-                "local_deploy_fallback": local_fallback,
-                "in_progress": in_progress,
-                "deploy_record": deploy_record,
-                "marked": marked,
-            }
-        marked = mark_task_deploy_retry(task_id, "DEPLOY_WORKFLOW_FAILED")
-        return {
-            "ok": False,
-            "status": "DEPLOY_WORKFLOW_FAILED",
-            "evaluation": evaluation,
-            "readiness": readiness,
-            "deploy": deploy,
-            "local_deploy_fallback": local_fallback,
-            "in_progress": in_progress,
-            "deploy_record": deploy_record,
-            "marked": marked,
-        }
+        payload = deploy_with_local_fallback(
+            task_id,
+            task,
+            evaluation,
+            readiness,
+            in_progress,
+            "local_vm_fallback_after_workflow_failure",
+        )
+        payload["deploy"] = deploy
+        payload["deploy_record"] = deploy_record
+        return payload
     if not workflow_run_successful(deploy):
         return {
             "ok": True,
