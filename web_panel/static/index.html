@@ -906,12 +906,14 @@
           if (!current.has(key)) pipelineMainTaskExpanded.delete(key);
         });
       }
-      function bindFlowMainTaskToggles(){
+      function rememberPipelineMainTaskToggleIntent(details){
+        const key = details.dataset.mainTaskKey || '';
+        if (key) pipelineMainTaskExpanded.set(key, !details.open);
+      }
+      function bindFlowMainTaskToggleClicks(){
         pipelineFlowPanel.querySelectorAll('.flow-main-task[data-main-task-key]').forEach(details => {
-          details.addEventListener('toggle', event => {
-            const key = event.currentTarget.dataset.mainTaskKey || '';
-            if (key) pipelineMainTaskExpanded.set(key, event.currentTarget.open);
-          });
+          const summary = details.querySelector('summary');
+          if (summary) summary.addEventListener('click', () => rememberPipelineMainTaskToggleIntent(details));
         });
       }
       function selectedFlowStage(){
@@ -962,7 +964,7 @@
           ${renderFlowMainTasks()}
           <div>${tasksHtml}</div>
         `;
-        bindFlowMainTaskToggles();
+        bindFlowMainTaskToggleClicks();
       }
       function handlePipelineTabKey(event){
         const buttons = Array.from(pipelineFlowTabs.querySelectorAll('[role="tab"]'));

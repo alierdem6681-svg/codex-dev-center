@@ -559,6 +559,17 @@ Not:
 
 ---
 
+## Dashboard Pipeline Expand Click Intent Fix
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- Pipeline Flow ana gorev expand/collapse tercihi artik DOM `toggle` event'i yerine kullanici `summary` click niyetinden senkron kaydedilir.
+- Live polling ayni anda yeniden render yapsa bile kullanicinin actigi veya kapattigi ana gorev state'i `pipelineMainTaskExpanded` icinde korunur.
+- Frontend markup regresyon testi click-intent handler sozlesmesini kontrol edecek sekilde guncellendi.
+
+---
+
 ## Dashboard Pipeline Expand State Apply
 
 Tarih: 2026-06-04

@@ -214,6 +214,7 @@ Faz 19B-10A Model Policy
 
 - [x] Pipeline ana gorev expand/collapse tercihi polling ve render refresh sonrasinda korunur.
 - [x] Kullanici kapattigi aktif ana gorev otomatik tekrar acilmaz.
+- [x] Kullanici ac/kapat niyeti `toggle` event'i yerine `summary` click handler ile senkron kaydedilir.
 - [x] Expand state davranisi dashboard pipeline flow UI regresyon testiyle sabitlendi.
 
 ## Faz 38 - Dashboard Telegram Asset Inbox Backend
