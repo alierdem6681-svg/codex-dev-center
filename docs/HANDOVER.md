@@ -591,3 +591,29 @@ PR durumu:
 Devam:
 - Sonraki küçük paket runtime asset intake'i bu kontratı kullanarak bağlamalı.
 - Dashboard asset inbox read-only DTO tasarımı ayrı pakette ele alınmalı.
+
+---
+
+## Dashboard Pipeline Expand State Tests Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-110136-CTO-ACTION-20260604-102655-02-DASHBOARD-PIPELINE-EXPAND-STATE-TESTS
+
+Eklenenler:
+- `web_panel/static/index.html` pipeline ana gorev `<details>` acik/kapali tercihini `main_task_code` / `root_task_id` tabanli session state ile korur.
+- Polling, stage refresh veya `renderPipelineFlow()` sonrasi kullanicinin kapattigi ana gorev otomatik tekrar acilmaz.
+- `tests/test_runtime_status_model.py` icinde dashboard pipeline flow UI expand state regresyon testi eklendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.DashboardPipelineFlowUiTest` PASS.
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 136 test.
+- Gecici `/tmp` repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS.
+- `git diff --check` PASS.
+- Secret pattern diff scan bulgu vermedi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.

@@ -1932,6 +1932,19 @@ class DashboardPipelineFlowUiTest(unittest.TestCase):
         self.assertNotIn("task.stdout", html)
         self.assertNotIn("task.stderr", html)
 
+    def test_dashboard_pipeline_flow_preserves_main_task_expand_state(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("const mainTaskKeys = mainTasks.map(flowMainTaskKey);", html)
+        self.assertIn("prunePipelineMainTaskExpanded(mainTaskKeys);", html)
+        self.assertIn("const hasStoredExpandedState = pipelineMainTaskExpanded.size > 0;", html)
+        self.assertIn("pipelineMainTaskExpanded.set(key, !hasStoredExpandedState && index === 0);", html)
+        self.assertIn("const isOpen = key ? pipelineMainTaskExpanded.get(key) === true : index === 0;", html)
+        self.assertIn("if (!current.has(key)) pipelineMainTaskExpanded.delete(key);", html)
+        self.assertIn("bindFlowMainTaskToggles();", html)
+        self.assertNotIn("flowMainTaskIsOpen(mainTask, index)", html)
+        self.assertNotIn('data-flow-main-task="${esc(taskKey)}"', html)
+
 
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:
