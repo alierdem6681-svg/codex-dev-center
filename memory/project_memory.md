@@ -197,3 +197,9 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Worker Dispatch v2 Small Apply
+
+Worker Dispatch v2 icin onceki genis proposal kucuk apply scope'una indirildi. `supervisor/worker_dispatch.py` worker profil dosyalarindan role, capability, enabled flag ve risk limit uygunluguna gore secim yapar. CTO router parent/subtask atamalari ve lifecycle backlog apply/retry child atamalari bu helper'a baglandi.
+
+Davranis `tests/test_runtime_status_model.py` icinde explicit QA capability, disabled/risk-limited profile ve dashboard task assignment testleriyle sabitlendi. Lease, retry backoff ve event telemetry sonraki kucuk paketlere birakildi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

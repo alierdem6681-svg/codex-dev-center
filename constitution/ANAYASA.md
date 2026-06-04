@@ -34,6 +34,8 @@ Başlangıç rolleri:
 - worker-3: DevOps, yayına alma ve servisler
 - worker-4: Test, kalite ve denetim
 
+Görev dağıtımı worker profillerindeki rol, yetenek, aktiflik ve risk limiti ile uyumlu olmalıdır. Explicit role/capability şartı varsa önce bu şartlar denenir; uygun profil bulunamazsa mevcut deterministik güvenli fallback korunur ve sonraki paketlerde bu durum kayıt/telemetry ile izlenir.
+
 ## 6. Canlı Ortam Kuralı
 
 Canlıya alma işlemi yalnızca GitHub Actions `Deploy to VM` workflow'u üzerinden yapılabilir. VM'ye doğrudan SSH ile bağlanılamaz, production runtime dosyalarına elle müdahale edilemez ve terminalden production deploy çalıştırılamaz.

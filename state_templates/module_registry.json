@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:57:57+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -67,12 +67,13 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "worker-1..4 servisleri, görev işleme, controlled repo apply path validation ve log üretimi.",
+      "description": "worker-1..4 servisleri, profil bazlı görev dağıtımı, görev işleme, controlled repo apply path validation ve log üretimi.",
       "actions": [
         "start_worker",
         "stop_worker",
         "restart_worker",
         "view_worker_logs",
+        "profile_based_dispatch",
         "repo_apply_validation"
       ]
     },

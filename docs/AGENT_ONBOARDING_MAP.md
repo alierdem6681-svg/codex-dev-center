@@ -87,6 +87,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/worker_dispatch.py içindeki profil bazlı worker role/capability/risk seçimi
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -106,6 +107,11 @@ Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
+
+Worker dispatch notu:
+- CTO router ve lifecycle backlog dispatcher worker seciminde `state/worker_profiles.json`, yoksa `state_templates/worker_profiles.json` okur.
+- Explicit `required_role` ve `required_capabilities` varsa worker profile role/skills ve risk limitine gore eslestirilir.
+- Explicit requirement yoksa title/description icinden dashboard, test, deploy ve backend/queue/router sinyalleriyle deterministik profil tercihi yapilir; uygun profil bulunamazsa eski sirali fallback korunur.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

@@ -2,9 +2,15 @@
   "sleep_when_queue_empty": true,
   "wake_when_task_arrives": true,
   "supervisor_assigns_tasks": true,
+  "profile_based_dispatch": true,
+  "dispatch_profile_sources": [
+    "state/worker_profiles.json",
+    "state_templates/worker_profiles.json"
+  ],
+  "dispatch_uses_role_capability_and_risk": true,
   "current_sleep_mode_implemented": true,
   "current_wake_mode_implemented": true,
-  "next_step": "implement_worker_sleep_wake_services",
-  "updated_at": "2026-06-01T10:12:49.039459+00:00",
+  "next_step": "implement_dispatch_lease_retry_and_event_telemetry",
+  "updated_at": "2026-06-04T06:57:57+00:00",
   "daemon_service": "codex-lifecycle.service"
 }

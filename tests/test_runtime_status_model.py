@@ -18,6 +18,7 @@ from supervisor import (  # noqa: E402
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
+    cto_task_router,
     direct_cto_job_recovery,
     lifecycle_manager,
     production_readiness_suite,
@@ -29,6 +30,7 @@ from supervisor import (  # noqa: E402
     task_validation_engine,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
+    worker_dispatch,
     worker_runner,
 )
 from supervisor.task_status_constants import (  # noqa: E402
@@ -77,6 +79,58 @@ import pipeline_flow  # noqa: E402
 
 
 class WorkerStatusModelTest(unittest.TestCase):
+    def test_worker_dispatch_matches_explicit_role_capabilities_and_risk(self):
+        profiles = json.loads((ROOT / "state_templates" / "worker_profiles.json").read_text(encoding="utf-8"))
+
+        selected = worker_dispatch.select_worker_for_task(
+            {
+                "title": "Quality gate audit",
+                "required_role": "qa",
+                "required_capabilities": ["testing", "audit"],
+                "risk": "medium",
+            },
+            profiles,
+        )
+
+        self.assertEqual(selected, "worker-4")
+
+    def test_worker_dispatch_filters_disabled_profiles_and_risk_limit(self):
+        profiles = {
+            "profiles": [
+                {"id": "worker-1", "enabled": True, "skills": ["systemd"], "risk_limit": "low"},
+                {"id": "worker-2", "enabled": False, "skills": ["systemd"], "risk_limit": "medium"},
+                {"id": "worker-3", "enabled": True, "skills": ["systemd"], "risk_limit": "medium"},
+            ]
+        }
+
+        selected = worker_dispatch.select_worker_for_task(
+            {"title": "Service lifecycle repair", "required_capabilities": ["systemd"], "risk": "medium"},
+            profiles,
+        )
+
+        self.assertEqual(selected, "worker-3")
+
+    def test_cto_router_submit_uses_profile_based_worker_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            templates = root / "state_templates"
+            templates.mkdir()
+            (templates / "worker_profiles.json").write_text(
+                (ROOT / "state_templates" / "worker_profiles.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+
+            result = cto_task_router.submit_task(
+                root=root,
+                source="dashboard",
+                title="Dashboard panel UI update",
+                message="Frontend dashboard panel change",
+                risk="low",
+                split=False,
+            )
+
+        self.assertEqual(result["task"]["assigned_worker"], "worker-2")
+
     def test_task_status_normalizer_accepts_case_space_hyphen_and_separator_variants(self):
         self.assertEqual(normalize_status("ready for validation"), TASK_STATUS_READY_FOR_VALIDATION)
         self.assertEqual(normalize_status("ready/for.validation"), TASK_STATUS_READY_FOR_VALIDATION)

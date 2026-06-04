@@ -21,3 +21,5 @@ CTO gorev dagitirken sunlari dikkate alir:
 - Gecmis hata durumu
 - Gorevin modulu
 - Hedef uyumu
+
+Worker Dispatch v2 small apply ile CTO router ve lifecycle backlog dispatcher worker profil dosyalarini salt okunur okuyarak role/capability/risk uygunluguna gore secim yapar. Lease, retry backoff ve event telemetry sonraki paket kapsamindadir.

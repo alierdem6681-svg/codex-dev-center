@@ -36,6 +36,7 @@ try:
         read_json as read_state_json,
         worker_block_reason,
     )
+    from .worker_dispatch import active_counts_from_tasks, load_worker_profiles, select_worker_for_task
 except ImportError:
     import cto_autonomous_delivery
     from critical_operation_policy import approval_required_payload
@@ -63,6 +64,7 @@ except ImportError:
         read_json as read_state_json,
         worker_block_reason,
     )
+    from worker_dispatch import active_counts_from_tasks, load_worker_profiles, select_worker_for_task
 
 APP = Path("/opt/codex-dev-center")
 STATE = APP / "state"
@@ -184,15 +186,15 @@ def queue_counts():
     active = pending + assigned + running
     return len(pending), len(running), len(active)
 
-def choose_worker(title):
-    text = str(title or "").lower()
-    if any(x in text for x in ["dashboard", "panel", "ui", "frontend"]):
-        return "worker-2"
-    if any(x in text for x in ["service", "watcher", "deploy", "rollback", "lifecycle"]):
-        return "worker-3"
-    if any(x in text for x in ["quality", "test", "gate", "validation", "pipeline"]):
-        return "worker-4"
-    return "worker-1"
+def choose_worker(title, task: dict[str, Any] | None = None, tasks: list[dict[str, Any]] | None = None):
+    dispatch_task = task or {"title": title, "description": title, "risk": "low"}
+    profiles = load_worker_profiles(APP)
+    return select_worker_for_task(
+        dispatch_task,
+        profiles,
+        active_counts=active_counts_from_tasks(tasks or []),
+        fallback_index=0,
+    )
 
 def max_parallel_workers() -> int:
     try:
@@ -231,7 +233,7 @@ def selected_workers_for_active_mode() -> list[str]:
             if worker_id in WORKERS:
                 preferred = worker_id
             else:
-                preferred = choose_worker(task.get("title") or task.get("id"))
+                preferred = choose_worker(task.get("title") or task.get("id"), task=task, tasks=tasks)
             if append_worker(preferred):
                 return selected
     return selected or ["worker-1"]
@@ -356,7 +358,7 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
         "proposal_report_path": parent.get("report_path", ""),
         "risk": risk,
         "risk_level": risk,
-        "assigned_worker": choose_worker(title),
+        "assigned_worker": None,
         "worker_eligible": True,
         "dispatcher_mode": "apply",
         "execution_mode": "repo_apply",
@@ -371,6 +373,7 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
         "pipeline_status": "NOT_RUN",
         "delivery_level": "REPO_APPLY_QUEUED",
     }
+    child["assigned_worker"] = choose_worker(title, task=child, tasks=queue.get("tasks", []))
     queue.setdefault("tasks", []).append(child)
     parent["repo_apply_child"] = child_id
     parent["repo_apply_attempts"] = int(parent.get("repo_apply_attempts", 0) or 0) + 1
@@ -512,7 +515,7 @@ def ensure_single_backlog_task() -> bool:
         "parent_task": parent_id,
         "risk": risk,
         "risk_level": risk,
-        "assigned_worker": choose_worker(title),
+        "assigned_worker": None,
         "worker_eligible": True,
         "dispatcher_mode": mode,
         "created_at": now(),
@@ -523,6 +526,7 @@ def ensure_single_backlog_task() -> bool:
         "pipeline_status": "NOT_RUN",
         "delivery_level": "BACKLOG_DISPATCH",
     }
+    child["assigned_worker"] = choose_worker(title, task=child, tasks=tasks)
     tasks.append(child)
     parent["backlog_dispatcher_child"] = child_id
     parent["backlog_dispatcher_attempts"] = int(parent.get("backlog_dispatcher_attempts", 0) or 0) + 1
