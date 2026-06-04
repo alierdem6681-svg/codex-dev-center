@@ -155,6 +155,7 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 ## DASHBOARD PIPELINE FLOW BACKEND V0
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+Payload mevcut `stages` alanini koruyarak read-only `main_tasks` ana gorev gruplarini da dondurur. Grup iliskileri `root_task_id`, `parent_task_id`, `parent_task` ve `dispatch_id` alanlarindan turetilir; belirsiz eski kayitlar `Gruplanmamış Eski Görevler` altinda toplanir.
 
 ## WORKER DISPATCH CONTRACT V1
 

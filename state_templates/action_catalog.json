@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T09:32:25+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -26,6 +26,8 @@
       "requires_approval": false,
       "non_mutating": true,
       "endpoint": "/api/pipeline-flow",
+      "groups_main_tasks": true,
+      "legacy_group_label": "Gruplanmamış Eski Görevler",
       "redacts_raw_messages": true,
       "redacts_terminal_output": true
     },

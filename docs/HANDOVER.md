@@ -500,6 +500,35 @@ PR durumu:
 
 ---
 
+## Dashboard Pipeline Flow Main Task Grouping v0
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-092448 / CTO-BACKLOG-20260604-091751-464617-TELEGRAM-ACTION-COMMAND
+
+Eklenenler:
+- `/api/pipeline-flow` payload'u mevcut `stages` alanini koruyarak `main_tasks` ana gorev gruplarini dondurur.
+- Ana gorev gruplari `root_task_id`, `parent_task_id`, `parent_task` ve farkli `dispatch_id` iliskilerinden turetilir.
+- Belirsiz eski kayitlar `Gruplanmamış Eski Görevler` altinda toplanir.
+- Dashboard Pipeline Flow bolumune yeni menu acmadan accordion gorunumu eklendi.
+- Pipeline Flow tarihleri UI'da `DD.MM.YYYY HH:mm` formatina cevrildi.
+- Raw kullanici mesaji, uzun description, stdout/stderr, log veya terminal dump payload'a eklenmedi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 122 test.
+- `python3 -m json.tool` ile guncellenen state template JSON dosyalari PASS.
+- Gecici `/tmp` repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Ana worktree'de `git add`, sandbox disindaki git metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- Gecici `/tmp` clone uzerinde commit `1c523c3` olusturuldu; `git push` DNS nedeniyle `Could not resolve host: github.com` hatasiyla basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
 ## Worker Dispatch v2 Apply Retry - Dispatch Contract Metadata
 
 Tarih: 2026-06-04

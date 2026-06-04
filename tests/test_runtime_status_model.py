@@ -1536,6 +1536,62 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertEqual(flow["summary"]["failed_count"], 2)
         self.assertEqual(flow["summary"]["blocked_count"], 2)
 
+    def test_pipeline_flow_groups_main_tasks_and_legacy_records(self):
+        parent_id = "CTO-BACKLOG-20260604-091751-464617-TELEGRAM-ACTION-COMMAND"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_flow_runtime(
+                root,
+                [
+                    {
+                        "id": parent_id,
+                        "status": TASK_STATUS_PROPOSAL_DONE,
+                        "risk": "medium",
+                        "updated_at": "2026-06-04T09:00:00+00:00",
+                    },
+                    {
+                        "id": "CTO-APPLY-CHILD",
+                        "status": TASK_STATUS_RUNNING,
+                        "root_task_id": parent_id,
+                        "risk": "medium",
+                        "assigned_worker": "worker-1",
+                        "updated_at": "2026-06-04T09:20:00+00:00",
+                    },
+                    {
+                        "id": "CTO-DISPATCH-CHILD",
+                        "status": TASK_STATUS_READY_FOR_VALIDATION,
+                        "parent_task_id": parent_id,
+                        "risk": "medium",
+                        "assigned_worker": "worker-2",
+                        "updated_at": "2026-06-04T09:15:00+00:00",
+                    },
+                    {
+                        "id": "TASK-OLD",
+                        "status": TASK_STATUS_DONE,
+                        "risk": "low",
+                        "updated_at": "2026-06-04T08:00:00+00:00",
+                    },
+                ],
+            )
+
+            flow = pipeline_flow.build_pipeline_flow(root)
+
+        self.assertEqual(flow["summary"]["main_task_count"], 2)
+        groups = {item["code"]: item for item in flow["main_tasks"]}
+        main = groups[parent_id]
+        legacy = groups["LEGACY"]
+
+        self.assertEqual(main["title"], "Telegram Action Command")
+        self.assertEqual(main["status"], TASK_STATUS_PROPOSAL_DONE)
+        self.assertEqual(main["stage"], "validation")
+        self.assertEqual(main["counts"]["tasks"], 3)
+        self.assertEqual(main["counts"]["children"], 2)
+        self.assertEqual(main["progress"]["current_stage"], "validation")
+        self.assertEqual({child["id"] for child in main["children"]}, {"CTO-APPLY-CHILD", "CTO-DISPATCH-CHILD"})
+        self.assertEqual(legacy["title"], "Gruplanmamış Eski Görevler")
+        self.assertEqual(legacy["counts"]["tasks"], 1)
+        self.assertEqual(legacy["children"][0]["id"], "TASK-OLD")
+
     def test_pipeline_flow_reads_safe_markers_without_raw_task_or_terminal_fields(self):
         secret_text = "raw-secret-value-should-not-leak"
         with tempfile.TemporaryDirectory() as tmp:
@@ -1579,6 +1635,7 @@ class DashboardPipelineFlowTest(unittest.TestCase):
         self.assertNotIn("stdout", encoded)
         self.assertNotIn("stderr", encoded)
         self.assertNotIn("description", encoded)
+        self.assertNotIn("title", flow["stages"][2]["tasks"][0])
         self.assertEqual(flow["markers"]["pipeline_status"]["task_to_deploy_test"], "PASS")
         self.assertEqual(flow["markers"]["github_actions"]["runner_name"], "codex-dev-center-01")
         self.assertEqual(flow["markers"]["last_smoke_test"]["status"], "PASS")
@@ -1618,6 +1675,13 @@ class DashboardPipelineFlowUiTest(unittest.TestCase):
         self.assertIn("document.hidden", html)
         self.assertIn("pipelineFlowFailureCount", html)
         self.assertIn("renderPipelineFlow", html)
+        self.assertIn("flowDateTime", html)
+        self.assertIn("flowMainTasks", html)
+        self.assertIn("renderFlowMainTasks", html)
+        self.assertIn('class="flow-main-task"', html)
+        self.assertIn("latestFlow.main_tasks", html)
+        self.assertIn("day: '2-digit'", html)
+        self.assertIn("month: '2-digit'", html)
         self.assertIn("<strong>${esc(task.id || '-')}</strong>", html)
         self.assertIn("${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}", html)
         self.assertNotIn("task.description", html)

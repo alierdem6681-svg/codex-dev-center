@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T09:32:25+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -31,6 +31,15 @@
     "endpoint": "/api/pipeline-flow",
     "read_only": true,
     "include_empty_stages": true,
+    "include_main_task_groups": true,
+    "main_task_grouping_fields": [
+      "root_task_id",
+      "parent_task_id",
+      "parent_task",
+      "dispatch_id"
+    ],
+    "legacy_group_label": "Gruplanmamış Eski Görevler",
+    "ui_date_format": "DD.MM.YYYY HH:mm",
     "deployed_stage_last": true,
     "return_raw_task_messages": false,
     "return_terminal_output": false

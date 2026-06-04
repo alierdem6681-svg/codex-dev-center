@@ -217,8 +217,45 @@
         padding: 9px 0;
       }
       .flow-marker-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
+      .flow-main-tasks {
+        border-top: 1px solid var(--line);
+        margin-top: 8px;
+        padding-top: 8px;
+      }
+      .flow-main-task {
+        border-top: 1px solid var(--line);
+        padding: 8px 0;
+      }
+      .flow-main-task:first-of-type { border-top: 0; }
+      .flow-main-task summary {
+        cursor: pointer;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(180px, 1.2fr) minmax(150px, .7fr) minmax(160px, .8fr);
+        align-items: center;
+        list-style: none;
+      }
+      .flow-main-task summary::-webkit-details-marker { display: none; }
+      .flow-progress {
+        height: 7px;
+        border-radius: 999px;
+        background: var(--soft);
+        overflow: hidden;
+      }
+      .flow-progress span {
+        display: block;
+        height: 100%;
+        background: #2f5f73;
+      }
+      .flow-child {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.2fr) minmax(140px, .7fr) minmax(130px, .7fr);
+        gap: 8px;
+        border-top: 1px solid var(--line);
+        padding: 7px 0;
+      }
       @media (max-width: 980px) {
-        .grid, .wide, .three, .controls, .flow-summary, .flow-task { grid-template-columns: 1fr; }
+        .grid, .wide, .three, .controls, .flow-summary, .flow-task, .flow-main-task summary, .flow-child { grid-template-columns: 1fr; }
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
@@ -440,6 +477,18 @@
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
       }
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
+      function flowDateTime(value){
+        const time = Date.parse(value || '');
+        if (Number.isNaN(time)) return '-';
+        return new Intl.DateTimeFormat('tr-TR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(new Date(time)).replace(',', '');
+      }
       function tasks(){ return ((latest.tasks || latest.queue || {}).tasks || []).slice(); }
       function workers(){ return ((latest.workers || {}).workers || []).slice(); }
       function accountDisplayName(data){
@@ -524,8 +573,41 @@
       function flowStages(){
         return latestFlow && Array.isArray(latestFlow.stages) ? latestFlow.stages : [];
       }
+      function flowMainTasks(){
+        return latestFlow && Array.isArray(latestFlow.main_tasks) ? latestFlow.main_tasks : [];
+      }
       function flowStateBadge(state){
         return badge(flowStateLabels[String(state || '').toLowerCase()] || state || '-');
+      }
+      function flowProgressBar(progress){
+        const percent = Math.max(0, Math.min(100, Number(progress?.percent || 0)));
+        return `<div class="flow-progress" aria-label="${esc(percent)}%"><span style="width:${esc(percent)}%"></span></div>`;
+      }
+      function renderFlowMainTasks(){
+        const mainTasks = flowMainTasks();
+        if (!mainTasks.length) return '<div class="flow-main-tasks"><div class="muted">Ana görev grubu yok.</div></div>';
+        return `<div class="flow-main-tasks"><div class="muted">Ana görevler</div>${mainTasks.map((mainTask, index) => {
+          const counts = mainTask.counts || {};
+          const progress = mainTask.progress || {};
+          const children = Array.isArray(mainTask.children) ? mainTask.children : [];
+          const childRows = children.map(child => {
+            return `<div class="flow-child"><div><strong>${esc(child.id || '-')}</strong><br><span class="muted">${esc(child.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(child.status)} ${badge(child.risk || child.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(child.updated_at || child.finished_at || child.created_at))}</div></div>`;
+          }).join('') || '<div class="muted">Alt görev yok.</div>';
+          return `<details class="flow-main-task" ${index === 0 ? 'open' : ''}>
+            <summary>
+              <div><strong>${esc(mainTask.title || mainTask.code || '-')}</strong><br><span class="muted">${esc(mainTask.code || mainTask.id || '-')}</span></div>
+              <div>${badge(mainTask.status)} ${flowStateBadge(mainTask.state)}<br><span class="muted">${esc(counts.tasks ?? 0)} görev, ${esc(counts.children ?? 0)} alt görev</span></div>
+              <div>${flowProgressBar(progress)}<span class="muted">${esc(progress.percent ?? 0)}% - ${esc(flowStageLabels[progress.current_stage] || progress.current_stage_label || '-')}</span></div>
+            </summary>
+            <div class="flow-marker-row">
+              ${badge(`Aktif: ${counts.active ?? 0}`)}
+              ${badge(`Bloklu: ${counts.blocked ?? 0}`)}
+              ${badge(`Hatalı: ${counts.failed ?? 0}`)}
+              ${badge(`Kapalı: ${counts.closed ?? 0}`)}
+            </div>
+            <div>${childRows}</div>
+          </details>`;
+        }).join('')}</div>`;
       }
       function selectedFlowStage(){
         const stages = flowStages();
@@ -555,7 +637,7 @@
         const stages = flowStages();
         const selected = selectedFlowStage();
         if (selected && activeFlowStage !== selected.id) activeFlowStage = selected.id;
-        const generatedAt = latestFlow?.generated_at ? new Date(latestFlow.generated_at).toLocaleTimeString() : '-';
+        const generatedAt = flowDateTime(latestFlow?.generated_at);
         const stale = pipelineFlowError && latestFlow ? 'Son veri korunuyor' : '';
         pipelineFlowUpdated.textContent = pipelineFlowError ? `Hata: ${pipelineFlowError}` : `Güncellendi ${generatedAt}`;
         pipelineFlowMode.textContent = stale || (latestFlow?.non_mutating ? 'Salt okunur' : 'Kontrol ediliyor');
@@ -578,7 +660,7 @@
         const githubMarker = markers.github_actions || {};
         const smokeMarker = markers.last_smoke_test || {};
         const tasksHtml = (selected.tasks || []).map(task => {
-          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(task.updated_at || task.finished_at || task.created_at || '-')}</div></div>`;
+          return `<div class="flow-task"><div><strong>${esc(task.id || '-')}</strong><br><span class="muted">${esc(task.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(task.status)} ${badge(task.risk || task.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(task.updated_at || task.finished_at || task.created_at))}</div></div>`;
         }).join('') || '<div class="muted">Bu stage içinde görev yok.</div>';
         pipelineFlowPanel.innerHTML = `
           <div class="flow-summary">
@@ -592,6 +674,7 @@
             ${badge(`GitHub: ${githubMarker.last_deploy_status || githubMarker.status || '-'}`)}
             ${badge(`Smoke: ${smokeMarker.status || smokeMarker.ok || '-'}`)}
           </div>
+          ${renderFlowMainTasks()}
           <div class="muted">Status dağılımı</div>
           <div class="flow-marker-row">${statusCounts.length ? statusCounts.map(([status, count]) => `${badge(status)}<span class="badge">${esc(count)}</span>`).join('') : badge('Boş')}</div>
           <div>${tasksHtml}</div>

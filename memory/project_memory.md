@@ -212,6 +212,16 @@ Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, 
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
 
+## 2026-06-04 Dashboard Pipeline Flow Main Task Grouping v0
+
+Pipeline Flow backend mevcut `stages` sozlesmesini bozmadan `main_tasks` ana gorev gruplarini da dondurur. Gruplama `root_task_id`, `parent_task_id`, `parent_task` ve farkli `dispatch_id` alanlarindan turetilir; belirsiz eski kayitlar `Gruplanmamış Eski Görevler` altinda toplanir.
+
+Dashboard mevcut Pipeline Flow bolumunde accordion ile ana gorevleri, sayimlari, progress ozetini ve guvenli child task ozetlerini gosterir. Pipeline Flow tarihleri UI'da `DD.MM.YYYY HH:mm` formatina cevrilir. Raw kullanici mesaji, uzun description, stdout/stderr, log veya terminal dump payload'a eklenmez.
+
+Compile, `tests.test_runtime_status_model` 122 test, state template JSON validation, `git diff --check` ve gecici `/tmp` repo kopyasinda production readiness suite PASS oldu. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+PR durumu: Ana worktree'de `git add` sandbox disindaki git metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu. Gecici `/tmp` clone uzerinde commit `1c523c3` olusturuldu fakat `git push` DNS nedeniyle GitHub'a ulasamadi. GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
 ## 2026-06-04 Worker Dispatch v2 Apply Retry
 
 Worker Dispatch v2 apply retry kucuk kapsama indirildi. Queue task normalizasyonu artik dispatch contract metadata alanlarini varsayilanlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.

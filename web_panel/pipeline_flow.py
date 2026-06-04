@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -201,6 +202,11 @@ STATUS_TO_STAGE = {
     for stage in STAGE_DEFINITIONS
     for status in stage["statuses"]
 }
+STAGE_ORDER_BY_ID = {
+    stage["id"]: order
+    for order, stage in enumerate(STAGE_DEFINITIONS, start=1)
+}
+STAGE_LABEL_BY_ID = {stage["id"]: stage["label"] for stage in STAGE_DEFINITIONS}
 MAPPED_STATUSES = set(STATUS_TO_STAGE)
 UNMAPPED_KNOWN_STATUSES = sorted(set(KNOWN_TASK_STATUSES) - MAPPED_STATUSES)
 ACTIVE_STATUSES = {
@@ -230,6 +236,26 @@ BLOCKED_STATUSES = {
     TASK_STATUS_APPROVAL_REQUIRED,
     TASK_STATUS_BLOCKED,
 }
+COMPLETE_STATUSES = {
+    TASK_STATUS_DONE,
+    TASK_STATUS_NO_CHANGE,
+    TASK_STATUS_ARCHIVED_STALE,
+    TASK_STATUS_ARCHIVED,
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_CANCELLED_BY_OWNER_CLEANUP,
+    TASK_STATUS_DEPLOYED,
+}
+GROUP_STATUS_PRIORITY = (
+    tuple(FAILED_STATUSES),
+    tuple(BLOCKED_STATUSES),
+    tuple(ACTIVE_STATUSES),
+    (TASK_STATUS_DEPLOYED,),
+    tuple(COMPLETE_STATUSES),
+)
+LEGACY_MAIN_TASK_ID = "__legacy_ungrouped_tasks__"
+LEGACY_MAIN_TASK_CODE = "LEGACY"
+LEGACY_MAIN_TASK_TITLE = "Gruplanmamış Eski Görevler"
+MAIN_TASK_CHILD_LIMIT = 8
 
 SAFE_TASK_KEYS = (
     "id",
@@ -329,6 +355,145 @@ def compact_task(task: dict[str, Any]) -> dict[str, Any]:
     if "risk" not in compact and "risk_level" in compact:
         compact["risk"] = compact["risk_level"]
     return compact
+
+
+def task_id(task: dict[str, Any]) -> str:
+    return str(task.get("id") or "").strip()
+
+
+def relation_id(task: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = str(task.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def referenced_root_ids(tasks: list[dict[str, Any]]) -> set[str]:
+    roots: set[str] = set()
+    for task in tasks:
+        root_id = relation_id(task, ("root_task_id", "parent_task_id", "parent_task"))
+        if root_id:
+            roots.add(root_id)
+    return roots
+
+
+def main_group_id(task: dict[str, Any], referenced_roots: set[str]) -> str:
+    explicit_root = relation_id(task, ("root_task_id", "parent_task_id", "parent_task"))
+    if explicit_root:
+        return explicit_root
+
+    own_id = task_id(task)
+    if own_id and own_id in referenced_roots:
+        return own_id
+
+    dispatch_id = str(task.get("dispatch_id") or "").strip()
+    if dispatch_id and dispatch_id != own_id:
+        return dispatch_id
+
+    return LEGACY_MAIN_TASK_ID
+
+
+def safe_title_from_code(code: str) -> str:
+    parts = [part for part in re.split(r"[-_\s]+", code) if part]
+    skipped = {"CTO", "TASK", "JOB", "APPLY", "BACKLOG", "DISPATCH", "WORKER", "SUB"}
+    words = []
+    for part in parts:
+        upper = part.upper()
+        if upper in skipped or upper.startswith("SUB"):
+            continue
+        if upper.isdigit():
+            continue
+        words.append(part.capitalize())
+    if words:
+        return safe_scalar(" ".join(words[-6:]), 80)
+    return safe_scalar(f"Ana görev {code}", 80)
+
+
+def group_current_stage(tasks: list[dict[str, Any]]) -> str | None:
+    stage_ids = {stage_for_status(task.get("status")) for task in tasks}
+    ordered = sorted(stage_ids, key=lambda stage_id: STAGE_ORDER_BY_ID.get(stage_id, 0))
+    return ordered[-1] if ordered else None
+
+
+def group_status(tasks: list[dict[str, Any]], parent: dict[str, Any] | None) -> str:
+    if parent is not None:
+        return normalize_status(parent.get("status"))
+    statuses = {normalize_status(task.get("status")) for task in tasks}
+    for group in GROUP_STATUS_PRIORITY:
+        for status in group:
+            if status in statuses:
+                return status
+    return normalize_status(tasks[0].get("status")) if tasks else TASK_STATUS_QUEUED
+
+
+def build_main_tasks(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    tasks_by_id = {task_id(task): task for task in tasks if task_id(task)}
+    referenced_roots = referenced_root_ids(tasks)
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for task in tasks:
+        groups.setdefault(main_group_id(task, referenced_roots), []).append(task)
+
+    main_tasks = []
+    for group_id, group_tasks in groups.items():
+        group_tasks.sort(key=task_sort_value, reverse=True)
+        parent = tasks_by_id.get(group_id)
+        statuses = [normalize_status(task.get("status")) for task in group_tasks]
+        status_counts: dict[str, int] = {}
+        stage_counts: dict[str, int] = {}
+        for status in statuses:
+            status_counts[status] = status_counts.get(status, 0) + 1
+            stage_id = stage_for_status(status)
+            stage_counts[stage_id] = stage_counts.get(stage_id, 0) + 1
+
+        current_stage = group_current_stage(group_tasks)
+        current_order = STAGE_ORDER_BY_ID.get(current_stage or "", 0)
+        total_stages = len(STAGE_DEFINITIONS)
+        is_legacy = group_id == LEGACY_MAIN_TASK_ID
+        child_candidates = [
+            task
+            for task in group_tasks
+            if is_legacy or task_id(task) != group_id
+        ]
+        updated_at = task_sort_value(group_tasks[0]) if group_tasks else ""
+        main_tasks.append(
+            {
+                "id": safe_scalar(group_id),
+                "code": LEGACY_MAIN_TASK_CODE if is_legacy else safe_scalar(group_id, 120),
+                "title": LEGACY_MAIN_TASK_TITLE if is_legacy else safe_title_from_code(group_id),
+                "status": group_status(group_tasks, parent),
+                "stage": current_stage,
+                "state": stage_state(current_stage or "", set(status_counts)) if current_stage else "empty",
+                "updated_at": safe_scalar(updated_at),
+                "counts": {
+                    "tasks": len(group_tasks),
+                    "children": len(child_candidates),
+                    "active": sum(status_counts.get(status, 0) for status in ACTIVE_STATUSES),
+                    "failed": sum(status_counts.get(status, 0) for status in FAILED_STATUSES),
+                    "blocked": sum(status_counts.get(status, 0) for status in BLOCKED_STATUSES),
+                    "closed": sum(status_counts.get(status, 0) for status in COMPLETE_STATUSES),
+                },
+                "progress": {
+                    "current_stage": current_stage,
+                    "current_stage_label": STAGE_LABEL_BY_ID.get(current_stage or ""),
+                    "completed_stage_count": current_order,
+                    "total_stage_count": total_stages,
+                    "percent": round((current_order / total_stages) * 100) if current_order else 0,
+                },
+                "status_counts": status_counts,
+                "stage_counts": stage_counts,
+                "children": [compact_task(task) for task in child_candidates[:MAIN_TASK_CHILD_LIMIT]],
+            }
+        )
+
+    main_tasks.sort(
+        key=lambda item: (
+            item["id"] != LEGACY_MAIN_TASK_ID,
+            str(item.get("updated_at") or ""),
+        ),
+        reverse=True,
+    )
+    return main_tasks
 
 
 def task_sort_value(task: dict[str, Any]) -> str:
@@ -431,6 +596,7 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
 
     non_empty_stages = [stage for stage in stages if stage["task_count"] > 0]
     current_stage = non_empty_stages[-1]["id"] if non_empty_stages else None
+    main_tasks = build_main_tasks(normalized_tasks)
     return {
         "ok": True,
         "generated_at": generated_at or utc_now(),
@@ -445,6 +611,7 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
         ],
         "summary": {
             "task_count": len(normalized_tasks),
+            "main_task_count": len(main_tasks),
             "stage_count": len(stages),
             "current_stage": current_stage,
             "status_counts": status_counts,
@@ -453,5 +620,6 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
             "unmapped_known_statuses": UNMAPPED_KNOWN_STATUSES,
         },
         "stages": stages,
+        "main_tasks": main_tasks,
         "markers": read_flow_markers(state_dir),
     }

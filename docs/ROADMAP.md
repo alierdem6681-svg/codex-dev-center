@@ -181,7 +181,9 @@ Faz 19B-10A Model Policy
 - [x] Gercek task status enumlari sabit pipeline stage sirasina maplenir.
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
-- [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+- [x] Mevcut Pipeline Flow alaninda stage tab UI ve guvenli polling davranisi eklendi.
+- [x] `main_tasks` ana gorev gruplama payload'u ve accordion gorunumu eklendi.
+- [x] Pipeline Flow tarihleri panelde `DD.MM.YYYY HH:mm` formatina cevrildi.
 
 ## Faz 34 - Worker Dispatch v2 Contract Metadata
 
