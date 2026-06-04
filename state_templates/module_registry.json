@@ -12,6 +12,7 @@
       "description": "Canlı izleme, pipeline tracking, ayarlar ve kontrol paneli.",
       "actions": [
         "refresh_dashboard",
+        "view_quality_gate_status",
         "update_dashboard_settings",
         "restart_panel"
       ]

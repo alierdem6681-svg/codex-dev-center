@@ -34,6 +34,19 @@
       "client_state_preserved_on_poll": true
     },
     {
+      "id": "view_quality_gate_status",
+      "label": "Kalite Kapısı Görünümü",
+      "module": "dashboard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/api/status",
+      "payload_key": "qualityGateView",
+      "contract_version": 1,
+      "legacy_decision_source_allowed": false
+    },
+    {
       "id": "panel_first_user_setup",
       "label": "İlk Panel Kullanıcısını Oluştur",
       "module": "panel_auth",
