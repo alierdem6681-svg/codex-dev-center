@@ -861,3 +861,36 @@ Test:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+---
+
+## Safe Test Scratch Standard Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-ACTION-20260604-131808-02-SAFE-TEST-SCRATCH-STANDARD
+Worker: worker-1
+
+Eklenenler:
+- `tests/safe_test_scratch.py` ortak test scratch helper'i eklendi.
+- Scratch root `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` onceligiyle cozulur ve repo icine denk gelirse reddedilir.
+- Her test icin `{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}` formatinda atomik benzersiz dizin olusturulur.
+- `TMPDIR`, `TEMP`, `TMP`, `HOME`, `XDG_CACHE_HOME`, `XDG_CONFIG_HOME`, `CODEX_TEST_OUTPUT_DIR` ve `TEST_SCRATCH_ACTIVE_DIR` aktif scratch alanina yonlendirilir.
+- `repo_snapshot`, `assert_repo_unchanged` ve `guard_repo_clean` repo write guard yardimcilari eklendi.
+- `modules/test_scratch_standard/`, `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, roadmap ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m unittest tests.test_safe_test_scratch_standard` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- JSON validation PASS.
+- `python3 -m unittest discover -s tests` PASS, 184 test.
+- Gecici `/tmp` repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS.
+- `git diff --check` PASS.
+- Repo apply path allowlist kontrolu PASS, 16 dosya.
+- Diff/untracked secret pattern scan PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.
+- Local `git add` `.git/index.lock` yolunda read-only filesystem hatasi verdigi icin commit olusturulamadi.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu tamamlanmadigi icin PR acilamadi.

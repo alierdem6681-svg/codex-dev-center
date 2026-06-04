@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:40:00+00:00",
+  "updated_at": "2026-06-04T13:52:42+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -128,6 +128,28 @@
     "reject_unknown_manifest_fields": true,
     "reject_unknown_asset_fields": true,
     "dashboard_snapshot_raw_payload_included": false
+  },
+  "test_scratch_standard": {
+    "enabled": true,
+    "scratch_root_priority": [
+      "TEST_SCRATCH_ROOT",
+      "RUNNER_TEMP/test-scratch",
+      "TMPDIR/test-scratch"
+    ],
+    "reject_repo_local_scratch_root": true,
+    "per_test_directory_format": "{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}",
+    "runtime_env_redirects": [
+      "TMPDIR",
+      "TEMP",
+      "TMP",
+      "HOME",
+      "XDG_CACHE_HOME",
+      "XDG_CONFIG_HOME",
+      "CODEX_TEST_OUTPUT_DIR",
+      "TEST_SCRATCH_ACTIVE_DIR"
+    ],
+    "repo_write_guard_available": true,
+    "test_command": "{python} -m unittest tests.test_safe_test_scratch_standard"
   },
   "cto_router": {
     "enabled": true,

@@ -97,6 +97,7 @@ Ajan şu klasörleri inceler:
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
 - supervisor/telegram_asset_intake.py Telegram `photo`, `document`, caption ve unsupported medya payload'larını ham dosya indirmeden güvenli metadata event'ine sınıflandırır
 - supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
+- tests/safe_test_scratch.py test runtime dosyalarını repo dışı scratch alanına yönlendirir; `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` önceliği, atomik per-test dizin ve repo write guard sözleşmesini tutar
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/production_environment_manager.py health/smoke yazımlarında aynı read-only/dry-run write policy helper'ını kullanır
@@ -125,6 +126,12 @@ Controlled apply notu:
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
 - `PIPELINE_FAILED` apply child tasklari icin yeni kok task acmadan root-cause raporu uretilmeli; `workspace_missing` gibi nedenler son hata, retry edilebilirlik ve onerilen duzeltme ile ayrastirilmalidir.
+
+Safe test scratch notu:
+- Testler runtime state, cache, config, log veya output dosyalarını repo içine yazmamalıdır.
+- `tests.safe_test_scratch.test_scratch()` aktif test için benzersiz scratch dizini açar, `TMPDIR`, `HOME`, `XDG_CACHE_HOME`, `XDG_CONFIG_HOME` ve test output env değerlerini o alana yönlendirir.
+- Scratch root repo içinde çözülürse helper fail eder; debug için `TEST_SCRATCH_KEEP=1` veya `KEEP_TEST_SCRATCH=1` dışında scratch alanı temizlenir.
+- `guard_repo_clean()` repo write guard sağlar ve allowlist dışı yeni/değişmiş/silinmiş dosyada test fail eder.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

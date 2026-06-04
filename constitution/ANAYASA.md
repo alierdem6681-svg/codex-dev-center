@@ -104,3 +104,9 @@ Her geliştirme sonunda HANDOVER.md, ROADMAP.md ve memory/project_memory.md gün
 ## 10. Telegram Asset Güvenliği
 
 Telegram asset sözleşmeleri gerçek Telegram API'ye fallback yapmadan, secret/env/token/private key değeri okumadan ve runtime state mutasyonu yapmadan test edilir. Asset manifest, limit, checksum, MIME/uzantı ve dashboard hata görünürlüğü redaction kurallarına bağlı kalmalıdır.
+
+## 11. Test Scratch Standardı
+
+Testler ana repo dizinine runtime state, cache, config, log veya output dosyası yazmamalıdır. Test scratch root önceliği `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` şeklindedir ve repo içine çözülen scratch root reddedilir.
+
+Her test benzersiz scratch dizini kullanmalı, temp/home/cache/config/output değişkenlerini scratch alanına yönlendirmeli ve allowlist dışı repo mutasyonlarını repo write guard ile fail etmelidir.

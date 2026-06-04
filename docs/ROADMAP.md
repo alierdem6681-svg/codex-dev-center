@@ -278,3 +278,12 @@ Faz 19B-10A Model Policy
 - [x] Legacy `quality_gate_status` sadece `legacy_quality_gate_status` diagnostik alanina tasinir; pozitif READY fallback kaynagi olmaz.
 - [x] Missing/stale readiness veya health kaynaklari `UNKNOWN` sonucuna baglandi.
 - [x] Kontrat davranisi runtime status unit testleriyle sabitlendi.
+
+## Faz 46 - Safe Test Scratch Standard
+
+- [x] Ortak `tests.safe_test_scratch` helper'i eklendi.
+- [x] Scratch root onceligi `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` olarak sabitlendi.
+- [x] Per-test atomik scratch dizini ve runtime env redirect davranisi unit test ile dogrulandi.
+- [x] Repo write guard allowlist disi checkout mutasyonunu yakalayacak sekilde sabitlendi.
+- [x] Module registry, settings ve action template kayitlari eklendi.
+- [ ] Mevcut uzun test dosyalarinin tempfile kullanimlari sonraki kucuk paketlerde helper'a kademeli tasinacak.

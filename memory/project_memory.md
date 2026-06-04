@@ -337,3 +337,13 @@ Dashboard kalite kapisi karari icin tek kaynakli `qualityGateView` sozlesmesi ek
 Legacy `quality_gate_status` artik dashboard karari icin tek basina kullanilmamali; payload icinde sadece `legacy_quality_gate_status` diagnostik alani olarak tasinir. Eksik veya stale readiness/health kaynagi `UNKNOWN` olur ve legacy fallback pozitif READY iddiasi uretmez.
 
 Davranis `tests/test_runtime_status_model.py` icindeki quality gate view kontrat testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Safe Test Scratch Standard Apply
+
+Testlerin repo checkout'unu kirletmeden deterministik calismasi icin `tests/safe_test_scratch.py` ortak helper'i eklendi. Scratch root `TEST_SCRATCH_ROOT`, sonra `RUNNER_TEMP/test-scratch`, sonra `TMPDIR/test-scratch` onceligiyle cozulur ve repo icinde ise fail eder.
+
+`test_scratch()` her test icin atomik benzersiz dizin acar, temp/home/cache/config/output env degerlerini scratch alanina yonlendirir ve debug retain env'i yoksa cikista temizler. `guard_repo_clean()` allowlist disi repo file create/delete/modify davranisini test fail'e cevirir.
+
+Davranis `tests/test_safe_test_scratch_standard.py` ile sabitlendi. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local `git add` `.git/index.lock` read-only filesystem hatasiyla durdu ve GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu tamamlanmadi; bu nedenle bu sandbox icinde commit/PR acilamadi.

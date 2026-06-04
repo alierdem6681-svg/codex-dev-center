@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:40:00+00:00",
+  "updated_at": "2026-06-04T13:52:42+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -117,6 +117,19 @@
       "description": "Telegram asset manifest, limit, redaction, simulator and dashboard-safe snapshot contracts; real Telegram API fallback is disabled.",
       "actions": [
         "validate_telegram_asset_safety_contract"
+      ]
+    },
+    {
+      "id": "test_scratch_standard",
+      "name": "Safe Test Scratch Standard",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Shared test scratch helper and repo write guard for deterministic non-mutating tests.",
+      "actions": [
+        "validate_test_scratch_standard"
       ]
     },
     {

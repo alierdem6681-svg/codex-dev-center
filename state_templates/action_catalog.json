@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T11:40:00+00:00",
+  "updated_at": "2026-06-04T13:52:42+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -266,6 +266,18 @@
       "non_mutating": true,
       "real_telegram_api": false,
       "command": "{python} -m unittest tests.test_telegram_asset_safety"
+    },
+    {
+      "id": "validate_test_scratch_standard",
+      "label": "Güvenli Test Scratch Standardını Doğrula",
+      "module": "test_scratch_standard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_safe_test_scratch_standard",
+      "repo_local_scratch_rejected": true,
+      "repo_write_guard_available": true
     }
   ]
 }
