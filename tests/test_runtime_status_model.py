@@ -920,6 +920,16 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(result["route"], "async_job")
         self.assertEqual(result["ack_deadline_seconds"], 3)
 
+    def test_fix_phrase_routes_to_action_async_job(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "fix_followup",
+            "Dashboard Pipeline Flow alt görev görünümü kendi kendine kapanıyor, bunu düzeltelim.",
+        )
+
+        self.assertTrue(result["action_command"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertEqual(result["ack_deadline_seconds"], 3)
+
     def test_telegram_asset_action_mode_builds_specific_backlog(self):
         tasks = direct_cto_action_mode.build_backlog(
             "CTO ya telegram üzerinden dosya resim gibi assetler gönderebilmeliyim. geliştirme yapar mısın",
@@ -936,6 +946,24 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             ],
         )
         self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-1", "worker-3", "worker-2", "worker-4"])
+
+    def test_dashboard_pipeline_expand_action_mode_builds_specific_backlog(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "dashboard pipeline flow ekranında aktif ana görev alt görevleri gösteriyor. "
+            "Alt görevler görünmesi diye tıklıyorum ve görünüm kapanıyor ama birkaç saniye sonra otomatik açılıyor. "
+            "Bunu düzeltelim.",
+            "20260604-TEST",
+        )
+
+        self.assertEqual(
+            [task["title"] for task in tasks],
+            [
+                "Dashboard Pipeline Expand State Root Cause",
+                "Dashboard Pipeline Expand State Tests",
+                "Dashboard Pipeline Live Polling Contract",
+            ],
+        )
+        self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-2", "worker-4", "worker-1"])
 
     def test_long_task_routes_to_async_before_local_reply(self):
         result = telegram_direct_cto_simulator.simulate_case(

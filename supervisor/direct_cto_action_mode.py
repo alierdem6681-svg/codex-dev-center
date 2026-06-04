@@ -71,6 +71,12 @@ def build_backlog(raw_text, run_id):
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
         "görsel", "gorsel", "media", "medya"
     ])
+    dashboard_pipeline_expand_requested = (
+        "dashboard" in text
+        and "pipeline" in text
+        and any(x in text for x in ["alt görev", "alt gorev", "ana görev", "ana gorev"])
+        and any(x in text for x in ["aç", "ac", "kapan", "kapat", "görünüm", "gorunum", "tıkla", "tikla"])
+    )
 
     if telegram_asset_requested:
         tasks = [
@@ -101,6 +107,32 @@ def build_backlog(raw_text, run_id):
                 "Telegram Asset Safety Tests",
                 "Asset kabul, limit, manifest, secret redaction, Telegram simulator, dashboard smoke ve hata durumları için test planı ve risk raporu üret.",
                 "worker-4"
+            ),
+        ]
+        return tasks
+
+    if dashboard_pipeline_expand_requested:
+        tasks = [
+            make_task(
+                run_id, 1,
+                "dashboard-pipeline-expand-state-root-cause",
+                "Dashboard Pipeline Expand State Root Cause",
+                "Pipeline Flow ana görev/alt görev expand-collapse durumunun live polling sonrası kendi kendine açılıp kapanmasının kök nedenini incele. UI state key, selected stage, polling refresh ve DOM render etkisini ayıran değişiklik önerisi üret.",
+                "worker-2"
+            ),
+            make_task(
+                run_id, 2,
+                "dashboard-pipeline-expand-state-tests",
+                "Dashboard Pipeline Expand State Tests",
+                "Ana görev tıklanınca alt görevlerin kullanıcı tercihini koruması, aktif ana görevde kapanınca tekrar açılmaması ve kapalı stage kayıtlarında birkaç saniye sonra kapanma/açılma olmaması için test planı üret.",
+                "worker-4"
+            ),
+            make_task(
+                run_id, 3,
+                "dashboard-pipeline-live-polling-contract",
+                "Dashboard Pipeline Live Polling Contract",
+                "Pipeline Flow API/live polling sözleşmesinde kullanıcı UI state'inin server refresh ile ezilmemesi için küçük güvenli backend/frontend kontrat önerisi üret.",
+                "worker-1"
             ),
         ]
         return tasks

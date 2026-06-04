@@ -416,7 +416,8 @@ def is_action_command(text):
         "pipeline kur", "pipeline'ı kur", "pipeline’i kur", "pipeline başlat",
         "görevleri başlat", "gorevleri baslat", "tüm görevleri", "tum gorevleri",
         "geliştirmeye başla", "gelistirmeye basla", "geliştirmeye başlayalım",
-        "gelistirmeye baslayalim"
+        "gelistirmeye baslayalim", "düzeltelim", "duzeltelim", "bunu düzelt",
+        "bunu duzelt", "bunu çözelim", "bunu cozelim", "çözelim", "cozelim"
     ]
     return any(w in lowered for w in action_words)
 
