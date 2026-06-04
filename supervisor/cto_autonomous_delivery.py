@@ -268,6 +268,15 @@ def deploy_gate_repo_applied(task: dict[str, Any]) -> bool:
 
 def backlog_candidate_reason(task: dict[str, Any]) -> str:
     status = normalize_status(task.get("status"))
+    task_id = str(task.get("id") or "")
+    root_task_id = str(task.get("root_task_id") or task_id)
+    result = str(task.get("result") or "").lower()
+    if task.get("final_reconcile") or task.get("superseded_by_deploy"):
+        return "superseded_or_reconciled_task"
+    if "superseded" in result or result.startswith("cancelled_scope_guard"):
+        return "superseded_or_scope_cancelled_task"
+    if task_id.startswith("CTO-ACTION-20260604-140243-") or root_task_id.startswith("CTO-ACTION-20260604-140243-"):
+        return "duplicate_observed_issue_batch_superseded"
     if task_flag(task, "production_deployed"):
         return "already_deployed"
     if task_flag(task, "backlog_continuation_created"):

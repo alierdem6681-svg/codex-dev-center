@@ -910,6 +910,7 @@ Eklenenler:
 - `supervisor/retry_policy.py` timeout/usage-limit icin ayni task uzerinde idempotency key'li backoff karari uretir.
 - `supervisor/task_status_constants.py` atomic JSON state/tmp audit helper'i ekler.
 - `supervisor/production_readiness_suite.py` uzun dry-run JSON stdout'unu kesmeden okur ve prefixed JSON payload'lari toleransli parse eder.
+- `supervisor/cto_autonomous_delivery.py` superseded/cancelled/final-reconciled duplicate parent task'larindan backlog continuation uretmez.
 - `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, anayasa, roadmap ve memory kayitlari guncellendi.
 
 Test:

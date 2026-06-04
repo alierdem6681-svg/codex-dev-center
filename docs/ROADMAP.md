@@ -297,4 +297,5 @@ Faz 19B-10A Model Policy
 - [x] Timeout/usage-limit retry/backoff idempotency sozlesmesi eklendi.
 - [x] Atomic JSON state/tmp audit helper'i eklendi.
 - [x] Production readiness dry-run JSON stdout parser'i uzun/prefixed payload icin sabitlendi.
+- [x] Superseded duplicate parent task'larindan backlog continuation uretilmesi engellendi.
 - [x] Module registry, settings, action catalog ve runtime status unit testleri guncellendi.

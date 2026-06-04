@@ -215,6 +215,20 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["status"], "PASS")
 
+    def test_superseded_duplicate_observed_issue_parent_is_not_backlog_candidate(self):
+        task = {
+            "id": "CTO-ACTION-20260604-140243-01-READ-ONLY-DRY-RUN-TEST-MODE",
+            "status": "FAILED_NO_PROPOSAL",
+            "risk": "medium",
+            "source": "cto",
+            "result": "superseded_by_deployed_commit_026fa09",
+        }
+
+        self.assertEqual(
+            cto_autonomous_delivery.backlog_candidate_reason(task),
+            "superseded_or_scope_cancelled_task",
+        )
+
     def test_router_subtasks_get_dispatch_contract_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = cto_task_router.submit_task(
