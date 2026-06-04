@@ -4,6 +4,7 @@
 
 Telegram
 → Telegram Bridge
+→ Telegram Asset Intake Classifier
 → CTO/Supervisor
 → Task Queue
 → 4 Worker
@@ -51,6 +52,7 @@ workers/
 
 supervisor/
 - CTO/Supervisor sistemi
+- Telegram asset intake sınıflandırıcısı dosya indirmeden medya metadata event'i üretir
 
 projects/
 - Geliştirilecek projeler

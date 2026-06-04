@@ -15,11 +15,21 @@ try:
     from .critical_operation_policy import critical_operation_findings
     from .cto_task_router import submit_task, trigger_lifecycle
     from .task_status_constants import read_json as read_state_json, redact_sensitive_text
+    from .telegram_asset_intake import (
+        asset_event_to_task_message,
+        classify_telegram_message,
+        is_media_intake_event,
+    )
 except ImportError:
     try:
         from critical_operation_policy import critical_operation_findings
         from cto_task_router import submit_task, trigger_lifecycle
         from task_status_constants import read_json as read_state_json, redact_sensitive_text
+        from telegram_asset_intake import (
+            asset_event_to_task_message,
+            classify_telegram_message,
+            is_media_intake_event,
+        )
     except ImportError:
         def critical_operation_findings(value):
             return []
@@ -34,6 +44,12 @@ except ImportError:
             return default
         def redact_sensitive_text(value):
             return str(value or "")
+        def classify_telegram_message(*_args, **_kwargs):
+            return {"status": "rejected", "message_type": "unavailable", "should_enqueue_asset": False}
+        def is_media_intake_event(_event):
+            return False
+        def asset_event_to_task_message(event):
+            return json.dumps(event, ensure_ascii=False, sort_keys=True)
 
 PROJECT_ID = "eterna-498108"
 APP = Path("/opt/codex-dev-center")
@@ -803,9 +819,10 @@ def log_inbox(payload):
     with (LOGS / "direct_cto_inbox.ndjson").open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
-def handle_message(token, expected_chat_id, msg):
+def handle_message(token, expected_chat_id, msg, update_id=None):
     chat_id = str(msg.get("chat", {}).get("id", ""))
     text = msg.get("text", "")
+    caption = msg.get("caption", "")
     from_user = msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name") or "unknown"
 
     log_inbox({
@@ -818,6 +835,48 @@ def handle_message(token, expected_chat_id, msg):
 
     if chat_id != str(expected_chat_id):
         send_message(token, chat_id, "Bu bot sadece yetkili kullanıcı için çalışır.")
+        return
+
+    asset_event = classify_telegram_message(msg, update_id=update_id)
+    if is_media_intake_event(asset_event):
+        audit_input = caption or text or asset_event.get("message_type", "")
+        if asset_event.get("should_enqueue_asset"):
+            task_message = asset_event_to_task_message(asset_event)
+            if submit_task is not None:
+                submit_task(
+                    APP,
+                    source="telegram",
+                    title="Telegram Asset Intake",
+                    message=task_message,
+                    priority="high",
+                    risk="medium",
+                    requested_by=from_user,
+                    split=False,
+                    worker_eligible=False,
+                )
+            audit_passthrough(
+                chat_id,
+                from_user,
+                audit_input,
+                asset_event.get("caption_sanitized") or asset_event.get("message_type", ""),
+                "asset_intake",
+            )
+            send_message(
+                token,
+                chat_id,
+                "Medya alındı; güvenli asset intake kaydına dönüştürdüm. "
+                "Dosya indirme ve güvenlik taraması ayrı aşamada işlenecek.",
+            )
+            return
+
+        audit_passthrough(
+            chat_id,
+            from_user,
+            audit_input,
+            asset_event.get("reject_reason", "asset_intake_rejected"),
+            "asset_intake_rejected",
+        )
+        send_message(token, chat_id, "Bu medya şu an güvenli kabul kurallarından geçmedi; kontrollü şekilde reddedildi.")
         return
 
     if not text.strip():
@@ -937,7 +996,7 @@ def main():
                 offset = str(item["update_id"] + 1)
                 OFFSET_FILE.write_text(offset)
                 if "message" in item:
-                    handle_message(token, chat_id, item["message"])
+                    handle_message(token, chat_id, item["message"], update_id=item.get("update_id"))
         except Exception as exc:
             with (LOGS / "direct_cto.log").open("a", encoding="utf-8") as f:
                 f.write(now() + " error=" + str(exc)[:500] + "\n")

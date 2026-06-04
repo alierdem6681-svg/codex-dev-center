@@ -685,3 +685,31 @@ Not:
 - Gercek Telegram API cagrisi, asset indirme, production deploy, staging deploy, runtime `state/`, `logs/`, `workspaces/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; repo template kayitlari guncellendi.
 - Local `git add` sandbox disindaki git metadata dizini read-only oldugu icin tamamlanamadi. GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Telegram Asset Intake Backend Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-ACTION-20260604-102221-01-TELEGRAM-ASSET-INTAKE-BACKEND
+
+Eklenenler:
+- `supervisor/telegram_asset_intake.py` Telegram update payload'larini `photo`, `document`, `media_with_caption`, `text`, `unsupported` ve `rejected` olarak siniflandirir.
+- Direct CTO handler yetkili chat'ten gelen fotoğraf/doküman mesajlarını raw dosya indirmeden `Telegram Asset Intake` routed task'ına çevirir.
+- Caption sanitize edilir, dosya adı normalize edilir, MIME allowlist ve dosya boyutu limiti uygulanır.
+- Raw `file_id` task mesajına yazılmaz; `file_id_ref` hash referansı, `file_unique_id` ve idempotency metadata'sı kullanılır.
+- Desteklenmeyen medya ve eksik/limit dışı payload'lar controlled reject cevabı alır.
+- `state_templates/module_settings.json`, `state_templates/module_registry.json`, `state_templates/action_catalog.json`, onboarding, roadmap ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m py_compile supervisor/telegram_asset_intake.py supervisor/telegram_direct_cto.py tests/test_runtime_status_model.py` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.TelegramAsyncRoutingTest` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS.
+- `python3 supervisor/production_readiness_suite.py --json` PASS; production deploy yapılmadı.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Dosya indirme, kalıcı saklama, checksum ve malware scan bu pakette yapılmadı; sonraki Telegram Asset Storage And Manifest paketine bırakıldı.
+- Bu apply worktree içinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları güncellendi.
+- Local `git add` git metadata dizini read-only olduğu için çalışmadı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` sonucu tamamlanmadı. Bu nedenle commit/PR bu sandbox içinde açılamadı.

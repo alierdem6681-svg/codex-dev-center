@@ -92,6 +92,8 @@ Ajan şu klasörleri inceler:
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
+- supervisor/telegram_asset_intake.py Telegram `photo`, `document`, caption ve unsupported medya payload'larını ham dosya indirmeden güvenli metadata event'ine sınıflandırır
+- supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -142,6 +144,13 @@ Telegram asset safety notu:
 - `modules/telegram_asset_safety/` ve `supervisor/telegram_asset_safety.py` gelecekteki Telegram asset intake icin non-mutating test sozlesmesini tutar.
 - Manifest dogrulama, limitler, checksum, MIME/uzanti eslesmesi, secret redaction, simulator retry/idempotency ve dashboard-safe snapshot davranisi `tests/test_telegram_asset_safety.py` ile sabitlenir.
 - Bu sozlesme gercek Telegram API cagrisi, asset indirme, production deploy veya secret/env/token/private key degeri okuma yetkisi vermez.
+
+Telegram asset intake notu:
+- `supervisor/telegram_asset_intake.py` Telegram update payload'ında `message`, `edited_message`, `channel_post` ve `edited_channel_post` alanlarını okur.
+- Fotoğraf ve doküman mesajları `file_id_ref`, `file_unique_id`, MIME, boyut, sanitize dosya adı, sanitize caption ve idempotency metadata'sına çevrilir.
+- Raw `file_id`, raw payload, token, secret veya header bilgisi intake event/task mesajına yazılmaz.
+- Dosya indirme, kalıcı saklama, checksum ve malware scan bu backend sınıflandırıcıda yapılmaz; sonraki asset processing aşamasına bırakılır.
+- Desteklenmeyen medya ve limit/allowlist dışı dokümanlar controlled reject olarak işaretlenir.
 
 ## Servis Keşfi
 

@@ -269,3 +269,13 @@ Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime 
 Telegram asset akisi icin ilk non-mutating guvenlik sozlesmesi eklendi. `supervisor/telegram_asset_safety.py` manifest schema, asset sayisi/boyutu, toplam boyut, caption uzunlugu, path traversal, tehlikeli uzanti, MIME/uzanti uyumu, sha256 checksum, secret redaction, simulator-only Telegram send ve dashboard-safe snapshot davranisini dogrular.
 
 Davranis `tests/test_telegram_asset_safety.py` icinde unit test ile sabitlendi. `modules/telegram_asset_safety/` ve `state_templates` kayitlari module/action gorunurlugu icin guncellendi. Bu paket gercek Telegram API cagrisi, asset indirme, production/staging deploy, runtime state/log/workspace mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-04 Telegram Asset Intake Backend Apply
+
+Telegram CTO hattına gelen medya mesajları için backend sınıflandırıcı eklendi. `supervisor/telegram_asset_intake.py` `message`, `edited_message`, `channel_post` ve `edited_channel_post` payload'larından fotoğraf, doküman, caption, text ve unsupported medya ayrımı yapar.
+
+Direct CTO handler yetkili chat'ten gelen fotoğraf/doküman mesajlarını dosya indirmeden `Telegram Asset Intake` routed task'ına dönüştürür. Raw `file_id` ve raw payload task/log mesajına yazılmaz; hash `file_id_ref`, `file_unique_id`, MIME, boyut, sanitize dosya adı, sanitize caption ve idempotency metadata'sı kullanılır.
+
+Bu paket dosya indirme, kalıcı saklama, checksum, malware scan, production deploy, staging deploy, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı. Davranış `tests/test_runtime_status_model.py` içindeki Telegram asset intake ve direct CTO routing testleriyle sabitlendi.
+
+Local `git add` git metadata dizini read-only olduğu için çalışmadı. GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` sonucu tamamlanmadığı için bu sandbox içinde commit/PR açılamadı.
