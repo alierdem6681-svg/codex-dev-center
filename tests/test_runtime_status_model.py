@@ -2290,6 +2290,21 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertTrue(child["repo_apply_allowed"])
         self.assertEqual(queue["tasks"][0]["repo_apply_child"], child["id"])
 
+    def test_dispatcher_validation_child_does_not_create_repo_apply_child(self):
+        tasks = [
+            {
+                "id": "VALIDATION-CHILD",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "source": lifecycle_manager.BACKLOG_DISPATCHER_SOURCE,
+                "dispatcher_mode": "validation",
+                "risk": "medium",
+                "title": "Validation: Dashboard Profile / Account Menu",
+            }
+        ]
+
+        self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
+        self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
+
     def test_idle_worker_state_clears_current_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "workers.json"

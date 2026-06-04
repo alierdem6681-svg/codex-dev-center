@@ -301,7 +301,7 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
         or str(task.get("pipeline_status") or "").upper() != "PASS"
     ):
         return False
-    if task.get("source") == BACKLOG_DISPATCHER_SOURCE and task.get("dispatcher_mode") == "apply":
+    if task.get("source") == BACKLOG_DISPATCHER_SOURCE:
         return False
     if task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged"):
         return False
