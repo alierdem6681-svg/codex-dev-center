@@ -227,3 +227,9 @@ Dashboard Gorevler listesi artik render oncesinde deterministik comparator kulla
 Canli gorev algisi `DEPLOYED`, `isLive`, `liveAt`, `deployment_status`, `delivery_level=DEPLOYED` ve `production_deployed` sinyallerini okur. Filtre option'lari runtime yenilemelerinde gereksiz yeniden yazilmaz, secili filtre korunur.
 
 Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Dashboard Pipeline Expand State Apply
+
+Pipeline Flow ana gorev expand/collapse state'i polling datasindan ayrildi. `web_panel/static/index.html` stable main task key ile `pipelineMainTaskExpanded` map'i tutar; polling refresh yalniz server snapshot'ini yeniler ve kullanicinin actigi/kapattigi ana gorev durumunu resetlemez.
+
+Davranis `tests/test_runtime_status_model.py` icindeki frontend markup sozlesmesiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
