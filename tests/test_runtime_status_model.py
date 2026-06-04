@@ -2219,6 +2219,26 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "pipeline_failed_requires_root_cause_mode")
 
+    def test_backlog_candidate_skips_parent_with_existing_repo_apply_child(self):
+        task = {
+            "id": "PARENT",
+            "status": TASK_STATUS_PROPOSAL_DONE,
+            "risk": "medium",
+            "repo_apply_child": "CTO-APPLY-PARENT",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "repo_apply_child_already_created")
+
+    def test_backlog_candidate_skips_parent_with_existing_dispatcher_child(self):
+        task = {
+            "id": "PARENT",
+            "status": TASK_STATUS_READY_FOR_VALIDATION,
+            "risk": "medium",
+            "backlog_dispatcher_child": "CTO-DISPATCH-PARENT",
+        }
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "backlog_dispatcher_child_already_created")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")
