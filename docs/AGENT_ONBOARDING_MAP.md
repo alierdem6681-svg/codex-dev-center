@@ -90,6 +90,7 @@ Ajan şu klasörleri inceler:
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -121,6 +122,12 @@ Queue/status normalizer notu:
 - Worker claim akışı `worker_id` ve `claimed_at` yazar; bu görünürlük production deploy veya runtime state dışı mutasyon yetkisi vermez.
 - Bilinmeyen status degerleri guvenli varsayilan olarak `QUEUED` kalir ve `cto_doctor --fix` yalniz runtime kuyrugunda normalizasyon yapar.
 - 2026-06-04 owner repair sonrasinda runtime queue bilincli olarak bosaltildi. Snapshot `/opt/codex-dev-center/archives/system_repair_20260604_054027/queue_owner_cleanup` altindadir; yeni gorevler temiz queue uzerinden alinmalidir.
+
+Telegram asset manifest contract notu:
+- `telegram_asset_manifest_contract` modulu runtime asset indirme kodu yazilmadan once manifest schema version `1` sozlesmesini sabitler.
+- Testler `tests/fixtures/telegram_asset_manifest/` fixture setleriyle gercek Telegram, network veya runtime storage kullanmadan calisir.
+- Manifest `policy.max_bytes`, Telegram `file_size` ve original `size_bytes` alanlari `20971520` byte ustune cikarsa test/validator fail olur.
+- Manifest icinde raw payload, Telegram file URL veya sensitive credential-like alanlar kabul edilmez.
 
 ## Servis Keşfi
 

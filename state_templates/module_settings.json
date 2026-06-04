@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:51:13+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -75,6 +75,16 @@
     "send_diff_outputs": false,
     "token_configured": false,
     "smoke_test_required": true
+  },
+  "telegram_asset_manifest_contract": {
+    "enabled": true,
+    "schema_version": 1,
+    "max_bytes": 20971520,
+    "network_required": false,
+    "runtime_storage_mutation": false,
+    "forbid_raw_payload": true,
+    "forbid_file_url": true,
+    "forbid_sensitive_fields": true
   },
   "cto_router": {
     "enabled": true,

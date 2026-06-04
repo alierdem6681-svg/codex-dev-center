@@ -233,3 +233,11 @@ Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup
 Pipeline Flow ana gorev expand/collapse state'i polling datasindan ayrildi. `web_panel/static/index.html` stable main task key ile `pipelineMainTaskExpanded` map'i tutar; polling refresh yalniz server snapshot'ini yeniler ve kullanicinin actigi/kapattigi ana gorev durumunu resetlemez.
 
 Davranis `tests/test_runtime_status_model.py` icindeki frontend markup sozlesmesiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Telegram Asset Manifest Contract Apply
+
+Telegram asset storage backlog icin ilk repo/app degisikligi olarak manifest v1 sozlesmesi sabitlendi. `supervisor/telegram_asset_manifest.py` network kullanmadan manifest alanlarini, SHA-256 formatini, MIME/storage metadata alanlarini, `20971520` byte limitini ve forbidden raw/file URL/sensitive field kontrollerini dogrular.
+
+Fixture setleri `tests/fixtures/telegram_asset_manifest/` altinda tutulur ve `tests/test_telegram_asset_manifest_contract.py` ile valid, boundary, limit-asimi ve forbidden-field davranislari test edilir. `telegram_asset_manifest_contract` modulu state template registry/settings/action catalog icine eklendi.
+
+Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Repo worktree icinde runtime `state/` dizini yoktu ve olusturulmadi.

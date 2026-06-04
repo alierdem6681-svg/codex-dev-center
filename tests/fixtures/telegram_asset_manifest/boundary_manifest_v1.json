@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "asset_id": "tg_20260604_105113_document_boundary",
+  "source": "telegram",
+  "received_at": "2026-06-04T10:51:13Z",
+  "telegram": {
+    "chat_id_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "message_id": 12346,
+    "file_id_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "file_unique_id": "BQADBAADb6cxG4x",
+    "file_size": 20971520
+  },
+  "original": {
+    "filename": "document.bin",
+    "declared_mime": "application/octet-stream",
+    "detected_mime": "application/octet-stream",
+    "size_bytes": 20971520,
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "storage": {
+    "backend": "local_runtime",
+    "bucket": null,
+    "object_key": "telegram-assets/2026/06/04/tg_20260604_105113_document_boundary/document.bin",
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "policy": {
+    "max_bytes": 20971520,
+    "download_allowed": true,
+    "retention": "runtime"
+  }
+}

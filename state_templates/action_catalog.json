@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T08:30:51+00:00",
+  "updated_at": "2026-06-04T10:51:13+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -177,6 +177,19 @@
       "owner_directed_only": true,
       "archive_required": true,
       "command": "{python} scripts/queue_owner_cleanup.py --archive {archive_path} --execute"
+    },
+    {
+      "id": "validate_telegram_asset_manifest_contract",
+      "label": "Telegram Asset Manifest Contract Doğrula",
+      "module": "telegram_asset_manifest_contract",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_telegram_asset_manifest_contract",
+      "max_bytes": 20971520,
+      "network_required": false,
+      "runtime_storage_mutation": false
     },
     {
       "id": "repo_apply_validation",
