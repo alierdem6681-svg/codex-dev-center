@@ -75,6 +75,15 @@ WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
 POLL_SECONDS = 5
 SLEEP_AFTER_IDLE_CYCLES = 4
 BACKLOG_DISPATCHER_SOURCE = "cto_backlog_dispatcher"
+DISPATCH_CONTRACT_MAX_ATTEMPTS = 2
+RETRYABLE_CHILD_STATUSES = {
+    TASK_STATUS_FAILED,
+    TASK_STATUS_FAILED_NO_PROPOSAL,
+    TASK_STATUS_FAILED_RETRYABLE,
+    TASK_STATUS_FAILED_TIMEOUT,
+    TASK_STATUS_VALIDATION_FAILED,
+    TASK_STATUS_PIPELINE_FAILED,
+}
 BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_FAILED,
     TASK_STATUS_FAILED_NO_PROPOSAL,
@@ -245,22 +254,74 @@ def active_child_exists(tasks: list[dict[str, Any]], child_id: str | None) -> bo
         return normalize_status(task.get("status")) in ACTIVE_TASK_STATUSES
     return False
 
+def child_status_allows_retry(status: str) -> bool:
+    return normalize_status(status) in RETRYABLE_CHILD_STATUSES
+
 def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> bool:
     if not child_id:
         return True
-    retryable = {
-        TASK_STATUS_FAILED,
-        TASK_STATUS_FAILED_NO_PROPOSAL,
-        TASK_STATUS_FAILED_RETRYABLE,
-        TASK_STATUS_FAILED_TIMEOUT,
-        TASK_STATUS_VALIDATION_FAILED,
-        TASK_STATUS_PIPELINE_FAILED,
-    }
     for task in tasks:
         if task.get("id") != child_id:
             continue
-        return normalize_status(task.get("status")) in retryable
+        return child_status_allows_retry(task.get("status"))
     return True
+
+def dispatch_child_for_parent(
+    tasks: list[dict[str, Any]],
+    parent: dict[str, Any],
+    pointer_field: str,
+    dispatcher_mode: str | None = None,
+) -> str | None:
+    explicit = parent.get(pointer_field)
+    if explicit:
+        return str(explicit)
+
+    parent_id = str(parent.get("id") or "")
+    if not parent_id:
+        return None
+
+    matches: list[dict[str, Any]] = []
+    for task in tasks:
+        if str(task.get("id") or "") == parent_id:
+            continue
+        linked_parent = str(task.get("parent_task_id") or task.get("parent_task") or "")
+        if linked_parent != parent_id:
+            continue
+        if task.get("source") != BACKLOG_DISPATCHER_SOURCE:
+            continue
+        if dispatcher_mode and str(task.get("dispatcher_mode") or "") != dispatcher_mode:
+            continue
+        matches.append(task)
+
+    if not matches:
+        return None
+
+    for task in reversed(matches):
+        if normalize_status(task.get("status")) in ACTIVE_TASK_STATUSES:
+            return str(task.get("id") or "")
+    for task in reversed(matches):
+        if not child_status_allows_retry(task.get("status")):
+            return str(task.get("id") or "")
+    return str(matches[-1].get("id") or "")
+
+def dispatch_contract_fields(
+    parent: dict[str, Any],
+    child_id: str,
+    worker_id: str,
+    attempt: int,
+    max_attempts: int = DISPATCH_CONTRACT_MAX_ATTEMPTS,
+) -> dict[str, Any]:
+    parent_id = str(parent.get("id") or "TASK")
+    return {
+        "root_task_id": parent.get("root_task_id") or parent.get("parent_task_id") or parent.get("parent_task") or parent_id,
+        "dispatch_id": child_id,
+        "worker_id": worker_id,
+        "attempt": attempt,
+        "max_attempts": max_attempts,
+        "last_error_code": "",
+        "claimed_at": None,
+        "finished_at": None,
+    }
 
 def backlog_dispatch_mode(status: str) -> str:
     if status == TASK_STATUS_PROPOSAL_DONE:
@@ -301,7 +362,7 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
         or str(task.get("pipeline_status") or "").upper() != "PASS"
     ):
         return False
-    if task.get("source") == BACKLOG_DISPATCHER_SOURCE and task.get("dispatcher_mode") == "apply":
+    if task.get("source") == BACKLOG_DISPATCHER_SOURCE:
         return False
     if task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged"):
         return False
@@ -309,13 +370,13 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
         return False
     if worker_block_reason(task):
         return False
-    child_id = task.get("repo_apply_child")
+    child_id = dispatch_child_for_parent(tasks, task, "repo_apply_child", "apply")
     if active_child_exists(tasks, child_id):
         return False
     if not child_allows_retry(tasks, child_id):
         return False
     attempts = int(task.get("repo_apply_attempts", 0) or 0)
-    return attempts < 2
+    return attempts < DISPATCH_CONTRACT_MAX_ATTEMPTS
 
 def repo_apply_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     for task in tasks:
@@ -338,6 +399,8 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
     child_id = f"CTO-APPLY-{stamp}-{safe_id(parent_id)}"
     risk = normalize_risk(parent.get("risk") or parent.get("risk_level") or "medium")
     evidence = parent.get("workspace") or parent.get("report_path") or "-"
+    worker_id = choose_worker(title)
+    attempt = int(parent.get("repo_apply_attempts", 0) or 0) + 1
     child = {
         "id": child_id,
         "title": f"Apply: {str(title)[:90]}",
@@ -356,7 +419,7 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
         "proposal_report_path": parent.get("report_path", ""),
         "risk": risk,
         "risk_level": risk,
-        "assigned_worker": choose_worker(title),
+        "assigned_worker": worker_id,
         "worker_eligible": True,
         "dispatcher_mode": "apply",
         "execution_mode": "repo_apply",
@@ -371,9 +434,10 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
         "pipeline_status": "NOT_RUN",
         "delivery_level": "REPO_APPLY_QUEUED",
     }
+    child.update(dispatch_contract_fields(parent, child_id, worker_id, attempt))
     queue.setdefault("tasks", []).append(child)
     parent["repo_apply_child"] = child_id
-    parent["repo_apply_attempts"] = int(parent.get("repo_apply_attempts", 0) or 0) + 1
+    parent["repo_apply_attempts"] = attempt
     parent["repo_apply_created_at"] = now()
     parent["updated_at"] = now()
     return child
@@ -392,13 +456,14 @@ def dispatcher_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
             continue
         if worker_block_reason(task):
             continue
-        child_id = task.get("backlog_dispatcher_child")
+        mode = backlog_dispatch_mode(status)
+        child_id = dispatch_child_for_parent(tasks, task, "backlog_dispatcher_child", mode)
         if active_child_exists(tasks, child_id):
             continue
         if not child_allows_retry(tasks, child_id):
             continue
         retries = int(task.get("backlog_dispatcher_attempts", 0) or 0)
-        if retries >= 2:
+        if retries >= DISPATCH_CONTRACT_MAX_ATTEMPTS:
             continue
         return task
     return None
@@ -516,6 +581,8 @@ def ensure_single_backlog_task() -> bool:
         return False
 
     title = parent.get("title") or parent_id
+    worker_id = choose_worker(title)
+    attempt = int(parent.get("backlog_dispatcher_attempts", 0) or 0) + 1
     child = {
         "id": child_id,
         "title": f"{mode.title()}: {str(title)[:80]}",
@@ -525,7 +592,7 @@ def ensure_single_backlog_task() -> bool:
         "parent_task": parent_id,
         "risk": risk,
         "risk_level": risk,
-        "assigned_worker": choose_worker(title),
+        "assigned_worker": worker_id,
         "worker_eligible": True,
         "dispatcher_mode": mode,
         "created_at": now(),
@@ -536,9 +603,10 @@ def ensure_single_backlog_task() -> bool:
         "pipeline_status": "NOT_RUN",
         "delivery_level": "BACKLOG_DISPATCH",
     }
+    child.update(dispatch_contract_fields(parent, child_id, worker_id, attempt))
     tasks.append(child)
     parent["backlog_dispatcher_child"] = child_id
-    parent["backlog_dispatcher_attempts"] = int(parent.get("backlog_dispatcher_attempts", 0) or 0) + 1
+    parent["backlog_dispatcher_attempts"] = attempt
     parent["backlog_dispatcher_last_mode"] = mode
     parent["updated_at"] = now()
     write_json(QUEUE_PATH, queue)

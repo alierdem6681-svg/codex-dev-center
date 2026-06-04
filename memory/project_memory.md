@@ -211,3 +211,13 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Worker Dispatch Contract v2 Apply
+
+Worker Dispatch v2 icin lifecycle dispatcher idempotency guclendirildi. Dispatcher artik parent uzerinde child pointer eksik olsa bile mevcut child kayitlarini `parent_task` / `parent_task_id` ile bulur; aktif veya non-retryable terminal child varken ayni parent icin duplicate child uretmez.
+
+Yeni dispatch child kayitlari `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tasir. Worker claim islemi task uzerine `worker_id` ve `claimed_at` ownership alanlarini yazar. Davranis unit testlerle sabitlendi.
+
+Bu paket production deploy, gerçek staging deploy, production runtime state migration, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Local readiness suite ignored `state/` artefact'leri uretti; bunlar patch kapsamına alınmadı.
+
+Local commit/PR tamamlanamadi: git metadata index path'i read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.

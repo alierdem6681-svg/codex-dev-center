@@ -360,9 +360,12 @@ def claim_task(worker_id: str) -> dict[str, Any] | None:
             if not is_worker_eligible_task(task):
                 continue
             if task.get("assigned_worker") == worker_id and normalize_status(task.get("status")) in ("ASSIGNED", "QUEUED", "PENDING"):
+                claim_time = now()
                 task["status"] = TASK_STATUS_RUNNING
-                task["started_at"] = now()
-                task["updated_at"] = now()
+                task["worker_id"] = worker_id
+                task["claimed_at"] = claim_time
+                task["started_at"] = claim_time
+                task["updated_at"] = claim_time
                 claimed = task
                 break
 
@@ -371,10 +374,13 @@ def claim_task(worker_id: str) -> dict[str, Any] | None:
                 if not is_worker_eligible_task(task):
                     continue
                 if task.get("assigned_worker") in (None, "", worker_id) and normalize_status(task.get("status")) in ("PENDING", "QUEUED"):
+                    claim_time = now()
                     task["assigned_worker"] = worker_id
                     task["status"] = TASK_STATUS_RUNNING
-                    task["started_at"] = now()
-                    task["updated_at"] = now()
+                    task["worker_id"] = worker_id
+                    task["claimed_at"] = claim_time
+                    task["started_at"] = claim_time
+                    task["updated_at"] = claim_time
                     claimed = task
                     break
 

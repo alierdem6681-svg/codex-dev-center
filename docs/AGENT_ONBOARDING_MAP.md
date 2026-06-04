@@ -109,6 +109,11 @@ Controlled apply notu:
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
 
+Worker dispatch v2 notu:
+- Lifecycle dispatcher parent uzerindeki child pointer eksik olsa bile mevcut child kaydini `parent_task` / `parent_task_id` ile bulur ve aktif ya da non-retryable terminal child varken duplicate child uretmez.
+- Yeni dispatch child kayitlari `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` contract alanlarini tasir.
+- Worker claim task uzerine `worker_id` ve `claimed_at` yazar; retry yalniz retryable failure statuslari ve bounded attempt sayisi icinde kalir.
+
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.
 - Status aliaslari case farki ve yaygin ayirici varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED TIMEOUT` ve `FAILED.TIMEOUT` gibi girdiler standart enumlara cevrilir.

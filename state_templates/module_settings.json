@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:26:43+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -50,7 +50,20 @@
     "auto_dispatch_low_risk": true,
     "auto_dispatch_medium_risk": true,
     "high_risk_requires_approval": true,
-    "critical_risk_requires_approval": true
+    "critical_risk_requires_approval": true,
+    "worker_dispatch_contract_v2": true,
+    "dispatch_existing_child_idempotency": true,
+    "dispatch_max_attempts": 2,
+    "dispatch_contract_fields": [
+      "root_task_id",
+      "dispatch_id",
+      "worker_id",
+      "attempt",
+      "max_attempts",
+      "last_error_code",
+      "claimed_at",
+      "finished_at"
+    ]
   },
   "workers": {
     "worker_count": 4,
@@ -58,6 +71,8 @@
     "safe_mode": true,
     "codex_execution_enabled": false,
     "worker_recovery_required": true,
+    "claim_records_worker_id": true,
+    "claim_records_claimed_at": true,
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_report_checklist": true,

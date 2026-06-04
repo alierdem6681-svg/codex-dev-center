@@ -70,6 +70,8 @@ Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notu içermelidir.
 
+Worker dispatch sözleşmesi idempotent olmalıdır. Dispatcher, parent task üzerinde child pointer eksik olsa bile mevcut child kayıtlarını parent id üzerinden bulur; aktif veya non-retryable terminal child varken aynı parent için yeni child üretmez. Yeni dispatch child kayıtlarında root task, dispatch id, worker ownership, attempt/max_attempts ve claim/finish zaman alanları izlenebilir olmalıdır.
+
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.
 
 Kalite kapısı retry simülasyonu ilk deneme ve en fazla bir retry sonucunu non-blocking raporlar; bu rapor production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

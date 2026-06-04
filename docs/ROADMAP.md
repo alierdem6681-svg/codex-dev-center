@@ -182,3 +182,11 @@ Faz 19B-10A Model Policy
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
 - [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+
+## Faz 34 - Worker Dispatch Contract v2
+
+- [x] Lifecycle dispatcher mevcut child kayitlarini parent id uzerinden bularak pointer eksikliginde duplicate dispatch uretmez.
+- [x] Repo apply ve backlog dispatch child kayitlari root/dispatch/worker/attempt contract alanlariyla olusturulur.
+- [x] Worker claim task uzerine `worker_id` ve `claimed_at` ownership alanlarini yazar.
+- [x] Duplicate child, bounded retry ve claim ownership davranisi unit test ile sabitlendi.
+- [ ] Production deploy yok; PR/merge sonrasi GitHub Actions manuel kapisi disinda canli islem yapilmayacak.

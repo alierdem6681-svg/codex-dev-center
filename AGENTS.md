@@ -169,3 +169,9 @@ Validated proposal apply worker'lari sadece izole git worktree ve worker branch 
 `AGENTS.md` gibi tekil allowlist dosyalari sadece exact dosya eslesmesiyle kabul edilir; `AGENTS.md.bak` veya `AGENTS.md/child` gibi varyantlar repo apply icin guvenli sayilmaz. Runtime `state/`, `logs/`, `reports/`, `workspaces/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database ve reklam platformu live-write kapsam disi kalir.
 
 Apply raporu patch scope, diff review, secret scan, local pipeline, production deploy yapılmadı kanıtı ve rollback notunu içermelidir.
+
+## WORKER DISPATCH CONTRACT V2
+
+Lifecycle dispatcher parent task ustunde child pointer eksik olsa bile mevcut child kayitlarini `parent_task` / `parent_task_id` ile bulup duplicate dispatch uretmemelidir. Yeni dispatch child kayitlari `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tasir.
+
+Worker claim islemi task uzerinde `worker_id` ve `claimed_at` ownership alanlarini yazar. Terminal veya non-retryable child varsa ayni parent icin yeni child acilmaz; retry yalniz retryable failure statuslari ve bounded attempt sayisi icinde kalir.

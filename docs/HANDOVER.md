@@ -497,3 +497,34 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Worker Dispatch Contract v2 Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-082643 / CTO-TASK-20260604-082503-854382-WORKER-DISPATCH-V2
+
+Eklenenler:
+- `supervisor/lifecycle_manager.py` parent pointer eksik olsa bile mevcut child kaydini `parent_task` / `parent_task_id` ile bulur; aktif veya non-retryable terminal child varsa duplicate dispatch uretmez.
+- Repo apply ve backlog dispatch child kayitlari `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlariyla olusturulur.
+- `supervisor/worker_runner.py` claim aninda task uzerine `worker_id` ve `claimed_at` ownership alanlarini yazar.
+- `tests/test_runtime_status_model.py` duplicate child, repo apply idempotency ve worker claim ownership davranisini sabitler.
+
+Not:
+- Production deploy calistirilmadi.
+- Runtime `state/` dizini bu worktree'de baslangicta yoktu; local readiness suite ignored state artefact'leri uretti, patch kapsamına alınmadı.
+- State template ve yaşayan dokümantasyon repo tarafinda güncellendi.
+- Secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 118 test.
+- `python3 supervisor/production_readiness_suite.py --json` PASS, score 100.0, production deploy yapilmadi.
+- `git diff --check` PASS.
+- Secret pattern scan bulgu vermedi.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.

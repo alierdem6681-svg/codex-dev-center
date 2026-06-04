@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:26:43+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -188,6 +188,22 @@
       "requires_exact_path_allowlist": true,
       "requires_secret_scan": true,
       "requires_control_report": true
+    },
+    {
+      "id": "worker_dispatch_contract_check",
+      "label": "Worker Dispatch Sözleşmesi Kontrolü",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.BacklogDispatcherModelTest tests.test_runtime_status_model.WorkerStatusModelTest",
+      "checks": [
+        "duplicate_dispatch_prevention",
+        "repo_apply_child_idempotency",
+        "dispatch_contract_fields",
+        "worker_claim_ownership_fields"
+      ]
     }
   ]
 }

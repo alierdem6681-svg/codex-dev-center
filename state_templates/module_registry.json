@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T07:12:00+00:00",
+  "updated_at": "2026-06-04T08:26:43+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -52,11 +52,12 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Görev kuyruğu, worker dağıtımı ve sistem koordinasyonu.",
+      "description": "Görev kuyruğu, worker dağıtımı, idempotent dispatch contract ve sistem koordinasyonu.",
       "actions": [
         "add_task",
         "dispatch_tasks",
-        "view_status"
+        "view_status",
+        "worker_dispatch_contract_check"
       ]
     },
     {
@@ -67,13 +68,14 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "worker-1..4 servisleri, görev işleme, controlled repo apply path validation, control report ve log üretimi.",
+      "description": "worker-1..4 servisleri, görev işleme, dispatch ownership claim, controlled repo apply path validation, control report ve log üretimi.",
       "actions": [
         "start_worker",
         "stop_worker",
         "restart_worker",
         "view_worker_logs",
-        "repo_apply_validation"
+        "repo_apply_validation",
+        "worker_dispatch_contract_check"
       ]
     },
     {
