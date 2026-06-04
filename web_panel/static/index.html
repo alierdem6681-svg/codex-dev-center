@@ -659,6 +659,7 @@
       let pipelineFlowTimer = null;
       let pipelineFlowAbort = null;
       let pipelineFlowFailureCount = 0;
+      let pipelineMainTaskExpanded = new Map();
       let activeFlowStage = new URLSearchParams(location.search).get('pipeline_stage') || '';
       function esc(value){return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
       function foldedText(value){
@@ -868,13 +869,24 @@
       }
       function renderFlowMainTasks(){
         const mainTasks = flowMainTasks();
-        if (!mainTasks.length) return '<div class="flow-main-tasks"><div class="muted">Ana görev grubu yok.</div></div>';
+        if (!mainTasks.length) {
+          prunePipelineMainTaskExpanded([]);
+          return '<div class="flow-main-tasks"><div class="muted">Ana görev grubu yok.</div></div>';
+        }
+        const mainTaskKeys = mainTasks.map(flowMainTaskKey);
+        prunePipelineMainTaskExpanded(mainTaskKeys);
+        const hasStoredExpandedState = pipelineMainTaskExpanded.size > 0;
         return `<div class="flow-main-tasks"><div class="muted">Ana görevler</div>${mainTasks.map((mainTask, index) => {
+          const key = mainTaskKeys[index];
+          if (key && !pipelineMainTaskExpanded.has(key)) {
+            pipelineMainTaskExpanded.set(key, !hasStoredExpandedState && index === 0);
+          }
+          const isOpen = key ? pipelineMainTaskExpanded.get(key) === true : index === 0;
           const children = Array.isArray(mainTask.children) ? mainTask.children : [];
           const childRows = children.map(child => {
             return `<div class="flow-child"><div><strong>${esc(child.id || '-')}</strong><br><span class="muted">${esc(child.assigned_worker || 'Çalışan yok')}</span></div><div>${badge(child.status)} ${badge(child.pipeline_status || child.risk || child.risk_level || '-')}</div><div class="muted">${esc(flowDateTime(child.updated_at || child.finished_at || child.created_at))}</div></div>`;
           }).join('') || '<div class="muted">Alt görev yok.</div>';
-          return `<details class="flow-main-task" ${index === 0 ? 'open' : ''}>
+          return `<details class="flow-main-task" data-main-task-key="${esc(key)}" ${isOpen ? 'open' : ''}>
             <summary>
               <div><strong>${esc(mainTask.main_task_title || mainTask.title || mainTask.main_task_code || '-')}</strong><br><span class="muted">${esc(mainTask.main_task_code || mainTask.code || mainTask.root_task_id || '-')}</span></div>
               <div>${badge(mainTask.overall_status || mainTask.status)} ${flowStateBadge(mainTask.state)}</div>
@@ -882,6 +894,23 @@
             <div>${childRows}</div>
           </details>`;
         }).join('')}</div>`;
+      }
+      function flowMainTaskKey(mainTask){
+        return String(mainTask.id || mainTask.root_task_id || mainTask.main_task_code || mainTask.code || '');
+      }
+      function prunePipelineMainTaskExpanded(currentKeys){
+        const current = new Set(currentKeys.filter(Boolean));
+        pipelineMainTaskExpanded.forEach((_, key) => {
+          if (!current.has(key)) pipelineMainTaskExpanded.delete(key);
+        });
+      }
+      function bindFlowMainTaskToggles(){
+        pipelineFlowPanel.querySelectorAll('.flow-main-task[data-main-task-key]').forEach(details => {
+          details.addEventListener('toggle', event => {
+            const key = event.currentTarget.dataset.mainTaskKey || '';
+            if (key) pipelineMainTaskExpanded.set(key, event.currentTarget.open);
+          });
+        });
       }
       function selectedFlowStage(){
         const stages = flowStages();
@@ -930,6 +959,7 @@
           ${renderFlowMainTasks()}
           <div>${tasksHtml}</div>
         `;
+        bindFlowMainTaskToggles();
       }
       function handlePipelineTabKey(event){
         const buttons = Array.from(pipelineFlowTabs.querySelectorAll('[role="tab"]'));

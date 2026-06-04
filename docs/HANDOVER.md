@@ -537,3 +537,21 @@ Test:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
+## Dashboard Pipeline Expand State Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-ACTION-20260604-102655-01-DASHBOARD-PIPELINE-EXPAND-STATE-ROOT-CAUSE
+
+Eklenenler:
+- `web_panel/static/index.html` Pipeline Flow ana gorev expand/collapse state'ini stable main task key ile saklar.
+- Polling refresh artik ana gorevleri her render'da otomatik ilk acik duruma resetlemez; kullanici toggle state'i korunur.
+- Artik payload'da bulunmayan ana gorev key'leri sadece garbage collection olarak temizlenir.
+- `tests/test_runtime_status_model.py` frontend markup sozlesmesini stable key map ve toggle handler icin genisletti.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.

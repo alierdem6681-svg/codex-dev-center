@@ -181,6 +181,7 @@ Faz 19B-10A Model Policy
 - [x] Gercek task status enumlari sabit pipeline stage sirasina maplenir.
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
+- [x] Ana gorev expand/collapse state'i stable key ile polling refresh'ten ayrildi.
 - [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
 
 ## Faz 34 - Worker Dispatch v2 Contract Metadata
