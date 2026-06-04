@@ -33,5 +33,17 @@
     "google_ads_live_mutate",
     "live_customer_or_data_loss_risk"
   ],
-  "critical_operation_status": "APPROVAL_REQUIRED"
+  "critical_operation_status": "APPROVAL_REQUIRED",
+  "pipeline_failed_root_cause_reporting": {
+    "enabled": true,
+    "new_root_task_required": false,
+    "required_fields": [
+      "task_id",
+      "parent_task_id",
+      "root_cause",
+      "last_error",
+      "retryable",
+      "recommended_fix"
+    ]
+  }
 }

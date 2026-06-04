@@ -249,3 +249,10 @@ Faz 19B-10A Model Policy
 - [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
 - [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
 - [x] Metadata kontrati unit test ile sabitlendi.
+
+## Faz 42 - Pipeline Failed Root Cause Reporting
+
+- [x] `PIPELINE_FAILED` apply child tasklari icin yeni kok gorev acmadan root cause raporu uretilir.
+- [x] Rapor `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini ayrastirir.
+- [x] `workspace_missing` senaryosu unit test ile sabitlendi.
+- [x] Production deploy ve runtime state/log/report mutasyonu yapilmadan repo sozlesmesi guncellendi.
