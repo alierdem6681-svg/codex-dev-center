@@ -2373,6 +2373,11 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertEqual(lifecycle_manager.dispatcher_candidate(tasks)["id"], "PARENT")
 
+    def test_ready_for_validation_is_owned_by_validation_engine(self):
+        tasks = [{"id": "PARENT", "status": TASK_STATUS_READY_FOR_VALIDATION, "risk": "low", "worker_eligible": True}]
+
+        self.assertIsNone(lifecycle_manager.dispatcher_candidate(tasks))
+
     def test_proposal_done_prefers_repo_apply_child(self):
         queue = {"tasks": [{"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "risk": "low", "title": "safe app work"}]}
         child = lifecycle_manager.create_repo_apply_task(queue, queue["tasks"][0])

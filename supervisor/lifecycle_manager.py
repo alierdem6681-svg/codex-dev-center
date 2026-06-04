@@ -83,7 +83,6 @@ BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_PIPELINE_FAILED,
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
-    TASK_STATUS_READY_FOR_VALIDATION,
     TASK_STATUS_STALLED,
     TASK_STATUS_VALIDATION_FAILED,
 }
@@ -271,7 +270,7 @@ def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> boo
 def backlog_dispatch_mode(status: str) -> str:
     if status == TASK_STATUS_PROPOSAL_DONE:
         return "apply"
-    if status in {TASK_STATUS_PROPOSAL_READY, TASK_STATUS_READY_FOR_VALIDATION}:
+    if status == TASK_STATUS_PROPOSAL_READY:
         return "validation"
     if status in {TASK_STATUS_VALIDATION_FAILED, TASK_STATUS_PIPELINE_FAILED}:
         return "repair"
