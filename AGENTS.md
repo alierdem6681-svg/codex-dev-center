@@ -170,6 +170,12 @@ Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi 
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
 
+## PARALLEL WORKER REGRESSION GATE V1
+
+`supervisor/production_readiness_suite.py` `parallel_worker_regression` kapisiyla dort dummy/simulasyon task icin dispatch, lifecycle wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmamasi sozlesmesini gecici queue fixture'i uzerinden dogrular.
+
+Bu kapi production deploy, staging deploy, gercek worker servisi restart, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## QUALITY GATE STANDARD REPORT V1
 
 `supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

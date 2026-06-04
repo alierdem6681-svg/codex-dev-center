@@ -974,3 +974,30 @@ Eklenenler:
 Not:
 - PR #103, #104 ve #105 current main ile conflict verdigi icin kod/test/template degisiklikleri elle entegre edildi.
 - Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Parallel Worker Regression Gates Apply
+
+Tarih: 2026-06-04
+Görev: CTO-TASK-20260604-162645-288903-PARALLEL-WORKER-REGRESSION-GATES
+Worker: worker-2
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` `parallel_worker_regression` kapisini ekledi.
+- Gate gecici queue fixture'i uzerinde `sim-low-risk-a`, `sim-low-risk-b`, `sim-medium-risk-c` ve `sim-medium-risk-d` tasklarini dispatch/wake/claim/terminal akisiyle dogrular.
+- `supervisor/worker_runner.py` terminal status almis task icin ikinci `finish_task` cagrisinin status, result ve `finished_at` alanlarini degistirmemesini saglar.
+- `supervisor/codex_quality_gate.py` standard report simulation dry-run grubunda `parallel_worker_regression` gate'ini zorunlu kabul eder.
+- Policy template, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 185 test.
+- `CHECK_MODE=dry_run ... python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `parallel_worker_regression` PASS.
+- `python3 -m unittest discover -s tests` PASS, 212 test.
+- `git diff --check` PASS.
+- Changed-file secret pattern scan temiz; eslesme yok.
+
+Not:
+- Production deploy, staging deploy, gercek worker servisi restart, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Local commit/PR adimi tamamlanamadi: izole clone icindeki `.git/index.lock` read-only filesystem nedeniyle `git add` calismadi. GitHub connector mevcut olsa da tam dosya iceriklerini guvenli sekilde tek commit'e aktarmak icin bu ortamda uygulanabilir dosya tabanli commit yolu bulunmadi.

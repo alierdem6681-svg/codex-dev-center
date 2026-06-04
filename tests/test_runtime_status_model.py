@@ -461,6 +461,36 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(contracts[group]["contracts"])
             self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
+    def test_parallel_worker_regression_contract_has_no_duplicate_claim_or_terminal_event(self):
+        contract = production_readiness_suite.parallel_worker_regression_contract()
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "parallel_worker_lifecycle_simulation")
+        self.assertEqual(
+            contract["metrics"],
+            {
+                "dispatch_count": 4,
+                "wake_count": 4,
+                "unique_claimed_task_count": 4,
+                "claim_event_count": 4,
+                "terminal_task_count": 4,
+                "terminal_event_count": 4,
+                "duplicate_claim_count": 0,
+                "duplicate_terminal_count": 0,
+            },
+        )
+        self.assertEqual(
+            contract["terminal_status_by_task"],
+            {
+                "sim-low-risk-a": "DONE",
+                "sim-low-risk-b": "DONE",
+                "sim-medium-risk-c": "FAILED",
+                "sim-medium-risk-d": "CANCELLED",
+            },
+        )
+        self.assertFalse(contract["production_deploy_performed"])
+        self.assertFalse(contract["mutating_cloud_operations_performed"])
+
     def test_standard_quality_report_passes_with_required_readiness_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -478,6 +508,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "rollback_simulation",
                 "restart_simulation",
                 "failure_injection_simulation",
+                "parallel_worker_regression",
             ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
@@ -590,6 +621,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "rollback_simulation",
                 "restart_simulation",
                 "failure_injection_simulation",
+                "parallel_worker_regression",
             ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
@@ -654,6 +686,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "rollback_simulation",
                 "restart_simulation",
                 "failure_injection_simulation",
+                "parallel_worker_regression",
             ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
@@ -721,6 +754,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "rollback_simulation",
                 "restart_simulation",
                 "failure_injection_simulation",
+                "parallel_worker_regression",
             ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
@@ -888,6 +922,66 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(claimed["claimed_at"], claimed["started_at"])
         self.assertEqual(payload["tasks"][0]["worker_id"], "worker-2")
         self.assertEqual(payload["tasks"][0]["claimed_at"], claimed["claimed_at"])
+
+    def test_worker_finish_task_ignores_duplicate_terminal_transition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            workers_path = Path(tmp) / "workers.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-DUP-TERMINAL",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-2",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            workers_path.write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {
+                                "id": "worker-2",
+                                "status": "RUNNING",
+                                "current_task": "TASK-DUP-TERMINAL",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            originals = (worker_runner.QUEUE_PATH, worker_runner.WORKERS_PATH)
+            worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
+            try:
+                worker_runner.finish_task(
+                    "TASK-DUP-TERMINAL",
+                    "worker-2",
+                    TASK_STATUS_DONE,
+                    "first_terminal_transition",
+                )
+                first = json.loads(queue_path.read_text(encoding="utf-8"))["tasks"][0]
+                worker_runner.finish_task(
+                    "TASK-DUP-TERMINAL",
+                    "worker-2",
+                    "FAILED",
+                    "duplicate_terminal_transition",
+                )
+            finally:
+                worker_runner.QUEUE_PATH, worker_runner.WORKERS_PATH = originals
+            second = json.loads(queue_path.read_text(encoding="utf-8"))["tasks"][0]
+
+        self.assertEqual(first["status"], TASK_STATUS_DONE)
+        self.assertEqual(second["status"], TASK_STATUS_DONE)
+        self.assertEqual(second["result"], "first_terminal_transition")
+        self.assertEqual(second["finished_at"], first["finished_at"])
 
     def test_late_progress_update_does_not_reopen_finished_task(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -375,3 +375,11 @@ Kontrat: ozet 900 karakter ve 12 satiri asamaz; diff, stdout/stderr, stack trace
 PR #103, #104 ve #105 current main ile conflict verdigi icin otomatik merge yerine kod/test/template degisiklikleri elle entegre edildi.
 
 Entegrasyon kapsami: `worker_runner` repo apply stage plan report, `codex_quality_gate` retry simulation dry-run safety alanlari ve `supervisor_cli` stale dispatch claim repair. Stale claim repair aktif worker sahipligi yoksa ayni task uzerinde retry planlar; deneme siniri dolarsa `FAILED_TIMEOUT` terminal statüsüne alir ve yeni kok gorev acmaz.
+
+## 2026-06-04 Parallel Worker Regression Gates Apply
+
+Production readiness suite artik `parallel_worker_regression` kapisiyla dort dummy/simulasyon task icin dispatch, lifecycle wake, tek worker claim, tek terminal status, duplicate claim olmamasi ve duplicate terminal transition olmamasi metriklerini dogrular.
+
+`worker_runner.finish_task()` terminal status almis task uzerinde ikinci terminal yazimini status/result/finished_at degistirmeden no-op kabul eder. Standard quality gate `simulation_dry_run` grubu `parallel_worker_regression` gate'ini zorunlu sayar.
+
+Bu paket production deploy, staging deploy, gercek worker servisi restart, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

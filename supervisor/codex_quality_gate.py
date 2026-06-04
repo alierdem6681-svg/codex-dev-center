@@ -52,6 +52,7 @@ STANDARD_REPORT_GATES = {
         "rollback_simulation",
         "restart_simulation",
         "failure_injection_simulation",
+        "parallel_worker_regression",
     ],
 }
 

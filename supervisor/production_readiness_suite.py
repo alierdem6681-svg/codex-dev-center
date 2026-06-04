@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -638,6 +639,189 @@ def readiness_simulation_contracts() -> dict[str, Any]:
     }
 
 
+def _task_by_id(tasks: list[dict[str, Any]], task_id: str) -> dict[str, Any]:
+    for task in tasks:
+        if task.get("id") == task_id:
+            return task
+    return {}
+
+
+def parallel_worker_regression_contract() -> dict[str, Any]:
+    try:
+        from . import worker_runner as worker_runner_module
+        from .task_status_constants import (
+            TASK_STATUS_CANCELLED,
+            TASK_STATUS_DONE,
+            TASK_STATUS_FAILED,
+            TERMINAL_TASK_STATUSES,
+        )
+    except ImportError:
+        import worker_runner as worker_runner_module
+        from task_status_constants import (
+            TASK_STATUS_CANCELLED,
+            TASK_STATUS_DONE,
+            TASK_STATUS_FAILED,
+            TERMINAL_TASK_STATUSES,
+        )
+
+    dispatched_at = now()
+    task_specs = [
+        {"id": "sim-low-risk-a", "risk": "low", "worker": "worker-1", "terminal_status": TASK_STATUS_DONE},
+        {"id": "sim-low-risk-b", "risk": "low", "worker": "worker-2", "terminal_status": TASK_STATUS_DONE},
+        {"id": "sim-medium-risk-c", "risk": "medium", "worker": "worker-3", "terminal_status": TASK_STATUS_FAILED},
+        {"id": "sim-medium-risk-d", "risk": "medium", "worker": "worker-4", "terminal_status": TASK_STATUS_CANCELLED},
+    ]
+    events: list[dict[str, Any]] = []
+
+    with tempfile.TemporaryDirectory(prefix="parallel-worker-regression-") as tmp:
+        tmp_root = Path(tmp)
+        queue_path = tmp_root / "task_queue.json"
+        workers_path = tmp_root / "workers.json"
+        queue = {"tasks": []}
+        for spec in task_specs:
+            queue["tasks"].append(
+                {
+                    "id": spec["id"],
+                    "title": "Parallel worker regression simulation",
+                    "status": "QUEUED",
+                    "source": "cto",
+                    "risk": spec["risk"],
+                    "assigned_worker": spec["worker"],
+                    "worker_eligible": True,
+                    "dispatched_at": dispatched_at,
+                    "lifecycle_wake_requested": True,
+                }
+            )
+            events.append({"type": "dispatch", "task_id": spec["id"], "worker_id": spec["worker"]})
+            events.append({"type": "wake", "task_id": spec["id"], "worker_id": spec["worker"]})
+
+        queue_path.write_text(json.dumps(queue, indent=2), encoding="utf-8")
+        workers_path.write_text(
+            json.dumps(
+                {
+                    "workers": [
+                        {"id": spec["worker"], "status": "IDLE", "current_task": None}
+                        for spec in task_specs
+                    ]
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        originals = (worker_runner_module.QUEUE_PATH, worker_runner_module.WORKERS_PATH)
+        worker_runner_module.QUEUE_PATH = queue_path
+        worker_runner_module.WORKERS_PATH = workers_path
+        try:
+            claims: list[dict[str, Any] | None] = []
+            for spec in task_specs:
+                claimed = worker_runner_module.claim_task(spec["worker"])
+                claims.append(claimed)
+                if claimed:
+                    events.append({"type": "claim", "task_id": claimed.get("id"), "worker_id": spec["worker"]})
+
+            duplicate_claims = []
+            for spec in task_specs:
+                duplicate_claim = worker_runner_module.claim_task(spec["worker"])
+                duplicate_claims.append(duplicate_claim)
+                if duplicate_claim:
+                    events.append({"type": "duplicate_claim", "task_id": duplicate_claim.get("id"), "worker_id": spec["worker"]})
+
+            terminal_snapshots: dict[str, dict[str, Any]] = {}
+            for spec in task_specs:
+                before_tasks = read_json(queue_path, {"tasks": []}).get("tasks", [])
+                before_task = _task_by_id(before_tasks, spec["id"])
+                worker_runner_module.finish_task(
+                    spec["id"],
+                    spec["worker"],
+                    spec["terminal_status"],
+                    f"parallel_worker_regression_{str(spec['terminal_status']).lower()}",
+                )
+                after_tasks = read_json(queue_path, {"tasks": []}).get("tasks", [])
+                after_task = _task_by_id(after_tasks, spec["id"])
+                if before_task.get("status") not in TERMINAL_TASK_STATUSES and after_task.get("status") in TERMINAL_TASK_STATUSES:
+                    events.append({"type": "terminal", "task_id": spec["id"], "worker_id": spec["worker"], "status": after_task.get("status")})
+                terminal_snapshots[spec["id"]] = dict(after_task)
+
+            duplicate_terminal_attempts = []
+            for spec in task_specs:
+                before_tasks = read_json(queue_path, {"tasks": []}).get("tasks", [])
+                before_task = _task_by_id(before_tasks, spec["id"])
+                worker_runner_module.finish_task(
+                    spec["id"],
+                    spec["worker"],
+                    TASK_STATUS_FAILED,
+                    "duplicate_terminal_regression_attempt",
+                )
+                after_tasks = read_json(queue_path, {"tasks": []}).get("tasks", [])
+                after_task = _task_by_id(after_tasks, spec["id"])
+                changed = (
+                    after_task.get("status") != before_task.get("status")
+                    or after_task.get("finished_at") != before_task.get("finished_at")
+                    or after_task.get("result") != before_task.get("result")
+                )
+                duplicate_terminal_attempts.append({"task_id": spec["id"], "changed": changed})
+                if changed:
+                    events.append({"type": "duplicate_terminal", "task_id": spec["id"], "worker_id": spec["worker"]})
+
+            final_tasks = read_json(queue_path, {"tasks": []}).get("tasks", [])
+        finally:
+            worker_runner_module.QUEUE_PATH, worker_runner_module.WORKERS_PATH = originals
+
+    claimed_task_ids = [str(claim.get("id")) for claim in claims if isinstance(claim, dict)]
+    claim_pairs = [
+        (str(claim.get("id")), str(claim.get("worker_id") or claim.get("assigned_worker")))
+        for claim in claims
+        if isinstance(claim, dict)
+    ]
+    terminal_tasks = [
+        task for task in final_tasks
+        if task.get("status") in TERMINAL_TASK_STATUSES
+    ]
+    duplicate_claim_count = len([claim for claim in duplicate_claims if claim])
+    duplicate_terminal_count = len([item for item in duplicate_terminal_attempts if item["changed"]])
+    metrics = {
+        "dispatch_count": len([event for event in events if event["type"] == "dispatch"]),
+        "wake_count": len([event for event in events if event["type"] == "wake"]),
+        "unique_claimed_task_count": len(set(claimed_task_ids)),
+        "claim_event_count": len([event for event in events if event["type"] == "claim"]),
+        "terminal_task_count": len(terminal_tasks),
+        "terminal_event_count": len([event for event in events if event["type"] == "terminal"]),
+        "duplicate_claim_count": duplicate_claim_count,
+        "duplicate_terminal_count": duplicate_terminal_count,
+    }
+    expected = {
+        "dispatch_count": 4,
+        "wake_count": 4,
+        "unique_claimed_task_count": 4,
+        "claim_event_count": 4,
+        "terminal_task_count": 4,
+        "terminal_event_count": 4,
+        "duplicate_claim_count": 0,
+        "duplicate_terminal_count": 0,
+    }
+    terminal_status_by_task = {str(task.get("id")): task.get("status") for task in final_tasks}
+    ok = (
+        metrics == expected
+        and len(set(claim_pairs)) == 4
+        and all(terminal_snapshots.get(spec["id"], {}).get("finished_at") for spec in task_specs)
+        and terminal_status_by_task == {spec["id"]: spec["terminal_status"] for spec in task_specs}
+    )
+    return {
+        "ok": ok,
+        "mode": "parallel_worker_lifecycle_simulation",
+        "simulation_task_ids": [spec["id"] for spec in task_specs],
+        "worker_ids": [spec["worker"] for spec in task_specs],
+        "metrics": metrics,
+        "expected": expected,
+        "claim_pairs": [{"task_id": task_id, "worker_id": worker_id} for task_id, worker_id in claim_pairs],
+        "terminal_status_by_task": terminal_status_by_task,
+        "duplicate_terminal_attempts": duplicate_terminal_attempts,
+        "production_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
 def chaos_simulations(results: dict[str, Any]) -> None:
     contracts = readiness_simulation_contracts()
     record(results, "restart_simulation", contracts["restart"]["ok"], contracts["restart"])
@@ -647,6 +831,8 @@ def chaos_simulations(results: dict[str, Any]) -> None:
         contracts["failure_injection"]["ok"],
         contracts["failure_injection"],
     )
+    parallel_contract = parallel_worker_regression_contract()
+    record(results, "parallel_worker_regression", parallel_contract["ok"], parallel_contract)
 
 
 def unit_and_integration(results: dict[str, Any]) -> None:
