@@ -540,6 +540,25 @@ Not:
 
 ---
 
+## Dashboard Pipeline Live Polling Contract Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-ACTION-20260604-102655-03-DASHBOARD-PIPELINE-LIVE-POLLING-CONTRACT
+
+Eklenenler:
+- `/api/pipeline-flow` payload'u live polling icin `flowId`, `runId`, `serverRevision`, `generatedAt`, `resetToken`, `requiresUiReset`, `mergePolicy` ve `initialUiDefaults` alanlarini dondurur.
+- `serverRevision` endpoint'in okudugu runtime state dosyalarinin mtime bilgisinden read-only hesaplanir.
+- Frontend polling response'unu `applyPipelineFlowResponse()` ile uygular; ayni `resetToken` altinda eski veya ayni `serverRevision` full state replace yapmaz.
+- `resetToken` degismedikce ve `requiresUiReset=true` gelmedikce active stage ve ana gorev expand/collapse state'i korunur.
+- `tests/test_runtime_status_model.py` backend kontrat ve frontend markup regresyon testleriyle genisletildi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi.
+
+---
+
 ## Dashboard Pipeline Expand State Apply
 
 Tarih: 2026-06-04

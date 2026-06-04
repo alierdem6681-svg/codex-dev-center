@@ -258,6 +258,37 @@ LEGACY_MAIN_TASK_ID = "__legacy_ungrouped_tasks__"
 LEGACY_MAIN_TASK_CODE = "LEGACY"
 LEGACY_MAIN_TASK_TITLE = "Gruplanmamış Eski Görevler"
 MAIN_TASK_CHILD_LIMIT = 12
+FLOW_ID = "dashboard_pipeline_flow"
+RUN_ID = "runtime_state"
+FLOW_SOURCE_FILE_NAMES = (
+    "task_queue.json",
+    "pipeline_status.json",
+    "github_actions_status.json",
+    "production_deploy_status.json",
+    "staging_deploy_status.json",
+    "last_smoke_test_status.json",
+)
+FLOW_SOURCE_FILES = tuple(f"state/{name}" for name in FLOW_SOURCE_FILE_NAMES)
+FLOW_MERGE_POLICY = {
+    "serverOwned": [
+        "summary",
+        "stages",
+        "main_tasks",
+        "markers",
+        "generated_at",
+        "generatedAt",
+        "source_files",
+    ],
+    "clientOwned": [
+        "activeFlowStage",
+        "pipelineMainTaskExpanded",
+        "selectedNodeId",
+        "expandedNodeIds",
+        "activeTab",
+        "filters",
+        "scrollPosition",
+    ],
+}
 
 SAFE_TASK_KEYS = (
     "id",
@@ -656,9 +687,39 @@ def read_flow_markers(state_dir: Path) -> dict[str, dict[str, Any]]:
     }
 
 
+def flow_source_paths(state_dir: Path) -> list[Path]:
+    return [state_dir / name for name in FLOW_SOURCE_FILE_NAMES]
+
+
+def server_revision_for_paths(paths: list[Path]) -> int:
+    revisions = []
+    for path in paths:
+        try:
+            revisions.append(path.stat().st_mtime_ns)
+        except OSError:
+            continue
+    return max(revisions, default=0)
+
+
+def flow_run_id(markers: dict[str, dict[str, Any]]) -> str:
+    candidates = (
+        ("pipeline_status", "last_task_id"),
+        ("pipeline_status", "commit"),
+        ("pipeline_status", "last_commit"),
+        ("github_actions", "last_deploy_run_id"),
+        ("github_actions", "last_smoke_run_id"),
+    )
+    for group, key in candidates:
+        value = markers.get(group, {}).get(key)
+        if value not in (None, ""):
+            return str(safe_scalar(value, 120))
+    return RUN_ID
+
+
 def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None) -> dict[str, Any]:
     runtime_root = Path(root)
     state_dir = runtime_root / "state"
+    source_paths = flow_source_paths(state_dir)
     queue = read_json(state_dir / "task_queue.json", {"tasks": []})
     tasks = queue.get("tasks", []) if isinstance(queue, dict) else []
     if not isinstance(tasks, list):
@@ -700,18 +761,24 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
     non_empty_stages = [stage for stage in stages if stage["task_count"] > 0]
     current_stage = non_empty_stages[-1]["id"] if non_empty_stages else None
     main_tasks = build_main_tasks(normalized_tasks)
+    markers = read_flow_markers(state_dir)
+    run_id = flow_run_id(markers)
+    generated = generated_at or utc_now()
     return {
         "ok": True,
-        "generated_at": generated_at or utc_now(),
+        "flowId": FLOW_ID,
+        "runId": run_id,
+        "serverRevision": server_revision_for_paths(source_paths),
+        "generatedAt": generated,
+        "resetToken": f"{FLOW_ID}:{run_id}",
+        "requiresUiReset": False,
+        "mergePolicy": FLOW_MERGE_POLICY,
+        "initialUiDefaults": {
+            "activeFlowStage": current_stage,
+        },
+        "generated_at": generated,
         "non_mutating": True,
-        "source_files": [
-            "state/task_queue.json",
-            "state/pipeline_status.json",
-            "state/github_actions_status.json",
-            "state/production_deploy_status.json",
-            "state/staging_deploy_status.json",
-            "state/last_smoke_test_status.json",
-        ],
+        "source_files": list(FLOW_SOURCE_FILES),
         "summary": {
             "task_count": len(normalized_tasks),
             "main_task_count": len(main_tasks),
@@ -724,5 +791,5 @@ def build_pipeline_flow(root: Path | str = ROOT, generated_at: str | None = None
         },
         "stages": stages,
         "main_tasks": main_tasks,
-        "markers": read_flow_markers(state_dir),
+        "markers": markers,
     }

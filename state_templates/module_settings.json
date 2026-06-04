@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T10:51:13+00:00",
+  "updated_at": "2026-06-04T11:20:30+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -33,7 +33,12 @@
     "include_empty_stages": true,
     "deployed_stage_last": true,
     "return_raw_task_messages": false,
-    "return_terminal_output": false
+    "return_terminal_output": false,
+    "live_polling_contract": true,
+    "server_revision_required": true,
+    "reset_token_required": true,
+    "requires_ui_reset_default": false,
+    "merge_policy_client_state_preserved": true
   },
   "panel_auth": {
     "enabled": true,

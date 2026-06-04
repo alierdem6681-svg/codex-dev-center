@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T10:51:13+00:00",
+  "updated_at": "2026-06-04T11:20:30+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -27,7 +27,11 @@
       "non_mutating": true,
       "endpoint": "/api/pipeline-flow",
       "redacts_raw_messages": true,
-      "redacts_terminal_output": true
+      "redacts_terminal_output": true,
+      "live_polling_contract": true,
+      "server_revision": true,
+      "reset_token": true,
+      "client_state_preserved_on_poll": true
     },
     {
       "id": "panel_first_user_setup",
