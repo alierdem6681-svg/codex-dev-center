@@ -83,7 +83,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
 - supervisor/codex_quality_gate.py içindeki `standard-report` komutu readiness artefact'inden standart kalite raporu üretir
-- supervisor/codex_quality_gate.py içindeki `retry-simulation` komutu non-blocking retry deneme raporu üretir ve standard rapora gömülür
+- supervisor/codex_quality_gate.py içindeki `retry-simulation` komutu non-blocking retry deneme raporu üretir, dry-run/non-mutating safety alanlarını görünür kılar ve standard rapora gömülür
 - supervisor/read_only_execution.py içindeki `CHECK_MODE=read_only|dry_run|write_enabled` yazma politikası state/report yazımlarını `write-skipped` kanıtına çevirebilir
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` altında state/report yazmadan JSON sonucunda `write_evidence` ve `write_status=completed_with_write_skipped` döndürür

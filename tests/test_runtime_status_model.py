@@ -511,6 +511,16 @@ class WorkerStatusModelTest(unittest.TestCase):
         )
 
         self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["safety_status"], "pass")
+        self.assertEqual(report["safety_reasons"], [])
+        self.assertEqual(
+            report["required_false_flags"],
+            {
+                "production_deploy_performed": False,
+                "staging_deploy_performed": False,
+                "mutating_cloud_operations_performed": False,
+            },
+        )
         self.assertEqual(report["flaky_commands"], ["unit_test"])
         self.assertEqual(len(report["attempts"]), 2)
         for attempt in report["attempts"]:
@@ -597,6 +607,65 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertTrue(report["retry_simulation"]["non_blocking"])
         self.assertIn("## Retry Simulation", summary)
         self.assertIn("python3 supervisor/codex_quality_gate.py json-check attempt 1", summary)
+        self.assertIn("Safety status: fail", summary)
+
+    def test_retry_simulation_safety_is_visible_but_non_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            reports = root / "reports"
+            state.mkdir()
+            reports.mkdir()
+            gates = [
+                "python_compile_check",
+                "json_validation",
+                "yaml_validation",
+                "secret_leakage_scan",
+                "forbidden_operation_scan",
+                "unit_test",
+                "integration_test",
+                "staging_smoke_test",
+                "rollback_simulation",
+                "restart_simulation",
+                "failure_injection_simulation",
+            ]
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (reports / "quality-gate-retry-simulation.json").write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "dry_run": False,
+                        "non_blocking": True,
+                        "attempts": [],
+                        "commands": [],
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": True,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+            summary = codex_quality_gate.render_standard_quality_summary(report)
+
+        self.assertEqual(report["status"], "pass")
+        retry = report["retry_simulation"]
+        self.assertEqual(retry["safety_status"], "fail")
+        self.assertIn("dry_run_not_true", retry["safety_reasons"])
+        self.assertIn("staging_deploy_performed_not_false", retry["safety_reasons"])
+        self.assertTrue(retry["non_blocking"])
+        self.assertIn("Safety reasons: dry_run_not_true, staging_deploy_performed_not_false", summary)
 
     def test_standard_quality_report_fails_when_required_artifact_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

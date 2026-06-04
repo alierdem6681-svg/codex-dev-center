@@ -176,6 +176,8 @@ Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatc
 
 `supervisor/codex_quality_gate.py retry-simulation` komutu mevcut kalite kapısı test komutlarını değiştirmeden ilk deneme ve en fazla bir retry sonucunu `reports/quality-gate-retry-simulation.json` alanında non-blocking raporlar. Standard report bu artefact'i karar sonucunu değiştirmeden `retry_simulation` olarak gösterir.
 
+Retry simülasyonu artefact'i dry-run ve non-mutating kanıtını `safety_status`, `safety_reasons` ve `required_false_flags` alanlarıyla görünür kılar; bu görünürlük standard kalite kapısı kararını değiştirmez ve production deploy yetkisi vermez.
+
 ## READ-ONLY / DRY-RUN WRITE POLICY V1
 
 `supervisor/read_only_execution.py` readiness, drift ve smoke kontrol yazımları için ortak write evidence sözleşmesini sağlar. `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` olduğunda state/report yazımları dosya oluşturmadan `write-skipped` kanıtına dönüşür; `CHECK_MODE` verilmezse varsayılan `write_enabled` davranışı korunur.

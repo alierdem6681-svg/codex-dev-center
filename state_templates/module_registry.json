@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:18:45+00:00",
+  "updated_at": "2026-06-04T14:49:11+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -244,7 +244,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Codex çalışmadan önce preflight, test suite, diff, retry simülasyonu ve standart kalite kapısı raporu üretir.",
+      "description": "Codex çalışmadan önce preflight, test suite, diff, dry-run safety görünürlüklü retry simülasyonu ve standart kalite kapısı raporu üretir.",
       "actions": [
         "codex_preflight",
         "codex_test_suite",

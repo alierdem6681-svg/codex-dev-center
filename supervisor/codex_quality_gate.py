@@ -413,6 +413,22 @@ def _failure_hint(command_result):
         return "nonzero_exit"
     return "execution_error"
 
+def _retry_simulation_safety(payload):
+    reasons = []
+    if payload.get("dry_run") is not True:
+        reasons.append("dry_run_not_true")
+
+    required_false_flags = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
+    for name, value in required_false_flags.items():
+        if value is not False:
+            reasons.append(f"{name}_not_false")
+
+    return {
+        "safety_status": "pass" if not reasons else "fail",
+        "safety_reasons": reasons,
+        "required_false_flags": required_false_flags,
+    }
+
 def _run_retry_simulation_command(root, command, timeout):
     started = time.monotonic()
     try:
@@ -475,7 +491,7 @@ def _sanitize_retry_simulation_payload(payload):
         if isinstance(command, dict):
             commands.append({field: command.get(field) for field in RETRY_SIMULATION_COMMAND_FIELDS})
 
-    return {
+    sanitized = {
         "status": payload.get("status", "invalid"),
         "artifact": RETRY_SIMULATION_SOURCE,
         "generated_at": payload.get("generated_at"),
@@ -490,6 +506,8 @@ def _sanitize_retry_simulation_payload(payload):
         "staging_deploy_performed": payload.get("staging_deploy_performed"),
         "mutating_cloud_operations_performed": payload.get("mutating_cloud_operations_performed"),
     }
+    sanitized.update(_retry_simulation_safety(sanitized))
+    return sanitized
 
 def build_quality_gate_retry_simulation_report(root=APP, command_specs=None, generated_at=None, runner=None):
     root = Path(root)
@@ -535,7 +553,7 @@ def build_quality_gate_retry_simulation_report(root=APP, command_specs=None, gen
         if item["final_result"] == "pass" and item["retry_changed_result"]
     ]
     status = "pass" if not failed_commands else "fail"
-    return {
+    report = {
         "status": status,
         "generated_at": generated_at,
         "dry_run": True,
@@ -549,6 +567,8 @@ def build_quality_gate_retry_simulation_report(root=APP, command_specs=None, gen
         "staging_deploy_performed": False,
         "mutating_cloud_operations_performed": False,
     }
+    report.update(_retry_simulation_safety(report))
+    return report
 
 def write_quality_gate_retry_simulation_report(root=APP, command_specs=None):
     root = Path(root)
@@ -665,6 +685,8 @@ def render_standard_quality_summary(report):
         f"- Status: {retry.get('status', 'not_run')}",
         f"- Non-blocking: {str(retry.get('non_blocking', True)).lower()}",
         f"- Artifact: {retry.get('artifact', RETRY_SIMULATION_SOURCE)}",
+        f"- Safety status: {retry.get('safety_status', 'not_run')}",
+        f"- Safety reasons: {', '.join(retry.get('safety_reasons') or ['none'])}",
     ]
     for attempt in retry.get("attempts", []):
         lines.append(

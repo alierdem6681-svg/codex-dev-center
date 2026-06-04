@@ -920,3 +920,31 @@ Test:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Quality Gate Retry Safety Visibility Apply
+
+Tarih: 2026-06-04
+Görev: CTO-ACTION-20260604-144354-02-QUALITY-GATE-TEST-SIMULATION
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py` retry simulation payload'u `safety_status`, `safety_reasons` ve `required_false_flags` alanlariyla dry-run/non-mutating kanitini gorunur kilar.
+- Standard quality summary retry safety sonucunu non-blocking olarak yazar; retry safety sapmasi ana kalite kapisi `pass/fail` kararini degistirmez.
+- `tests/test_runtime_status_model.py` retry safety pass ve non-blocking fail gorunurlugunu sabitler.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, AGENTS, Anayasa, onboarding, roadmap ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_quality_gate_retry_simulation_records_attempt_fields tests.test_runtime_status_model.WorkerStatusModelTest.test_standard_quality_report_embeds_retry_simulation_non_blocking tests.test_runtime_status_model.WorkerStatusModelTest.test_retry_simulation_safety_is_visible_but_non_blocking` PASS.
+- `python3 -m compileall -q supervisor tests` PASS.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_runtime_status_model` PASS, 176 test.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests` PASS, 203 test.
+- `CHECK_MODE=dry_run PYTHONDONTWRITEBYTECODE=1 python3 supervisor/production_readiness_suite.py --json` PASS, `write_status=completed_with_write_skipped`.
+- `git diff --check` PASS.
+- JSON validation PASS: `state_templates/module_settings.json`, `state_templates/action_catalog.json`, `state_templates/module_registry.json`.
+- Deger odakli diff secret scan PASS: `secret_value_findings=0`.
+
+Not:
+- Production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu izole clone icinde runtime `state/system_state.json` ve STEP 10 `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.

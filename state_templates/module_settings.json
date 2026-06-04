@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T14:18:45+00:00",
+  "updated_at": "2026-06-04T14:49:11+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -206,6 +206,11 @@
       "result",
       "failure_hint",
       "retry_changed_result"
+    ],
+    "retry_simulation_safety_fields": [
+      "safety_status",
+      "safety_reasons",
+      "required_false_flags"
     ],
     "required_checks": [
       "lint",
