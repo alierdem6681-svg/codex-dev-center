@@ -57,6 +57,15 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
         self.assertIn("Pipeline Flow", html)
         self.assertIn("Görevler", html)
 
+    def test_dashboard_uses_scenic_shell_design(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("/assets/dashboard-landscape.png", html)
+        self.assertIn('class="dashboard-shell"', html)
+        self.assertIn('class="sidebar"', html)
+        self.assertIn('id="metricActiveQueue"', html)
+        self.assertIn('id="metricWorkers"', html)
+
     def test_dashboard_task_list_filters_live_tasks_and_keeps_running_first(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
 

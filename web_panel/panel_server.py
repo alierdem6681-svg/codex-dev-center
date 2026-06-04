@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
 import subprocess
 import sys
@@ -369,6 +370,19 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, data, code: int = 200):
         self.send_raw(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"), code=code)
 
+    def send_static_asset(self, parsed_path: str):
+        try:
+            target = (STATIC_DIR / parsed_path.lstrip("/")).resolve()
+            target.relative_to(STATIC_DIR.resolve())
+        except Exception:
+            self.send_json({"ok": False, "error": "not_found"}, 404)
+            return
+        if not target.is_file():
+            self.send_json({"ok": False, "error": "not_found"}, 404)
+            return
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        self.send_raw(target.read_bytes(), content_type)
+
     def redirect_login(self):
         self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/login"})
 
@@ -437,6 +451,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/pipeline-flow":
             self.send_json(pipeline_flow_payload())
+            return
+        if parsed.path.startswith("/assets/"):
+            self.send_static_asset(parsed.path)
             return
         if parsed.path in ("/", "/index.html"):
             self.send_raw((STATIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")

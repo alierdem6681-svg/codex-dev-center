@@ -241,68 +241,373 @@
         .account-trigger { max-width: calc(100vw - 160px); }
         .account-panel { left: auto; right: 0; }
       }
+      body {
+        min-height: 100vh;
+        background: #dfe8e5 url('/assets/dashboard-landscape.png') center top / cover fixed no-repeat;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: rgba(255, 255, 255, .2);
+      }
+      .dashboard-canvas {
+        position: relative;
+        min-height: 100vh;
+        padding: 54px 40px;
+      }
+      .dashboard-shell {
+        width: min(1450px, 100%);
+        min-height: calc(100vh - 108px);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 238px minmax(0, 1fr);
+        background: rgba(255, 255, 255, .82);
+        border: 1px solid rgba(255, 255, 255, .74);
+        border-radius: 22px;
+        box-shadow: 0 28px 70px rgba(37, 53, 68, .24);
+        overflow: hidden;
+        backdrop-filter: blur(18px);
+      }
+      .sidebar {
+        min-width: 0;
+        background: rgba(255, 255, 255, .74);
+        border-right: 1px solid rgba(39, 50, 64, .12);
+        padding: 22px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .brand-mark {
+        display: inline-grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: #1f2630;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .nav-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        padding: 8px 10px;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .nav-item:hover, .nav-item:focus { background: rgba(47, 95, 115, .08); color: var(--accent); }
+      .nav-item.active {
+        background: #1f2630;
+        color: #ffffff;
+        box-shadow: 0 10px 22px rgba(31, 38, 48, .18);
+      }
+      .nav-dot {
+        width: 8px;
+        height: 8px;
+        flex: 0 0 8px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: .72;
+      }
+      .workspace {
+        min-width: 0;
+        background: rgba(247, 249, 251, .72);
+      }
+      .topbar {
+        background: transparent;
+        border-bottom: 0;
+        padding: 28px 28px 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: flex-start;
+      }
+      .breadcrumb {
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+      }
+      .topbar h1 {
+        margin: 0;
+        font-size: 23px;
+        letter-spacing: 0;
+      }
+      .workspace main {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0 28px 30px;
+      }
+      .top-tools {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        min-width: 320px;
+      }
+      .top-search {
+        width: min(260px, 34vw);
+        min-height: 36px;
+        font-size: 12px;
+      }
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        gap: 14px;
+        margin-bottom: 16px;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+      }
+      .metric-card, .content-card {
+        min-width: 0;
+        background: #ffffff;
+        border: 1px solid rgba(39, 50, 64, .12);
+        border-radius: 8px;
+        box-shadow: 0 12px 26px rgba(43, 58, 73, .08);
+        overflow-wrap: anywhere;
+      }
+      .metric-card {
+        min-height: 92px;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .metric-label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .metric-value {
+        display: block;
+        margin-top: 3px;
+        color: var(--ink);
+        font-size: 25px;
+        line-height: 1.05;
+        font-weight: 800;
+      }
+      .metric-hint {
+        display: block;
+        margin-top: 8px;
+        color: var(--ok);
+        font-size: 12px;
+      }
+      .metric-hint.warn-text { color: var(--warn); }
+      .metric-icon {
+        display: inline-grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border-radius: 8px;
+        background: #1f2630;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 800;
+        box-shadow: 0 10px 20px rgba(31, 38, 48, .22);
+      }
+      .content-card {
+        padding: 18px;
+      }
+      .desktop-table { overflow-x: auto; }
+      .dashboard-grid { display: grid; gap: 16px; }
+      @media (max-width: 1220px) {
+        .dashboard-shell { grid-template-columns: 206px minmax(0, 1fr); }
+        .metrics-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+        .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 980px) {
+        .dashboard-canvas { padding: 18px; }
+        .dashboard-shell {
+          min-height: calc(100vh - 36px);
+          grid-template-columns: 1fr;
+          border-radius: 16px;
+        }
+        .sidebar {
+          border-right: 0;
+          border-bottom: 1px solid rgba(39, 50, 64, .12);
+          padding: 16px;
+        }
+        .nav-group {
+          flex-direction: row;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+        .nav-item { flex: 0 0 auto; }
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 20px 18px 12px;
+        }
+        .workspace main { padding: 0 18px 22px; }
+        .top-tools {
+          width: 100%;
+          min-width: 0;
+          justify-content: space-between;
+        }
+        .top-search { width: min(260px, 48vw); }
+      }
+      @media (max-width: 620px) {
+        .dashboard-canvas { padding: 0; }
+        .dashboard-shell {
+          min-height: 100vh;
+          border-radius: 0;
+        }
+        .metrics-grid { grid-template-columns: 1fr; }
+        .top-tools {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .top-search { width: 100%; }
+        .account-trigger { max-width: 100%; }
+      }
     </style>
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Codex Dev Center Yönetim Paneli</h1>
-        <div class="muted">Görevler, pipeline flow ve güvenli panel yönetimi</div>
-      </div>
-      <div class="actions header-actions">
-        <div id="accountMenu" class="account-menu">
-          <button id="accountMenuButton" class="account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenuPanel" onclick="toggleAccountMenu()">
-            <span id="accountAvatar" class="account-avatar">P</span>
-            <span class="account-copy">
-              <span id="accountName" class="account-name">Panel</span>
-              <span class="account-role">Hesap</span>
-            </span>
-          </button>
-          <div id="accountMenuPanel" class="account-panel" role="menu" aria-labelledby="accountMenuButton" hidden>
-            <div class="account-summary">
-              <span id="accountPanelAvatar" class="account-avatar">P</span>
-              <div class="account-copy">
-                <strong id="accountPanelUsername">Panel kullanıcısı</strong>
-                <span id="accountPanelMode" class="account-role">Oturum açık</span>
+    <div class="dashboard-canvas">
+      <div id="dashboard" class="dashboard-shell">
+        <aside class="sidebar" aria-label="Ana menü">
+          <a class="brand" href="#dashboard" aria-label="Codex Dev Center">
+            <span class="brand-mark">CD</span>
+            <span>Codex Dev Center</span>
+          </a>
+          <nav class="nav-group" aria-label="Panel bölümleri">
+            <a class="nav-item active" href="#dashboard"><span class="nav-dot"></span><span>Dashboard</span></a>
+            <a class="nav-item" href="#pipeline"><span class="nav-dot"></span><span>Pipeline Flow</span></a>
+            <a class="nav-item" href="#tasks"><span class="nav-dot"></span><span>Görevler</span></a>
+            <a class="nav-item" href="#workers"><span class="nav-dot"></span><span>Workers</span></a>
+          </nav>
+        </aside>
+
+        <div class="workspace">
+          <header class="topbar">
+            <div>
+              <div class="breadcrumb">Pages / Dashboard</div>
+              <h1>Dashboard</h1>
+              <div class="muted">Görevler, pipeline flow ve güvenli panel yönetimi</div>
+            </div>
+            <div class="top-tools">
+              <input id="pageSearch" class="top-search" type="search" placeholder="Type here..." aria-label="Sayfa arama">
+              <div class="actions header-actions">
+                <div id="accountMenu" class="account-menu">
+                  <button id="accountMenuButton" class="account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenuPanel" onclick="toggleAccountMenu()">
+                    <span id="accountAvatar" class="account-avatar">P</span>
+                    <span class="account-copy">
+                      <span id="accountName" class="account-name">Panel</span>
+                      <span class="account-role">Hesap</span>
+                    </span>
+                  </button>
+                  <div id="accountMenuPanel" class="account-panel" role="menu" aria-labelledby="accountMenuButton" hidden>
+                    <div class="account-summary">
+                      <span id="accountPanelAvatar" class="account-avatar">P</span>
+                      <div class="account-copy">
+                        <strong id="accountPanelUsername">Panel kullanıcısı</strong>
+                        <span id="accountPanelMode" class="account-role">Oturum açık</span>
+                      </div>
+                    </div>
+                    <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
-          </div>
+          </header>
+
+          <main class="stack">
+            <section class="metrics-grid" aria-label="Dashboard özetleri">
+              <article class="metric-card">
+                <div>
+                  <span class="metric-label">Aktif Kuyruk</span>
+                  <strong id="metricActiveQueue" class="metric-value">0</strong>
+                  <span id="metricActiveHint" class="metric-hint">boşta</span>
+                </div>
+                <span class="metric-icon">AQ</span>
+              </article>
+              <article class="metric-card">
+                <div>
+                  <span class="metric-label">Canlı İşler</span>
+                  <strong id="metricLiveTasks" class="metric-value">0</strong>
+                  <span id="metricLiveHint" class="metric-hint">canlı yok</span>
+                </div>
+                <span class="metric-icon">CI</span>
+              </article>
+              <article class="metric-card">
+                <div>
+                  <span class="metric-label">Kapalı Kayıt</span>
+                  <strong id="metricClosedTasks" class="metric-value">0</strong>
+                  <span id="metricClosedHint" class="metric-hint">tamamlandı</span>
+                </div>
+                <span class="metric-icon">KK</span>
+              </article>
+              <article class="metric-card">
+                <div>
+                  <span class="metric-label">Worker</span>
+                  <strong id="metricWorkers" class="metric-value">0</strong>
+                  <span id="metricWorkerHint" class="metric-hint">hazır</span>
+                </div>
+                <span class="metric-icon">WK</span>
+              </article>
+            </section>
+
+            <div class="dashboard-grid">
+              <section id="pipeline" class="content-card">
+                <div class="section-title-row">
+                  <h2>Pipeline Flow</h2>
+                </div>
+                <div id="pipelineFlowTabs" class="tabbar" role="tablist" aria-label="Pipeline Flow stage sekmeleri"></div>
+                <div id="pipelineFlowPanel" role="tabpanel" aria-live="polite"></div>
+              </section>
+
+              <section id="tasks" class="content-card">
+                <h2>Görevler</h2>
+                <div class="controls">
+                  <input id="search" placeholder="Ara">
+                  <select id="statusFilter"><option value="">Tüm durumlar</option></select>
+                  <select id="workerFilter"><option value="">Tüm çalışanlar</option></select>
+                  <select id="riskFilter"><option value="">Tüm riskler</option></select>
+                  <select id="sortMode">
+                    <option value="newest">En yeni</option>
+                    <option value="oldest">En eski</option>
+                    <option value="risk">En riskli</option>
+                    <option value="errors">En çok hata</option>
+                  </select>
+                  <label class="control-check" for="showLiveTasks">
+                    <input id="showLiveTasks" type="checkbox">
+                    Canlıya alınanları göster
+                  </label>
+                </div>
+                <div id="tasksTable" class="desktop-table"></div>
+                <div id="tasksCards" class="mobile-list"></div>
+              </section>
+            </div>
+          </main>
         </div>
       </div>
-    </header>
-
-    <main class="stack">
-      <section>
-        <div class="section-title-row">
-          <h2>Pipeline Flow</h2>
-        </div>
-        <div id="pipelineFlowTabs" class="tabbar" role="tablist" aria-label="Pipeline Flow stage sekmeleri"></div>
-        <div id="pipelineFlowPanel" role="tabpanel" aria-live="polite"></div>
-      </section>
-
-      <section>
-        <h2>Görevler</h2>
-        <div class="controls">
-          <input id="search" placeholder="Ara">
-          <select id="statusFilter"><option value="">Tüm durumlar</option></select>
-          <select id="workerFilter"><option value="">Tüm çalışanlar</option></select>
-          <select id="riskFilter"><option value="">Tüm riskler</option></select>
-          <select id="sortMode">
-            <option value="newest">En yeni</option>
-            <option value="oldest">En eski</option>
-            <option value="risk">En riskli</option>
-            <option value="errors">En çok hata</option>
-          </select>
-          <label class="control-check" for="showLiveTasks">
-            <input id="showLiveTasks" type="checkbox">
-            Canlıya alınanları göster
-          </label>
-        </div>
-        <div id="tasksTable" class="desktop-table"></div>
-        <div id="tasksCards" class="mobile-list"></div>
-      </section>
-    </main>
+    </div>
 
     <script>
       let latest = {};
@@ -438,6 +743,45 @@
       }
       function tasks(){ return ((latest.tasks || latest.queue || {}).tasks || []).slice(); }
       function workers(){ return ((latest.workers || {}).workers || []).slice(); }
+      function taskIsClosed(t){
+        const status = taskStatus(t);
+        return ['DONE','FINAL_REPORTED','CANCELLED','CANCELED','ARCHIVED','CLOSED'].includes(status)
+          || ['CLOSED','CANCELLED','CANCELED','ARCHIVED'].includes(foldedText(t.pipeline_status || t.lifecycle_status));
+      }
+      function workerIsAvailable(w){
+        const status = foldedText(w.status || w.state || w.active);
+        const serviceActive = foldedText(w.service_active || w.active);
+        const enabled = foldedText(w.enabled || w.service_enabled);
+        return ['ACTIVE','RUNNING','IDLE','SLEEPING'].includes(status)
+          || ['ACTIVE','TRUE','YES'].includes(serviceActive)
+          || ['ENABLED','TRUE','YES'].includes(enabled);
+      }
+      function setMetricText(id, value){
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      }
+      function setMetricHint(id, value, warn = false){
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = value;
+        el.classList.toggle('warn-text', warn);
+      }
+      function renderMetrics(){
+        const list = tasks();
+        const active = list.filter(t => !taskIsLive(t) && !taskIsClosed(t)).length;
+        const live = list.filter(taskIsLive).length;
+        const closed = list.filter(t => taskIsClosed(t) && !taskIsLive(t)).length;
+        const workerList = workers();
+        const availableWorkers = workerList.filter(workerIsAvailable).length;
+        setMetricText('metricActiveQueue', String(active));
+        setMetricText('metricLiveTasks', String(live));
+        setMetricText('metricClosedTasks', String(closed));
+        setMetricText('metricWorkers', workerList.length ? `${availableWorkers}/${workerList.length}` : '0');
+        setMetricHint('metricActiveHint', active ? 'takipte' : 'boşta', active > 0);
+        setMetricHint('metricLiveHint', live ? 'canlı kayıt' : 'canlı yok');
+        setMetricHint('metricClosedHint', closed ? 'tamamlandı' : 'kapalı yok');
+        setMetricHint('metricWorkerHint', workerList.length ? 'servis görünümü' : 'worker yok', availableWorkers === 0 && workerList.length > 0);
+      }
       function accountDisplayName(data){
         return String(data?.auth?.username || 'Panel kullanıcısı');
       }
@@ -630,6 +974,7 @@
       function render(data){
         latest = data;
         renderAccount(data);
+        renderMetrics();
         fillFilters();
         renderTasks();
       }
@@ -671,6 +1016,10 @@
         }
       });
       search.addEventListener('input', renderTasks);
+      pageSearch.addEventListener('input', event => {
+        search.value = event.target.value;
+        renderTasks();
+      });
       [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks].forEach(el => {
         el.addEventListener('change', event => {
           event.preventDefault();
