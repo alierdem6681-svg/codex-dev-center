@@ -20,6 +20,8 @@ from supervisor import (  # noqa: E402
     cto_autonomous_delivery,
     direct_cto_job_recovery,
     lifecycle_manager,
+    production_deploy_controller,
+    production_environment_manager,
     production_readiness_suite,
     progress_aware_runner,
     direct_cto_async_job,
@@ -29,6 +31,7 @@ from supervisor import (  # noqa: E402
     task_validation_engine,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
+    telegram_health_watcher,
     worker_runner,
 )
 from supervisor.task_status_constants import (  # noqa: E402
@@ -1673,6 +1676,80 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertEqual(updated["deploy_run_id"], "300")
         self.assertEqual(updated["smoke_run_id"], "301")
 
+    def test_deploy_workflow_failure_uses_local_vm_fallback_when_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            task = self.deployable_task("TASK-LOCAL-FALLBACK")
+            original_dispatch = cto_autonomous_delivery.dispatch_workflow
+            original_local = cto_autonomous_delivery.run_local_deploy_fallback
+            original_main_head = cto_autonomous_delivery.main_head
+
+            def fail_dispatch(_workflow, wait=False):
+                return {"ok": False, "status": "DISPATCH_FAILED", "dispatch": {"returncode": 1}}
+
+            def fake_local(_task):
+                return {
+                    "ok": True,
+                    "status": "LOCAL_VM_FALLBACK_DEPLOYED",
+                    "controller": {"ok": True, "status": "PASS"},
+                    "run": {
+                        "databaseId": "local-test",
+                        "url": "",
+                        "headSha": "local-sha",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "local_vm_fallback": True,
+                        "controller_status": "PASS",
+                    },
+                }
+
+            cto_autonomous_delivery.dispatch_workflow = fail_dispatch
+            cto_autonomous_delivery.run_local_deploy_fallback = fake_local
+            cto_autonomous_delivery.main_head = lambda: "local-sha"
+            try:
+                with self.patched_delivery_runtime(tmp, [task]) as queue_path:
+                    base_policy = cto_autonomous_delivery.policy
+                    cto_autonomous_delivery.policy = lambda: {
+                        **base_policy(),
+                        "local_vm_deploy_fallback_enabled": True,
+                        "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
+                    }
+                    try:
+                        result = cto_autonomous_delivery.deploy_task("TASK-LOCAL-FALLBACK", execute=True, wait=True, smoke=True)
+                    finally:
+                        cto_autonomous_delivery.policy = base_policy
+                    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            finally:
+                cto_autonomous_delivery.dispatch_workflow = original_dispatch
+                cto_autonomous_delivery.run_local_deploy_fallback = original_local
+                cto_autonomous_delivery.main_head = original_main_head
+
+        updated = queue["tasks"][0]
+        self.assertEqual(result["status"], "DEPLOYED")
+        self.assertEqual(result["deployment_path"], "local_vm_fallback_after_workflow_failure")
+        self.assertEqual(updated["status"], TASK_STATUS_DEPLOYED)
+        self.assertTrue(updated["local_vm_deploy_fallback_used"])
+        self.assertEqual(updated["deploy_run_id"], "local-test")
+
+    def test_root_cause_mode_blocks_backlog_creation_for_deploy_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            retry = self.deployable_task("TASK-DEPLOY-RETRY")
+            retry["deployment_status"] = "DEPLOY_RETRY_REQUIRED"
+            retry["deploy_retry_required"] = True
+            candidate = {"id": "TASK-CANDIDATE", "status": TASK_STATUS_DONE, "risk": "low", "title": "safe followup"}
+            with self.patched_delivery_runtime(tmp, [retry, candidate]) as queue_path:
+                status = cto_autonomous_delivery.root_cause_mode_status()
+                result = cto_autonomous_delivery.start_next_backlog(execute=True)
+                queue = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(status["active"])
+        self.assertEqual(result["status"], "ROOT_CAUSE_MODE_ACTIVE")
+        self.assertEqual(len(queue["tasks"]), 2)
+
+    def test_pipeline_failed_apply_child_requires_root_cause_mode(self):
+        task = {"id": "CTO-APPLY-1", "status": TASK_STATUS_PIPELINE_FAILED, "risk": "medium", "parent_task_id": "PARENT"}
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "pipeline_failed_requires_root_cause_mode")
+
     def test_execute_deploy_without_smoke_does_not_mark_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-NO-SMOKE")
@@ -1902,6 +1979,49 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(calls, [True])
         self.assertEqual(system_state["backlog_dispatcher_last_result"], "autonomous_backlog_created")
         self.assertEqual(system_state["backlog_dispatcher_last_child"], "CHILD")
+
+    def test_root_cause_mode_blocks_lifecycle_dispatcher_children(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            system_state_path = state / "system_state.json"
+            queue_path.write_text(
+                json.dumps({"tasks": [{"id": "PARENT", "status": TASK_STATUS_PROPOSAL_DONE, "risk": "low"}]}),
+                encoding="utf-8",
+            )
+
+            originals = (
+                lifecycle_manager.QUEUE_PATH,
+                lifecycle_manager.SYSTEM_STATE_PATH,
+                lifecycle_manager.cto_autonomous_delivery.root_cause_mode_status,
+            )
+            lifecycle_manager.QUEUE_PATH = queue_path
+            lifecycle_manager.SYSTEM_STATE_PATH = system_state_path
+            lifecycle_manager.cto_autonomous_delivery.root_cause_mode_status = lambda _queue=None: {
+                "ok": True,
+                "active": True,
+                "status": "ROOT_CAUSE_MODE_ACTIVE",
+                "deploy_retry_task_ids": ["TASK-DEPLOY-RETRY"],
+                "pipeline_failed_child_ids": [],
+                "reason": "deploy_or_pipeline_root_cause_required",
+            }
+            try:
+                created = lifecycle_manager.ensure_single_backlog_task()
+            finally:
+                (
+                    lifecycle_manager.QUEUE_PATH,
+                    lifecycle_manager.SYSTEM_STATE_PATH,
+                    lifecycle_manager.cto_autonomous_delivery.root_cause_mode_status,
+                ) = originals
+
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            system_state = json.loads(system_state_path.read_text(encoding="utf-8"))
+
+        self.assertFalse(created)
+        self.assertEqual(len(queue["tasks"]), 1)
+        self.assertEqual(system_state["backlog_dispatcher_last_result"], "root_cause_mode_active")
 
     def test_backlog_fallback_can_fill_parallel_capacity(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2338,6 +2458,81 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(pending, 2)
         self.assertEqual(running, 1)
         self.assertEqual(active, 4)
+
+    def test_github_actions_channel_allows_cto_local_fallback_context(self):
+        cfg = {
+            "production_deploy_channel": "github_actions_manual",
+            "local_vm_deploy_fallback_enabled": True,
+            "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
+        }
+        original_env = os.environ.copy()
+        try:
+            os.environ.pop("GITHUB_ACTIONS", None)
+            os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
+            os.environ["CODEX_DEPLOY_ACTOR"] = "cto_finalizer"
+            self.assertTrue(production_deploy_controller.github_actions_local_fallback_allowed(cfg))
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    def test_environment_manager_github_actions_blocker_is_bypassed_only_for_local_fallback(self):
+        original_policy = production_environment_manager.deploy_policy
+        original_env = os.environ.copy()
+        production_environment_manager.deploy_policy = lambda: {
+            "deploy_policy": {
+                "production_deploy_channel": "github_actions_manual",
+                "local_vm_deploy_fallback_enabled": True,
+            },
+            "production_policy": {"local_vm_deploy_fallback_allowed_actor": "cto_finalizer"},
+            "commands": {},
+        }
+        try:
+            os.environ.pop("GITHUB_ACTIONS", None)
+            os.environ.pop("CODEX_LOCAL_DEPLOY_FALLBACK", None)
+            os.environ.pop("CODEX_DEPLOY_ACTOR", None)
+            self.assertFalse(production_environment_manager.github_actions_local_fallback_allowed())
+            os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
+            os.environ["CODEX_DEPLOY_ACTOR"] = "cto_finalizer"
+            self.assertTrue(production_environment_manager.github_actions_local_fallback_allowed())
+        finally:
+            production_environment_manager.deploy_policy = original_policy
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    def test_telegram_health_watcher_suppresses_auto_report_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+
+            originals = (
+                telegram_health_watcher.APP,
+                telegram_health_watcher.STATE,
+                telegram_health_watcher.LOGS,
+                telegram_health_watcher.status_snapshot,
+                telegram_health_watcher.send_health,
+            )
+            telegram_health_watcher.APP = runtime
+            telegram_health_watcher.STATE = state
+            telegram_health_watcher.LOGS = logs
+            telegram_health_watcher.status_snapshot = lambda: [{"service": "codex-panel", "active": "active", "enabled": "enabled"}]
+            telegram_health_watcher.send_health = lambda _reason: (_ for _ in ()).throw(AssertionError("auto report must be suppressed"))
+            try:
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    telegram_health_watcher.main()
+                log_text = (logs / "telegram_health_watcher.log").read_text(encoding="utf-8")
+            finally:
+                (
+                    telegram_health_watcher.APP,
+                    telegram_health_watcher.STATE,
+                    telegram_health_watcher.LOGS,
+                    telegram_health_watcher.status_snapshot,
+                    telegram_health_watcher.send_health,
+                ) = originals
+
+        self.assertIn("TELEGRAM_HEALTH_WATCHER=SUPPRESSED_AUTO_DISABLED", out.getvalue())
+        self.assertIn("auto_report_enabled=false", log_text)
 
     def test_task_recovery_preserves_ready_phase_on_empty_queue(self):
         with tempfile.TemporaryDirectory() as tmp:

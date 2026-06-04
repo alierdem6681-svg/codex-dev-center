@@ -149,6 +149,98 @@ def github_actions_context() -> bool:
     return os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
 
 
+def truthy(value: Any) -> bool:
+    return value is True or str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def local_deploy_fallback_enabled() -> bool:
+    if truthy(os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")):
+        return True
+    policies = deploy_policy()
+    deploy = policies["deploy_policy"]
+    production = policies["production_policy"]
+    return bool(
+        truthy(deploy.get("local_vm_deploy_fallback_enabled"))
+        or truthy(production.get("local_vm_deploy_fallback_enabled"))
+    )
+
+
+def local_deploy_fallback_context() -> bool:
+    actor = os.environ.get("CODEX_DEPLOY_ACTOR", "").strip()
+    return bool(truthy(os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")) or actor == "cto_finalizer")
+
+
+def github_actions_local_fallback_allowed() -> bool:
+    return bool(local_deploy_fallback_enabled() and local_deploy_fallback_context())
+
+
+def source_sync_excludes() -> list[str]:
+    return [
+        ".git/",
+        ".env",
+        "*.pem",
+        "*.key",
+        "__pycache__/",
+        ".pytest_cache/",
+        "state/",
+        "logs/",
+        "reports/",
+        "archives/",
+        "workspaces/",
+        "tmp/",
+    ]
+
+
+def create_runtime_code_backup() -> dict[str, Any]:
+    archives = ROOT / "archives" / "production_code_backups"
+    archives.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    target = archives / f"runtime_code_{stamp}.tar.gz"
+    tar = shutil.which("tar")
+    if not tar:
+        return {"ok": False, "reason": "tar_not_found", "path": str(target)}
+    args = [tar]
+    for item in source_sync_excludes():
+        args.append(f"--exclude={item.rstrip('/')}")
+    args += ["-czf", str(target), "-C", str(ROOT), "."]
+    result = run(args, timeout=300, cwd=ROOT)
+    return {"ok": bool(result.get("ok")), "path": str(target), "result": result}
+
+
+def sync_source_to_runtime() -> dict[str, Any]:
+    if SOURCE_ROOT == ROOT:
+        return {"ok": True, "skipped": True, "reason": "source_is_runtime", "source": str(SOURCE_ROOT), "runtime": str(ROOT)}
+    if not (SOURCE_ROOT / ".git").exists():
+        return {"ok": False, "reason": "source_git_root_not_found", "source": str(SOURCE_ROOT), "runtime": str(ROOT)}
+    backup: dict[str, Any] = {"ok": True, "skipped": True, "reason": "backup_not_required_by_policy"}
+    policies = deploy_policy()
+    if truthy(policies["deploy_policy"].get("local_vm_deploy_fallback_requires_backup")) or truthy(
+        policies["production_policy"].get("local_vm_deploy_fallback_requires_backup")
+    ):
+        backup = create_runtime_code_backup()
+        if not backup.get("ok"):
+            return {"ok": False, "reason": "runtime_code_backup_failed", "backup": backup}
+    rsync = shutil.which("rsync")
+    if not rsync:
+        return {"ok": False, "reason": "rsync_not_found", "backup": backup}
+    args = [rsync, "-a", "--delete"]
+    for item in source_sync_excludes():
+        args.append(f"--exclude={item}")
+    args += [str(SOURCE_ROOT) + "/", str(ROOT) + "/"]
+    result = run(args, timeout=300, cwd=SOURCE_ROOT)
+    head = git_status().get("head", "")
+    if result.get("ok") and head:
+        (ROOT / ".production_commit").write_text(head + "\n", encoding="utf-8")
+    return {
+        "ok": bool(result.get("ok")),
+        "source": str(SOURCE_ROOT),
+        "runtime": str(ROOT),
+        "backup": backup,
+        "head": head,
+        "result": result,
+    }
+
+
 def configured_commands() -> dict[str, Any]:
     policy = deploy_policy()
     commands = {}
@@ -507,12 +599,20 @@ def production_deploy(dry_run: bool = False) -> dict[str, Any]:
         "staging": {"status": staging.get("status"), "ok": staging.get("ok"), "commit": staging.get("git", {}).get("head")},
         "commands": configured_commands(),
         "execute_enabled": execute_enabled,
+        "deploy_channel": deploy_channel(),
+        "local_vm_deploy_fallback_enabled": local_deploy_fallback_enabled(),
+        "local_vm_deploy_fallback_context": local_deploy_fallback_context(),
         "mutating_cloud_operations_performed": False,
     }
     blockers = []
     if not execute_enabled:
         blockers.append("production_execute_flag_missing")
-    if deploy_channel() == "github_actions_manual" and not github_actions_context() and not dry_run:
+    if (
+        deploy_channel() == "github_actions_manual"
+        and not github_actions_context()
+        and not github_actions_local_fallback_allowed()
+        and not dry_run
+    ):
         blockers.append("github_actions_workflow_required")
     if not critical["ok"]:
         blockers.append("critical_exception_detected")
@@ -535,6 +635,12 @@ def production_deploy(dry_run: bool = False) -> dict[str, Any]:
         write_production_outputs(result)
         return result
     atomic_write_json(STATE / "rollback_point.json", point)
+    if github_actions_local_fallback_allowed():
+        result["runtime_sync"] = sync_source_to_runtime()
+        if not result["runtime_sync"].get("ok"):
+            result.update({"status": "FAIL", "blockers": ["runtime_source_sync_failed"]})
+            write_production_outputs(result)
+            return result
     result["panel"] = ensure_panel(PRODUCTION_PORT, "production", "0.0.0.0", replace_mismatch=True)
     result["health"] = health_check("production")
     result["smoke"] = smoke_test("production")

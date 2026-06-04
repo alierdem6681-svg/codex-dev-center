@@ -452,6 +452,19 @@ def ensure_single_backlog_task() -> bool:
         "backlog_dispatcher_last_tick": now(),
         "backlog_dispatcher_worker_active": len(worker_active),
     }
+    root_cause = cto_autonomous_delivery.root_cause_mode_status(queue)
+    if root_cause.get("active"):
+        update_system_state(
+            **state_updates,
+            backlog_dispatcher_last_result="root_cause_mode_active",
+            backlog_dispatcher_root_cause=root_cause,
+        )
+        log(
+            "BACKLOG_DISPATCH root_cause_mode_active "
+            f"deploy_retry={len(root_cause.get('deploy_retry_task_ids', []))} "
+            f"pipeline_failed={len(root_cause.get('pipeline_failed_child_ids', []))}"
+        )
+        return False
     if len(worker_active) >= max_parallel_workers():
         update_system_state(**state_updates, backlog_dispatcher_last_result="worker_active")
         return False

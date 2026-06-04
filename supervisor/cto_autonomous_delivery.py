@@ -144,6 +144,16 @@ def policy() -> dict[str, Any]:
         ),
         "workflow": str(template.get("github_actions_workflow_name") or DEPLOY_WORKFLOW),
         "confirm_phrase": str(template.get("github_actions_confirm_phrase") or CONFIRM_PHRASE),
+        "local_vm_deploy_fallback_enabled": bool(
+            task_flag(deploy, "local_vm_deploy_fallback_enabled")
+            or task_flag(production, "local_vm_deploy_fallback_enabled")
+            or task_flag({"env": os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")}, "env")
+        ),
+        "local_vm_deploy_fallback_allowed_actor": str(
+            deploy.get("local_vm_deploy_fallback_allowed_actor")
+            or production.get("local_vm_deploy_fallback_allowed_actor")
+            or "cto_finalizer"
+        ),
     }
 
 
@@ -208,6 +218,16 @@ def task_flag(task: dict[str, Any], key: str) -> bool:
     return value is True or str(value).strip().lower() in {"1", "true", "yes"}
 
 
+def local_deploy_fallback_enabled() -> bool:
+    cfg = policy()
+    actor = os.environ.get("CODEX_DEPLOY_ACTOR", "").strip()
+    allowed_actor = str(cfg.get("local_vm_deploy_fallback_allowed_actor") or "cto_finalizer")
+    return bool(
+        cfg.get("local_vm_deploy_fallback_enabled")
+        and (task_flag({"env": os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")}, "env") or not actor or actor == allowed_actor)
+    )
+
+
 def gate_status(value: Any) -> str:
     return str(value or "").strip().upper()
 
@@ -269,6 +289,13 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         TASK_STATUS_DONE,
     }:
         return "status_not_recoverable_for_backlog_pilot"
+    if status == TASK_STATUS_PIPELINE_FAILED and (
+        task.get("parent_task")
+        or task.get("parent_task_id")
+        or str(task.get("source") or "").lower() == "cto_backlog_dispatcher"
+        or str(task.get("id") or "").startswith("CTO-APPLY-")
+    ):
+        return "pipeline_failed_requires_root_cause_mode"
     risk = normalize_risk(task.get("risk") or task.get("risk_level"))
     if risk not in {"low", "medium"}:
         return "risk_requires_approval"
@@ -356,10 +383,66 @@ def create_backlog_continuation_task(queue: dict[str, Any], parent: dict[str, An
     return child
 
 
+def root_cause_mode_status(queue: dict[str, Any] | None = None) -> dict[str, Any]:
+    queue = queue or load_queue()
+    tasks = [task for task in queue.get("tasks", []) if isinstance(task, dict)]
+    deploy_failure_statuses = {
+        "DEPLOY_WORKFLOW_FAILED",
+        "SMOKE_WORKFLOW_FAILED",
+        "LOCAL_DEPLOY_FALLBACK_FAILED",
+        "FAILED_PRODUCTION",
+        "FAILED_HEALTH_CHECK",
+        "DEPLOY_WORKFLOW_REQUIRED",
+    }
+    deploy_retry_tasks = []
+    pipeline_failed_children = []
+    delivery_ready_tasks = []
+    for task in tasks:
+        if task_flag(task, "production_deployed") or normalize_status(task.get("status")) == TASK_STATUS_DEPLOYED:
+            continue
+        deployment_status = str(task.get("deployment_status") or "").upper()
+        failure_status = str(task.get("last_deploy_failure_status") or "").upper()
+        delivery_level = str(task.get("delivery_level") or "").upper()
+        if task_flag(task, "deploy_retry_required") or deployment_status == "DEPLOY_RETRY_REQUIRED" or failure_status in deploy_failure_statuses:
+            deploy_retry_tasks.append(str(task.get("id") or ""))
+        if normalize_status(task.get("status")) == TASK_STATUS_PIPELINE_FAILED and (
+            task.get("parent_task")
+            or task.get("parent_task_id")
+            or str(task.get("source") or "").lower() == "cto_backlog_dispatcher"
+            or str(task.get("id") or "").startswith("CTO-APPLY-")
+        ):
+            pipeline_failed_children.append(str(task.get("id") or ""))
+        if delivery_level in {"PR_READY", "READY_FOR_DEPLOY"}:
+            delivery_ready_tasks.append(str(task.get("id") or ""))
+    active = bool(deploy_retry_tasks or (pipeline_failed_children and delivery_ready_tasks))
+    return {
+        "ok": True,
+        "active": active,
+        "status": "ROOT_CAUSE_MODE_ACTIVE" if active else "ROOT_CAUSE_CLEAR",
+        "deploy_retry_task_ids": [task_id for task_id in deploy_retry_tasks if task_id],
+        "pipeline_failed_child_ids": [task_id for task_id in pipeline_failed_children if task_id],
+        "delivery_ready_task_ids": [task_id for task_id in delivery_ready_tasks if task_id],
+        "reason": "deploy_or_pipeline_root_cause_required" if active else "no_root_cause_blocker",
+    }
+
+
 def start_next_backlog(execute: bool = False) -> dict[str, Any]:
     cfg = policy()
     queue = load_queue()
     summary = queue_summary(queue)
+    root_cause = root_cause_mode_status(queue)
+    if root_cause["active"]:
+        if execute:
+            state = read_json(DELIVERY_STATE, {})
+            state.update(
+                {
+                    "root_cause_mode_active": True,
+                    "root_cause_mode_reason": root_cause["reason"],
+                    "last_backlog_dispatch_at": now(),
+                }
+            )
+            atomic_write_json(DELIVERY_STATE, state)
+        return {"ok": True, "status": "ROOT_CAUSE_MODE_ACTIVE", "root_cause": root_cause, "summary": summary}
     if summary["worker_eligible_active_count"] >= cfg["max_parallel_tasks"]:
         return {"ok": True, "status": "WAIT_ACTIVE_TASK", "summary": summary}
 
@@ -682,6 +765,9 @@ def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict
     task["deploy_run_url"] = deploy_run.get("url") or deploy_run.get("run", {}).get("url") or ""
     task["deploy_workflow_status"] = str(deploy_run.get("status") or "")
     task["deploy_workflow_conclusion"] = str(deploy_run.get("conclusion") or "")
+    if deploy_run.get("local_vm_fallback"):
+        task["local_vm_deploy_fallback_used"] = True
+        task["local_vm_deploy_fallback_status"] = str(deploy_run.get("controller_status") or "PASS")
     if deploy_run.get("headSha"):
         task["deploy_commit"] = str(deploy_run.get("headSha"))
     if smoke_run:
@@ -768,6 +854,61 @@ def mark_task_deploy_in_progress(task_id: str) -> dict[str, Any]:
     return {"ok": True, "task_id": task_id, "deployment_status": "DEPLOY_IN_PROGRESS"}
 
 
+def local_deploy_run_payload(controller_payload: dict[str, Any]) -> dict[str, Any]:
+    head = main_head()
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    ok = bool(controller_payload.get("ok") and controller_payload.get("status") == "PASS")
+    return {
+        "databaseId": f"local-{stamp}",
+        "url": "",
+        "headSha": head,
+        "status": "completed",
+        "conclusion": "success" if ok else "failure",
+        "local_vm_fallback": True,
+        "controller_status": str(controller_payload.get("status") or "UNKNOWN"),
+    }
+
+
+def run_local_deploy_fallback(task: dict[str, Any]) -> dict[str, Any]:
+    if not local_deploy_fallback_enabled():
+        return {"ok": False, "status": "LOCAL_VM_FALLBACK_DISABLED"}
+    env = os.environ.copy()
+    env.update(
+        {
+            "CODEX_LOCAL_DEPLOY_FALLBACK": "1",
+            "CODEX_DEPLOY_ACTOR": "cto_finalizer",
+            "CODEX_PRODUCTION_DEPLOY_DESCRIPTION": redact_sensitive_text(task_text(task))[:1000],
+        }
+    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "supervisor/production_deploy_controller.py", "start", "--auto"],
+            cwd=str(ROOT),
+            text=True,
+            capture_output=True,
+            timeout=1800,
+            env=env,
+        )
+    except Exception as exc:
+        return {"ok": False, "status": "LOCAL_VM_FALLBACK_EXCEPTION", "error": str(exc)}
+    controller_payload: dict[str, Any] = {}
+    if proc.stdout.strip().startswith("{"):
+        try:
+            controller_payload = json.loads(proc.stdout)
+        except Exception:
+            controller_payload = {}
+    ok = proc.returncode == 0 and bool(controller_payload.get("ok")) and controller_payload.get("status") == "PASS"
+    return {
+        "ok": ok,
+        "status": "LOCAL_VM_FALLBACK_DEPLOYED" if ok else "LOCAL_DEPLOY_FALLBACK_FAILED",
+        "returncode": proc.returncode,
+        "stdout": proc.stdout[-4000:],
+        "stderr": proc.stderr[-4000:],
+        "controller": controller_payload,
+        "run": local_deploy_run_payload(controller_payload),
+    }
+
+
 def set_task_approval_required(task_id: str, findings: list[str]) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
@@ -825,6 +966,21 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
     deploy = dispatch_workflow(DEPLOY_WORKFLOW, wait=wait)
     deploy_record = record_task_workflow_run(task_id, "deploy", deploy.get("run", {}), deploy.get("status", "")) if deploy.get("run") else {}
     if not deploy["ok"]:
+        local_fallback = run_local_deploy_fallback(task)
+        if local_fallback.get("ok"):
+            marked = mark_task_deployed(task_id, local_fallback.get("run", {}), None)
+            return {
+                "ok": True,
+                "status": "DEPLOYED",
+                "deployment_path": "local_vm_fallback_after_workflow_failure",
+                "evaluation": evaluation,
+                "readiness": readiness,
+                "deploy": deploy,
+                "local_deploy_fallback": local_fallback,
+                "in_progress": in_progress,
+                "deploy_record": deploy_record,
+                "marked": marked,
+            }
         marked = mark_task_deploy_retry(task_id, "DEPLOY_WORKFLOW_FAILED")
         return {
             "ok": False,
@@ -832,6 +988,7 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
             "evaluation": evaluation,
             "readiness": readiness,
             "deploy": deploy,
+            "local_deploy_fallback": local_fallback,
             "in_progress": in_progress,
             "deploy_record": deploy_record,
             "marked": marked,
@@ -1110,6 +1267,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CTO autonomous delivery controller")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
+    sub.add_parser("root-cause-status")
     evaluate = sub.add_parser("evaluate-task")
     evaluate.add_argument("task_id")
     dispatch = sub.add_parser("dispatch-next")
@@ -1139,6 +1297,8 @@ def main() -> None:
 
     if args.cmd == "status":
         payload = delivery_status()
+    elif args.cmd == "root-cause-status":
+        payload = root_cause_mode_status()
     elif args.cmd == "evaluate-task":
         _queue, task = find_task(args.task_id)
         payload = {"ok": bool(task), "task_id": args.task_id, "evaluation": evaluate_task(task) if task else None}

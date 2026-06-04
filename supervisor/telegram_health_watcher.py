@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,9 +37,33 @@ def snapshot_hash(rows):
     raw = json.dumps(rows, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()
 
+def read_json(path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return default
+    return default
+
+def truthy(value):
+    return value is True or str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+def auto_report_enabled():
+    if os.environ.get("CODEX_TELEGRAM_HEALTH_AUTO_REPORT", "").strip():
+        return truthy(os.environ.get("CODEX_TELEGRAM_HEALTH_AUTO_REPORT"))
+    runtime = read_json(STATE / "telegram_config.json", {})
+    settings = read_json(APP / "state_templates/module_settings.json", {})
+    telegram = settings.get("telegram", {}) if isinstance(settings, dict) else {}
+    return bool(
+        truthy(runtime.get("health_auto_report_enabled"))
+        or truthy(runtime.get("auto_health_report_enabled"))
+        or truthy(telegram.get("health_auto_report_enabled"))
+        or truthy(telegram.get("auto_health_report_enabled"))
+    )
+
 def send_health(reason):
     subprocess.run(
-        ["python3", "supervisor/telegram_notify.py"],
+        ["python3", "supervisor/telegram_notify.py", "--reason", reason],
         cwd=str(APP),
         text=True,
         capture_output=True,
@@ -68,6 +93,12 @@ def main():
                 "reason": reason
             }, indent=2, ensure_ascii=False) + "\n"
         )
+        if not auto_report_enabled():
+            with (LOGS / "telegram_health_watcher.log").open("a", encoding="utf-8") as f:
+                f.write(f"{datetime.now(timezone.utc).isoformat()} suppressed reason={reason} auto_report_enabled=false\n")
+            print("TELEGRAM_HEALTH_WATCHER=SUPPRESSED_AUTO_DISABLED")
+            print("REASON=" + reason)
+            return
         send_health(reason)
         print("TELEGRAM_HEALTH_WATCHER=SENT")
         print("REASON=" + reason)

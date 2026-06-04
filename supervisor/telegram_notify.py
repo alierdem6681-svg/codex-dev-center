@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import argparse
 import base64
 import json
+import os
 import subprocess
 import urllib.parse
 import urllib.request
@@ -79,7 +81,10 @@ def health_report(reason="manual"):
     return "\n".join(lines)
 
 def main():
-    text = health_report("manual-test")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reason", default=os.environ.get("CODEX_TELEGRAM_HEALTH_REASON", "manual"))
+    args = parser.parse_args()
+    text = health_report(args.reason)
     result = send(text)
 
     (APP / "reports/STEP_18D1_TELEGRAM_HEALTH_REPORT.md").write_text(
