@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:41:49+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -50,7 +50,9 @@
     "auto_dispatch_low_risk": true,
     "auto_dispatch_medium_risk": true,
     "high_risk_requires_approval": true,
-    "critical_risk_requires_approval": true
+    "critical_risk_requires_approval": true,
+    "worker_dispatch_v2_profile_matching": true,
+    "worker_dispatch_v2_preserve_preassigned_worker": true
   },
   "workers": {
     "worker_count": 4,
@@ -58,6 +60,8 @@
     "safe_mode": true,
     "codex_execution_enabled": false,
     "worker_recovery_required": true,
+    "profile_capabilities_enabled": true,
+    "dispatch_preserves_preassigned_worker": true,
     "repo_apply_path_normalization": true,
     "repo_apply_exact_file_allowlist": true,
     "repo_apply_runtime_artifacts_ignored": true

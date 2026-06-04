@@ -18,6 +18,7 @@ from supervisor import (  # noqa: E402
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
+    cto_task_router,
     direct_cto_job_recovery,
     lifecycle_manager,
     production_readiness_suite,
@@ -29,6 +30,7 @@ from supervisor import (  # noqa: E402
     task_validation_engine,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
+    worker_dispatch,
     worker_runner,
 )
 from supervisor.task_status_constants import (  # noqa: E402
@@ -190,6 +192,131 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertTrue(worker_runner.is_ignorable_repo_apply_artifact("./tmp/apply-worker.log"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
+
+    def test_worker_dispatch_selects_profile_capability_match(self):
+        profiles = worker_dispatch.load_worker_profiles(ROOT)
+
+        selected = worker_dispatch.select_worker_for_task(
+            {
+                "id": "TASK-QA",
+                "title": "Pipeline gate validation",
+                "risk": "medium",
+                "required_capabilities": ["testing", "risk_review"],
+            },
+            profiles=profiles,
+            queue={"tasks": []},
+        )
+
+        self.assertEqual(selected, "worker-4")
+
+    def test_worker_dispatch_blocks_above_profile_risk_limit(self):
+        profiles = worker_dispatch.load_worker_profiles(ROOT)
+
+        selected = worker_dispatch.select_worker_for_task(
+            {
+                "id": "TASK-HIGH",
+                "title": "High risk infrastructure operation",
+                "risk": "high",
+                "required_capabilities": ["backend_services"],
+            },
+            profiles=profiles,
+            queue={"tasks": []},
+        )
+
+        self.assertEqual(selected, "")
+
+    def test_cto_router_split_tasks_use_worker_dispatch_profiles(self):
+        parent = {
+            "id": "PARENT",
+            "source": "dashboard",
+            "priority": "normal",
+        }
+
+        subtasks = cto_task_router.planning_subtasks(
+            parent,
+            "pipeline worker queue deploy test",
+            root=ROOT,
+            queued_tasks=[],
+        )
+
+        self.assertEqual(subtasks[0]["assigned_worker"], "worker-1")
+        self.assertEqual(subtasks[1]["assigned_worker"], "worker-1")
+        self.assertEqual(subtasks[2]["assigned_worker"], "worker-4")
+        self.assertEqual(subtasks[2]["required_capabilities"], ["testing", "risk_review"])
+
+    def test_cto_router_required_capabilities_do_not_round_robin_fallback(self):
+        selected = cto_task_router.choose_worker(
+            0,
+            {
+                "id": "TASK-UNKNOWN-CAPABILITY",
+                "risk": "medium",
+                "required_capabilities": ["nonexistent_worker_capability"],
+            },
+            root=ROOT,
+            queued_tasks=[],
+        )
+
+        self.assertEqual(selected, "")
+
+    def test_supervisor_dispatch_preserves_preassigned_idle_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            log_dir = root / "logs"
+            report_dir = root / "reports"
+            state_dir.mkdir()
+            log_dir.mkdir()
+            report_dir.mkdir()
+            workers_path = state_dir / "workers.json"
+            queue_path = state_dir / "task_queue.json"
+            workers_path.write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "IDLE", "current_task": None},
+                            {"id": "worker-4", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-QA",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "risk": "medium",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-4",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_state_dir = supervisor_cli.STATE_DIR
+            original_log_dir = supervisor_cli.LOG_DIR
+            original_report_dir = supervisor_cli.REPORT_DIR
+            supervisor_cli.STATE_DIR = state_dir
+            supervisor_cli.LOG_DIR = log_dir
+            supervisor_cli.REPORT_DIR = report_dir
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    supervisor_cli.dispatch(None)
+            finally:
+                supervisor_cli.STATE_DIR = original_state_dir
+                supervisor_cli.LOG_DIR = original_log_dir
+                supervisor_cli.REPORT_DIR = original_report_dir
+
+            workers = json.loads(workers_path.read_text(encoding="utf-8"))["workers"]
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))["tasks"]
+
+        self.assertIsNone(workers[0]["current_task"])
+        self.assertEqual(workers[1]["current_task"], "TASK-QA")
+        self.assertEqual(queue[0]["assigned_worker"], "worker-4")
 
     def test_production_readiness_simulation_contracts_are_non_mutating(self):
         contracts = production_readiness_suite.readiness_simulation_contracts()

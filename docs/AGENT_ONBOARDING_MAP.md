@@ -79,6 +79,7 @@ Ajan şu klasörleri inceler:
 
 - supervisor/supervisor_cli.py
 - supervisor/lifecycle_manager.py
+- supervisor/worker_dispatch.py
 - supervisor/drift_checker.py
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
@@ -87,6 +88,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- state_templates/worker_profiles.json içindeki role/capabilities/risk_limit tabanli worker dispatch v2 profil sozlesmesi
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
 - supervisor/service_watchdog.py
@@ -106,6 +108,12 @@ Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
+
+Worker dispatch v2 notu:
+- `supervisor/worker_dispatch.py` role, capabilities/skills, risk_limit ve mevcut aktif yuke gore worker secimi yapar.
+- `supervisor/cto_task_router.py` split worker gorevlerine required role/capability metadata ekler.
+- `supervisor/supervisor_cli.py dispatch`, idle durumdaki mevcut `assigned_worker` atamasini korumalidir.
+- High/critical risk gorevler medium risk limitli worker profillerine otomatik atanmaz.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

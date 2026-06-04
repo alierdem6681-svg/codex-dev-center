@@ -180,3 +180,11 @@ Faz 19B-10A Model Policy
 - [x] Bos stage, failed, blocked, approval ve `DEPLOYED` son stage davranisi unit test ile sabitlendi.
 - [x] Endpoint raw mesaj, uzun aciklama, log, stdout/stderr veya terminal dump dondurmez.
 - [ ] UI stage tab gorunumu sonraki kucuk pakete birakildi.
+
+## Faz 34 - Worker Dispatch v2 Apply
+
+- [x] Worker profilindeki `role`, `capabilities` ve `risk_limit` alanlarini kullanan dispatch secim yardimcisi eklendi.
+- [x] CTO router split gorevleri artik required role/capability metadata ile worker secimine girer.
+- [x] Supervisor dispatch mevcut `assigned_worker` idle ise bu atamayi ezmeden korur.
+- [x] Profil eslesmesi, risk limiti ve pre-assigned worker davranisi unit test ile sabitlendi.
+- [ ] Lease timeout, retry backoff ve hata siniflandirma olay modeli sonraki kucuk pakete birakildi.
