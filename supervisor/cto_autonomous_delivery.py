@@ -529,7 +529,9 @@ def evaluate_task(task: dict[str, Any]) -> dict[str, Any]:
     repo_applied = deploy_gate_repo_applied(task)
     validation_pass = gate_pass(task.get("validation_status"))
     pipeline_pass = gate_pass(task.get("pipeline_status"))
-    deploy_in_progress = bool(task.get("deploy_in_progress")) or str(task.get("deployment_status") or "").upper() == "DEPLOY_IN_PROGRESS"
+    deployment_status = str(task.get("deployment_status") or "").upper()
+    deploy_retry_required = task_flag(task, "deploy_retry_required") or deployment_status == "DEPLOY_RETRY_REQUIRED"
+    deploy_in_progress = bool(not deploy_retry_required and (task.get("deploy_in_progress") or deployment_status == "DEPLOY_IN_PROGRESS"))
     ready_for_deploy_gate = (
         status in deployable_statuses
         and repo_applied
@@ -787,6 +789,8 @@ def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict
     task["production_deployed"] = True
     task["delivery_level"] = "DEPLOYED"
     task["deploy_in_progress"] = False
+    task["deploy_retry_required"] = False
+    task.pop("last_deploy_failure_status", None)
     task["deployment_status"] = "DEPLOYED"
     task["deploy_run_id"] = str(deploy_run.get("databaseId") or deploy_run.get("run", {}).get("databaseId") or "")
     task["deploy_run_url"] = deploy_run.get("url") or deploy_run.get("run", {}).get("url") or ""
