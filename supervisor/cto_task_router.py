@@ -26,6 +26,7 @@ try:
         utc_now,
         worker_block_reason,
     )
+    from .worker_dispatch import active_counts_from_tasks, load_worker_profiles, select_worker_for_task
 except ImportError:
     from critical_operation_policy import critical_operation_findings
     from state_file_lock import state_file_lock
@@ -44,6 +45,7 @@ except ImportError:
         utc_now,
         worker_block_reason,
     )
+    from worker_dispatch import active_counts_from_tasks, load_worker_profiles, select_worker_for_task
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
@@ -110,11 +112,30 @@ def should_split(text: str) -> bool:
     )
 
 
-def choose_worker(index: int) -> str:
-    return WORKERS[index % len(WORKERS)]
+def choose_worker(
+    index: int,
+    task: dict[str, Any] | None = None,
+    root: Path | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+) -> str:
+    if task is None:
+        return WORKERS[index % len(WORKERS)]
+    profiles = load_worker_profiles(root or DEFAULT_ROOT)
+    return select_worker_for_task(
+        task,
+        profiles,
+        active_counts=active_counts_from_tasks(tasks or []),
+        fallback_index=index,
+    )
 
 
-def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, Any]]:
+def planning_subtasks(
+    parent: dict[str, Any],
+    message: str,
+    root: Path | None = None,
+    existing_tasks: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    existing_tasks = existing_tasks or []
     if not should_split(message):
         return []
     parent_id = parent["id"]
@@ -135,29 +156,29 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
     ]
     tasks: list[dict[str, Any]] = []
     for idx, (title, description) in enumerate(base, 1):
-        tasks.append(
-            {
-                "id": f"{parent_id}-SUB{idx}",
-                "parent_task_id": parent_id,
-                "parent_source": parent.get("source"),
-                "title": title,
-                "description": description,
-                "raw_message": stored_message,
-                "source": "cto",
-                "priority": parent.get("priority", "normal"),
-                "status": TASK_STATUS_QUEUED,
-                "risk": "medium",
-                "risk_level": "medium",
-                "assigned_worker": choose_worker(idx - 1),
-                "worker_eligible": True,
-                "created_at": utc_now(),
-                "updated_at": utc_now(),
-                "repo_applied": False,
-                "staging_deployed": False,
-                "production_deployed": False,
-                "delivery_level": "PLAN_REQUESTED",
-            }
-        )
+        task = {
+            "id": f"{parent_id}-SUB{idx}",
+            "parent_task_id": parent_id,
+            "parent_source": parent.get("source"),
+            "title": title,
+            "description": description,
+            "raw_message": stored_message,
+            "source": "cto",
+            "priority": parent.get("priority", "normal"),
+            "status": TASK_STATUS_QUEUED,
+            "risk": "medium",
+            "risk_level": "medium",
+            "assigned_worker": None,
+            "worker_eligible": True,
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
+            "repo_applied": False,
+            "staging_deployed": False,
+            "production_deployed": False,
+            "delivery_level": "PLAN_REQUESTED",
+        }
+        task["assigned_worker"] = choose_worker(idx - 1, task, root=root, tasks=[*existing_tasks, *tasks])
+        tasks.append(task)
     return tasks
 
 
@@ -226,11 +247,11 @@ def submit_task(
             "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
         }
         if worker_eligible:
-            parent["assigned_worker"] = choose_worker(len(tasks))
+            parent["assigned_worker"] = choose_worker(len(tasks), parent, root=root, tasks=tasks)
         tasks.append(parent)
 
         should_create_subtasks = should_split(message) if split is None else split
-        created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+        created_subtasks = planning_subtasks(parent, message, root=root, existing_tasks=tasks) if should_create_subtasks else []
         tasks.extend(created_subtasks)
 
         normalized, changes = normalize_queue_payload(queue)

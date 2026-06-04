@@ -462,3 +462,22 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Worker Dispatch v2 Small Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-064838 / CTO-ACTION-20260604-062153-03-WORKER-DISPATCH-V2
+
+Eklenenler:
+- `supervisor/worker_dispatch.py` role, explicit capability, inferred capability, enabled flag ve risk limit kontroluyle worker secimi yapar.
+- `supervisor/cto_task_router.py` parent ve split subtask assignment icin profil bazli seciciyi kullanir.
+- `supervisor/lifecycle_manager.py` backlog dispatcher apply/retry child assignment icin ayni seciciyi kullanir.
+- `tests/test_runtime_status_model.py` explicit QA capability, disabled/risk-limited profile ve dashboard task assignment davranisini sabitler.
+
+Not:
+- Lease modeli, retry backoff ve event telemetry bu kucuk apply scope'una alinmadi.
+- Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+- Worktree icinde `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari mevcut degildi; repo apply kapsam disi oldugu icin runtime state dosyasi olusturulmadi.

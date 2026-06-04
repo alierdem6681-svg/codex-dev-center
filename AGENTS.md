@@ -165,3 +165,7 @@ Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline st
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.
 
 `AGENTS.md` gibi tekil allowlist dosyalari sadece exact dosya eslesmesiyle kabul edilir; `AGENTS.md.bak` veya `AGENTS.md/child` gibi varyantlar repo apply icin guvenli sayilmaz. Runtime `state/`, `logs/`, `reports/`, `workspaces/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database ve reklam platformu live-write kapsam disi kalir.
+
+## WORKER DISPATCH V2 SMALL APPLY
+
+CTO router ve lifecycle backlog dispatcher worker seciminde profil bazli helper kullanir. Secim sirasi runtime `state/worker_profiles.json`, yoksa repo `state_templates/worker_profiles.json` dosyasidir. Explicit role/capability sartlari worker profile role/skills ve risk limitine gore eslestirilir; uygun profil bulunamazsa mevcut deterministik fallback korunur.

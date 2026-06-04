@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T06:57:57+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -154,6 +154,19 @@
       "owner_directed_only": true,
       "archive_required": true,
       "command": "{python} scripts/queue_owner_cleanup.py --archive {archive_path} --execute"
+    },
+    {
+      "id": "profile_based_dispatch",
+      "label": "Profil Bazlı Worker Dağıtımı",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "uses_worker_profiles": true,
+      "profile_source_priority": [
+        "state/worker_profiles.json",
+        "state_templates/worker_profiles.json"
+      ]
     },
     {
       "id": "repo_apply_validation",
