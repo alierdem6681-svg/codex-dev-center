@@ -128,3 +128,5 @@ Repo apply raporları stage plan, diff review, secret scan, local test, rollback
 Quality gate retry simülasyonu dry-run safety alanlarını (`safety_status`, `safety_reasons`, `required_false_flags`) üretmelidir.
 
 Worker aktif sahipliği olmayan stale dispatch claim'leri yeni kök görev açmadan aynı task üzerinde retry'a alınmalı; deneme sınırı dolarsa `FAILED_TIMEOUT` terminal statüsü verilmelidir.
+
+Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı worker state transaction lock altında tutarlı güncellenmelidir. Bir worker aynı anda yalnızca bir aktif `current_task` taşıyabilir; aktif `current_task` varken ikinci task claim edilemez.

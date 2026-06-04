@@ -222,6 +222,12 @@ Repo apply control report ayrıca stage plan satırlarını içermelidir: propos
 
 `supervisor_cli dispatch` aktif worker sahipliği olmayan stale `ASSIGNED`/`RUNNING` claim'leri yaş eşiğinden sonra aynı task üzerinde retry'a alabilir. Maksimum deneme dolarsa task `FAILED_TIMEOUT` olur; yeni kök görev açılmaz.
 
+## PARALLEL WORKER STATE SAFETY V1
+
+Worker claim ve finish akışları `task_queue.json` ile `workers.json` dosyalarını ortak worker state transaction lock altında güncellemelidir. Claim sırasında queue `RUNNING/worker_id/claimed_at/started_at` alanları ile worker `status=RUNNING/current_task/last_seen` birlikte yazılır; finish sırasında terminal queue statusu ile worker `current_task=None` temizliği birlikte yapılır.
+
+Aktif `current_task` taşıyan worker ikinci task claim edemez. Dispatch de aynı transaction lock sırasını kullanır. Bu sözleşme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## SAFE TEST SCRATCH STANDARD V1
 
 Testler repo checkout icine runtime state, cache, config, log veya output dosyasi yazmamalidir. Ortak helper `tests/safe_test_scratch.py` uzerinden scratch root sirasi `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` olarak cozulur; repo icindeki scratch root reddedilir.

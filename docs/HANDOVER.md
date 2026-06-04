@@ -974,3 +974,30 @@ Eklenenler:
 Not:
 - PR #103, #104 ve #105 current main ile conflict verdigi icin kod/test/template degisiklikleri elle entegre edildi.
 - Production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Parallel Worker State Safety Apply
+
+Tarih: 2026-06-04
+Görev: CTO-APPLY-20260604-163057 / CTO-TASK-20260604-162645-222900-PARALLEL-WORKER-STATE-SAFETY
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/worker_runner.py` claim ve finish akislari `task_queue.json` ile `workers.json` dosyalarini ortak worker state transaction lock altinda gunceller.
+- Claim sirasinda queue `RUNNING`, `worker_id`, `claimed_at`, `started_at` alanlari ile worker `status=RUNNING`, `current_task` ve `last_seen` birlikte yazilir.
+- Worker zaten aktif `current_task` tasiyorsa ayni worker ikinci task claim etmez.
+- `supervisor/supervisor_cli.py dispatch` ayni transaction lock sirasi altina alindi.
+- `tests/test_runtime_status_model.py` worker current_task tutarliligi ve aktif current_task varken ikinci claim engeli icin regresyon testleriyle genisletildi.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, roadmap ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 184 test.
+- `python3 -m unittest discover -s tests` PASS, 211 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS; state/report yazimlari read-only modda `write-skipped`.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.

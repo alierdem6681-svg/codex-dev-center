@@ -783,6 +783,7 @@ class WorkerStatusModelTest(unittest.TestCase):
     def test_worker_does_not_claim_second_task_while_already_running_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
+            workers_path = Path(tmp) / "workers.json"
             queue_path.write_text(
                 json.dumps(
                     {
@@ -806,12 +807,19 @@ class WorkerStatusModelTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            workers_path.write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
             original_queue = worker_runner.QUEUE_PATH
+            original_workers = worker_runner.WORKERS_PATH
             worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
             try:
                 claimed = worker_runner.claim_task("worker-1")
             finally:
                 worker_runner.QUEUE_PATH = original_queue
+                worker_runner.WORKERS_PATH = original_workers
             payload = json.loads(queue_path.read_text(encoding="utf-8"))
 
         self.assertIsNone(claimed)
@@ -821,6 +829,7 @@ class WorkerStatusModelTest(unittest.TestCase):
     def test_worker_does_not_claim_terminal_dispatch_task(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
+            workers_path = Path(tmp) / "workers.json"
             queue_path.write_text(
                 json.dumps(
                     {
@@ -838,12 +847,19 @@ class WorkerStatusModelTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            workers_path.write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
             original_queue = worker_runner.QUEUE_PATH
+            original_workers = worker_runner.WORKERS_PATH
             worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
             try:
                 claimed = worker_runner.claim_task("worker-1")
             finally:
                 worker_runner.QUEUE_PATH = original_queue
+                worker_runner.WORKERS_PATH = original_workers
             payload = json.loads(queue_path.read_text(encoding="utf-8"))
 
         self.assertIsNone(claimed)
@@ -852,6 +868,7 @@ class WorkerStatusModelTest(unittest.TestCase):
     def test_worker_claim_records_dispatch_claim_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             queue_path = Path(tmp) / "task_queue.json"
+            workers_path = Path(tmp) / "workers.json"
             queue_path.write_text(
                 json.dumps(
                     {
@@ -868,13 +885,21 @@ class WorkerStatusModelTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            workers_path.write_text(
+                json.dumps({"workers": [{"id": "worker-2", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
             original_queue = worker_runner.QUEUE_PATH
+            original_workers = worker_runner.WORKERS_PATH
             worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
             try:
                 claimed = worker_runner.claim_task("worker-2")
             finally:
                 worker_runner.QUEUE_PATH = original_queue
+                worker_runner.WORKERS_PATH = original_workers
             payload = json.loads(queue_path.read_text(encoding="utf-8"))
+            workers = json.loads(workers_path.read_text(encoding="utf-8"))
 
         self.assertIsNotNone(claimed)
         self.assertEqual(claimed["status"], TASK_STATUS_RUNNING)
@@ -888,6 +913,49 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(claimed["claimed_at"], claimed["started_at"])
         self.assertEqual(payload["tasks"][0]["worker_id"], "worker-2")
         self.assertEqual(payload["tasks"][0]["claimed_at"], claimed["claimed_at"])
+        self.assertEqual(workers["workers"][0]["status"], TASK_STATUS_RUNNING)
+        self.assertEqual(workers["workers"][0]["current_task"], "TASK-CLAIM")
+        self.assertEqual(workers["workers"][0]["last_seen"], claimed["claimed_at"])
+
+    def test_worker_claim_respects_existing_active_current_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_path = Path(tmp) / "task_queue.json"
+            workers_path = Path(tmp) / "workers.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-NEXT",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "risk": "low",
+                                "assigned_worker": "worker-1",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            workers_path.write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "RUNNING", "current_task": "TASK-ACTIVE"}]}),
+                encoding="utf-8",
+            )
+            original_queue = worker_runner.QUEUE_PATH
+            original_workers = worker_runner.WORKERS_PATH
+            worker_runner.QUEUE_PATH = queue_path
+            worker_runner.WORKERS_PATH = workers_path
+            try:
+                claimed = worker_runner.claim_task("worker-1")
+            finally:
+                worker_runner.QUEUE_PATH = original_queue
+                worker_runner.WORKERS_PATH = original_workers
+            payload = json.loads(queue_path.read_text(encoding="utf-8"))
+            workers = json.loads(workers_path.read_text(encoding="utf-8"))
+
+        self.assertIsNone(claimed)
+        self.assertEqual(payload["tasks"][0]["status"], "PENDING")
+        self.assertEqual(workers["workers"][0]["current_task"], "TASK-ACTIVE")
 
     def test_late_progress_update_does_not_reopen_finished_task(self):
         with tempfile.TemporaryDirectory() as tmp:

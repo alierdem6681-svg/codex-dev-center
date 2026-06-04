@@ -320,3 +320,11 @@ Faz 19B-10A Model Policy
 - [x] Quality gate retry simulation dry-run safety alanlari eklendi.
 - [x] Stale dispatch claim repair ayni task uzerinde retry/timeout statüsüyle sabitlendi.
 - [x] PR #103, #104 ve #105 conflict nedeniyle current main uzerine elle entegre edildi.
+
+## Faz 51 - Parallel Worker State Safety
+
+- [x] Worker claim akisi `task_queue.json` ve `workers.json` icin ortak transaction lock altina alindi.
+- [x] Claim sirasinda `workers.json.current_task`, worker status ve queue `RUNNING/claimed_at` alanlari birlikte guncellenir.
+- [x] Worker finish akisi queue terminal status ve worker `current_task=None` temizligini ayni transaction altinda yapar.
+- [x] Dispatch de ayni transaction lock sirasi altina alinarak claim/assign yaris riski azaltildi.
+- [x] Worker current_task varken ayni worker'in ikinci task claim etmemesi unit test ile sabitlendi.

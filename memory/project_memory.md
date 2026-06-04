@@ -375,3 +375,9 @@ Kontrat: ozet 900 karakter ve 12 satiri asamaz; diff, stdout/stderr, stack trace
 PR #103, #104 ve #105 current main ile conflict verdigi icin otomatik merge yerine kod/test/template degisiklikleri elle entegre edildi.
 
 Entegrasyon kapsami: `worker_runner` repo apply stage plan report, `codex_quality_gate` retry simulation dry-run safety alanlari ve `supervisor_cli` stale dispatch claim repair. Stale claim repair aktif worker sahipligi yoksa ayni task uzerinde retry planlar; deneme siniri dolarsa `FAILED_TIMEOUT` terminal statüsüne alir ve yeni kok gorev acmaz.
+
+## 2026-06-04 Parallel Worker State Safety Apply
+
+Worker claim ve finish akislari queue/worker state tutarliligi icin ortak transaction lock altina alindi. `worker_runner.claim_task()` artik queue task'ini `RUNNING` yaparken ayni kritik bolumde `workers.json.current_task`, worker status ve `last_seen` alanlarini yazar; worker zaten aktif `current_task` tasiyorsa ikinci task claim etmez.
+
+`worker_runner.finish_task()` queue terminal statusu ve worker `current_task=None` temizligini birlikte yazar. `supervisor_cli.dispatch()` ayni transaction lock sirasi altina alindi. Davranis `tests/test_runtime_status_model.py` claim/current_task regresyon testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

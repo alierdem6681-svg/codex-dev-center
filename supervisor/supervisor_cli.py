@@ -193,6 +193,9 @@ def read_json(path, default):
 def write_json(path, data):
     atomic_write_json(Path(path), data)
 
+def worker_state_transaction_lock_path():
+    return STATE_DIR / "worker_state_transaction"
+
 def log(msg):
     with open(LOG_DIR / "supervisor.log", "a", encoding="utf-8") as f:
         f.write(f"{now()} {msg}\n")
@@ -265,58 +268,60 @@ def dispatch(_args):
     workers_path = STATE_DIR / "workers.json"
     queue_path = STATE_DIR / "task_queue.json"
 
-    with state_file_lock(queue_path):
-        with state_file_lock(workers_path):
-            workers = read_json(workers_path, {"workers": []})
-            queue = read_json(queue_path, {"tasks": []})
+    with state_file_lock(worker_state_transaction_lock_path()):
+        with state_file_lock(queue_path):
+            with state_file_lock(workers_path):
+                workers = read_json(workers_path, {"workers": []})
+                queue = read_json(queue_path, {"tasks": []})
 
-            stale_requeued, stale_terminal = reconcile_stale_dispatch_claims(queue, workers)
-            idle_workers = [
-                w
-                for w in workers.get("workers", [])
-                if w.get("status") in ("IDLE", "READY") and not w.get("current_task")
-            ]
-            idle_by_id = {str(w.get("id") or ""): w for w in idle_workers}
-            queue, _changes = normalize_queue_payload(queue)
-            dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
-            pending_tasks = [
-                t
-                for t in queue.get("tasks", [])
-                if is_worker_eligible_task(t) and normalize_status(t.get("status")) in dispatchable_statuses
-            ]
+                stale_requeued, stale_terminal = reconcile_stale_dispatch_claims(queue, workers)
+                idle_workers = [
+                    w
+                    for w in workers.get("workers", [])
+                    if w.get("status") in ("IDLE", "READY") and not w.get("current_task")
+                ]
+                idle_by_id = {str(w.get("id") or ""): w for w in idle_workers}
+                queue, _changes = normalize_queue_payload(queue)
+                dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
+                pending_tasks = [
+                    t
+                    for t in queue.get("tasks", [])
+                    if is_worker_eligible_task(t) and normalize_status(t.get("status")) in dispatchable_statuses
+                ]
 
-            assignments = []
-            assigned_task_ids = set()
+                assignments = []
+                assigned_task_ids = set()
 
-            def assign(worker, task):
-                worker["status"] = TASK_STATUS_ASSIGNED
-                worker["current_task"] = task["id"]
-                worker["last_seen"] = now()
-                task["status"] = TASK_STATUS_ASSIGNED
-                task["assigned_worker"] = worker["id"]
-                task["worker_id"] = worker["id"]
-                task["updated_at"] = now()
-                assigned_task_ids.add(task["id"])
-                assignments.append({"worker": worker["id"], "task": task["id"]})
+                def assign(worker, task):
+                    claim_time = now()
+                    worker["status"] = TASK_STATUS_ASSIGNED
+                    worker["current_task"] = task["id"]
+                    worker["last_seen"] = claim_time
+                    task["status"] = TASK_STATUS_ASSIGNED
+                    task["assigned_worker"] = worker["id"]
+                    task["worker_id"] = worker["id"]
+                    task["updated_at"] = claim_time
+                    assigned_task_ids.add(task["id"])
+                    assignments.append({"worker": worker["id"], "task": task["id"]})
 
-            for task in pending_tasks:
-                preferred = str(task.get("assigned_worker") or "")
-                worker = idle_by_id.get(preferred)
-                if not worker:
-                    continue
-                assign(worker, task)
-                idle_by_id.pop(preferred, None)
+                for task in pending_tasks:
+                    preferred = str(task.get("assigned_worker") or "")
+                    worker = idle_by_id.get(preferred)
+                    if not worker:
+                        continue
+                    assign(worker, task)
+                    idle_by_id.pop(preferred, None)
 
-            remaining_idle = [w for w in idle_workers if str(w.get("id") or "") in idle_by_id]
-            for task in pending_tasks:
-                if task.get("id") in assigned_task_ids:
-                    continue
-                if not remaining_idle:
-                    break
-                assign(remaining_idle.pop(0), task)
+                remaining_idle = [w for w in idle_workers if str(w.get("id") or "") in idle_by_id]
+                for task in pending_tasks:
+                    if task.get("id") in assigned_task_ids:
+                        continue
+                    if not remaining_idle:
+                        break
+                    assign(remaining_idle.pop(0), task)
 
-            write_json(queue_path, queue)
-            write_json(workers_path, workers)
+                write_json(queue_path, queue)
+                write_json(workers_path, workers)
 
     for item in stale_requeued:
         log(
