@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T07:00:17+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -24,7 +24,23 @@
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
     "show_controlled_execution_status": true,
-    "show_pipeline_flow": true
+    "show_pipeline_flow": true,
+    "show_pipeline_tracking_contract": true
+  },
+  "pipeline_tracking": {
+    "enabled": true,
+    "endpoint": "/api/status",
+    "read_only": true,
+    "poll_seconds": 5,
+    "source_files": [
+      "state/github_actions_status.json",
+      "state/pipeline_status.json"
+    ],
+    "sanitize_marker_fields": true,
+    "return_terminal_output": false,
+    "return_raw_task_messages": false,
+    "production_deploy_allowed_by_status_payload": false,
+    "critical_operations_allowed_by_status_payload": false
   },
   "pipeline_flow": {
     "enabled": true,

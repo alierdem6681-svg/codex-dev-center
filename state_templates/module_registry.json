@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-04T07:00:17+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -9,9 +9,10 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Canlı izleme, pipeline tracking, ayarlar ve kontrol paneli.",
+      "description": "Canlı izleme, allowlist ile temizlenen pipeline tracking status kontratı, ayarlar ve kontrol paneli.",
       "actions": [
         "refresh_dashboard",
+        "view_pipeline_tracking_status",
         "update_dashboard_settings",
         "restart_panel"
       ]

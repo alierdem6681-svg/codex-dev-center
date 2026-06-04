@@ -141,6 +141,7 @@ Faz 19B-10A Model Policy
 - [x] Runtime `github_actions_status.json` ve `pipeline_status.json` state dosyalari dashboard'a baglandi.
 - [x] Legacy panel status payload'u da `github_actions` ve `pipeline_status` alanlariyla dashboard pipeline tracking sozlesmesine hizalandi.
 - [x] Eksik runtime marker dosyalarinda ana ve legacy `/api/status` payload sozlesmesi unit test ile sabitlendi.
+- [x] `/api/status` pipeline tracking marker alanlari allowlist ile temizlenir ve `pipeline_tracking` read-only kontratiyla kaynak/refresh/deploy-yetki siniri gorunur.
 - [x] Production readiness suite `yaml_validation` kapisi eklendi.
 - [x] Bu paket PR/merge/deploy akisi ile canli dashboard'da dogrulandi.
 

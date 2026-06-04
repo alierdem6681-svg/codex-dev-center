@@ -63,7 +63,7 @@ Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templ
 
 Dashboard controlled execution proposal görünürlüğü salt okunurdur. Proposal durumu göstermek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi anlamına gelmez.
 
-Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy panel `/api/status` payload'larında GitHub Actions ve pipeline marker durumunu göstermek production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
+Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy panel `/api/status` payload'larında GitHub Actions ve pipeline marker durumunu allowlist ile temizlenmiş `github_actions`, `pipeline_status` ve `pipeline_tracking` alanlarıyla göstermek production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 
 Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/api/pipeline-flow` payload'larında task stage akışını göstermek raw kullanıcı mesajı, uzun açıklama, stdout/stderr, log, terminal dump, production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 

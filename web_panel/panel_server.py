@@ -15,7 +15,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_PANEL_DIR))
 
 import auth as panel_auth
-from pipeline_flow import build_pipeline_flow
+from pipeline_flow import build_pipeline_flow, build_pipeline_tracking
 
 
 ROOT = Path(os.environ.get("CODEX_DEV_CENTER_HOME", Path(__file__).resolve().parents[1])).resolve()
@@ -302,8 +302,9 @@ def status_payload():
     workers_payload = read_json(STATE / "workers.json", {"workers": []})
     tasks_payload = read_json(STATE / "task_queue.json", {"tasks": []})
     production_deploy = read_json(STATE / "production_deploy_status.json", {})
-    github_actions = read_json(STATE / "github_actions_status.json", {})
-    pipeline_status = read_json(STATE / "pipeline_status.json", {})
+    pipeline_tracking = build_pipeline_tracking(STATE.parent)
+    github_actions = pipeline_tracking["github_actions"]
+    pipeline_status = pipeline_tracking["pipeline_status"]
     return {
         "ok": True,
         "time": now(),
@@ -325,6 +326,7 @@ def status_payload():
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
         "staging_deploy": read_json(STATE / "staging_deploy_status.json", {}),
         "production_runtime": read_json(STATE / "production_runtime_status.json", {}),
+        "pipeline_tracking": pipeline_tracking,
         "github_actions": github_actions,
         "pipeline_status": pipeline_status,
         "direct_cto_jobs": direct_cto_jobs_summary(),
