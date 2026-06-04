@@ -1155,6 +1155,17 @@ class DashboardPipelineFlowTest(unittest.TestCase):
                 for module, original_root in originals.items():
                     module.ROOT = original_root
 
+    def test_dashboard_static_ui_consumes_pipeline_flow_endpoint(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("Pipeline Stage Akışı", html)
+        self.assertIn("pipelineFlowBox", html)
+        self.assertIn("pipelineFlowMarkers", html)
+        self.assertIn("function renderPipelineFlow", html)
+        self.assertIn("fetch('/api/pipeline-flow'", html)
+        self.assertNotIn("stdout", html)
+        self.assertNotIn("stderr", html)
+
 
 class DeployGateStatusModelTest(unittest.TestCase):
     def deployable_task(self, task_id: str = "TASK-DEPLOY") -> dict:

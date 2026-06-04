@@ -462,3 +462,34 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Dashboard Pipeline Flow UI v1
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-063547 / CTO-ACTION-20260604-062153-04-DASHBOARD-PIPELINE-TRACKING
+
+Eklenenler:
+- Ana dashboard HTML'i `/api/status` yaninda `/api/pipeline-flow` endpoint'ini okur.
+- `Pipeline Stage Akışı` bolumu backend payload stage sirasini kullanarak stage kutularini gosterir.
+- Stage kutulari task sayisi, stage state'i, status ozetleri ve en fazla uc guvenli task id/worker satiri gosterir.
+- Marker ozeti pipeline, GitHub Actions ve smoke durumlarini sinirli read-only alanlarla gosterir.
+- `tests/test_runtime_status_model.py` statik UI kontratinin `/api/pipeline-flow` endpoint'ini tukettigini sabitler.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Repo runtime `state/` dosyalari bu worktree'de yoktu; state template kayitlari guncellendi.
+
+Test:
+- `python3 -m json.tool` ile guncellenen state template JSON dosyalari PASS.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 92 test.
+- Gecici `/tmp` git repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- `git diff --check` PASS.
+- Secret pattern scan PASS.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
