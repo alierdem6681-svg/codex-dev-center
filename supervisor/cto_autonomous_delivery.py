@@ -432,6 +432,97 @@ def root_cause_mode_status(queue: dict[str, Any] | None = None) -> dict[str, Any
     }
 
 
+def _is_pipeline_failed_child(task: dict[str, Any]) -> bool:
+    return normalize_status(task.get("status")) == TASK_STATUS_PIPELINE_FAILED and (
+        task.get("parent_task")
+        or task.get("parent_task_id")
+        or str(task.get("source") or "").lower() == "cto_backlog_dispatcher"
+        or str(task.get("id") or "").startswith("CTO-APPLY-")
+    )
+
+
+def _first_failed_pipeline_gate(task: dict[str, Any]) -> dict[str, Any] | None:
+    results = task.get("pipeline_results")
+    if not isinstance(results, list):
+        return None
+    for item in results:
+        if isinstance(item, dict) and not item.get("ok"):
+            return item
+    return None
+
+
+def _pipeline_failure_root_cause(task: dict[str, Any]) -> str:
+    explicit = str(task.get("failure_class") or task.get("last_error_code") or "").strip()
+    if explicit:
+        return redact_sensitive_text(explicit)[:120]
+    if not (task.get("workspace") or task.get("repo_clone") or task.get("repo_worktree")):
+        return "workspace_missing"
+    failed_gate = _first_failed_pipeline_gate(task)
+    if failed_gate:
+        gate_name = str(failed_gate.get("name") or "pipeline_gate").strip() or "pipeline_gate"
+        return f"{gate_name}_failed"[:120]
+    return redact_sensitive_text(str(task.get("result") or "pipeline_failed"))[:120]
+
+
+def _pipeline_failure_last_error(task: dict[str, Any]) -> str:
+    failed_gate = _first_failed_pipeline_gate(task)
+    if failed_gate:
+        gate_name = str(failed_gate.get("name") or "pipeline_gate").strip() or "pipeline_gate"
+        return redact_sensitive_text(f"{gate_name}: returncode={failed_gate.get('returncode', '-')}"[:240])
+    for key in ("last_error_code", "result", "failure_class"):
+        value = str(task.get(key) or "").strip()
+        if value:
+            return redact_sensitive_text(value[:240])
+    return "pipeline_failed"
+
+
+def _pipeline_failure_recommendation(root_cause: str) -> str:
+    normalized = root_cause.lower()
+    if "workspace_missing" in normalized:
+        return "Verify isolated workspace/repo clone creation and record the workspace path before rerun; fail early if the path is missing."
+    if "timeout" in normalized:
+        return "Rerun with smaller scope and inspect the stalled gate before retrying the same apply branch."
+    if "secret" in normalized or "unsafe" in normalized or "approval" in normalized:
+        return "Do not retry automatically; keep the task blocked for policy review."
+    return "Inspect the failed local gate, fix the smallest affected repo path, then rerun validation before retry."
+
+
+def _pipeline_failure_retryable(root_cause: str) -> bool:
+    normalized = root_cause.lower()
+    if any(blocker in normalized for blocker in ("secret", "unsafe", "approval", "critical")):
+        return False
+    return True
+
+
+def pipeline_failed_root_cause_report(queue: dict[str, Any] | None = None) -> dict[str, Any]:
+    if queue is None:
+        queue = load_queue()
+    tasks = [task for task in queue.get("tasks", []) if isinstance(task, dict)]
+    failures = []
+    for task in tasks:
+        if not _is_pipeline_failed_child(task):
+            continue
+        root_cause = _pipeline_failure_root_cause(task)
+        failures.append(
+            {
+                "task_id": str(task.get("id") or ""),
+                "parent_task_id": str(task.get("parent_task_id") or task.get("parent_task") or ""),
+                "root_cause": root_cause,
+                "last_error": _pipeline_failure_last_error(task),
+                "retryable": _pipeline_failure_retryable(root_cause),
+                "recommended_fix": _pipeline_failure_recommendation(root_cause),
+                "new_root_task_required": False,
+            }
+        )
+    return {
+        "ok": True,
+        "status": "ROOT_CAUSE_REPORT" if failures else "NO_PIPELINE_FAILED_CHILD",
+        "pipeline_failed_count": len(failures),
+        "new_root_task_required": False,
+        "failures": failures,
+    }
+
+
 def start_next_backlog(execute: bool = False) -> dict[str, Any]:
     cfg = policy()
     queue = load_queue()
@@ -1331,6 +1422,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     sub.add_parser("root-cause-status")
+    sub.add_parser("root-cause-report")
     evaluate = sub.add_parser("evaluate-task")
     evaluate.add_argument("task_id")
     dispatch = sub.add_parser("dispatch-next")
@@ -1362,6 +1454,8 @@ def main() -> None:
         payload = delivery_status()
     elif args.cmd == "root-cause-status":
         payload = root_cause_mode_status()
+    elif args.cmd == "root-cause-report":
+        payload = pipeline_failed_root_cause_report()
     elif args.cmd == "evaluate-task":
         _queue, task = find_task(args.task_id)
         payload = {"ok": bool(task), "task_id": args.task_id, "evaluation": evaluate_task(task) if task else None}

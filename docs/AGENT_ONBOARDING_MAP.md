@@ -91,6 +91,7 @@ Ajan şu klasörleri inceler:
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
+- supervisor/cto_autonomous_delivery.py içindeki `root-cause-report` komutu `PIPELINE_FAILED` apply child tasklari icin yeni kok task acmadan `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini dondurur
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
 - supervisor/telegram_asset_intake.py Telegram `photo`, `document`, caption ve unsupported medya payload'larını ham dosya indirmeden güvenli metadata event'ine sınıflandırır
 - supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
@@ -119,6 +120,7 @@ Controlled apply notu:
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.
+- `PIPELINE_FAILED` apply child tasklari icin yeni kok task acmadan root-cause raporu uretilmeli; `workspace_missing` gibi nedenler son hata, retry edilebilirlik ve onerilen duzeltme ile ayrastirilmalidir.
 
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.

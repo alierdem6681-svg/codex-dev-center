@@ -311,3 +311,9 @@ Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task ç
 Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
 
 Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
+
+## 2026-06-04 Pipeline Failed Root Cause Reporting Apply
+
+`PIPELINE_FAILED` apply child tasklari artik yeni kok backlog task'i acmadan okunabilir kok neden raporu uretebilir. `cto_autonomous_delivery.pipeline_failed_root_cause_report()` task id, parent id, `root_cause`, `last_error`, retry edilebilirlik ve onerilen duzeltme alanlarini dondurur.
+
+`workspace_missing` kok nedeni workspace/repo clone bootstrap kontrolu olarak raporlanir ve unit test ile sabitlenmistir. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
