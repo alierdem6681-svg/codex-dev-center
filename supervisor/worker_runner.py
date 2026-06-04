@@ -526,13 +526,23 @@ def create_isolated_repo_clone(source_root: Path, repo_dir: Path, branch: str, b
 
     set_origin = run_cmd(["git", "remote", "set-url", "origin", remote_url], cwd=repo_dir, timeout=60)
     result["git_remote_set_origin"] = set_origin
+    config_name = run_cmd(["git", "config", "user.name", "Codex Dev Center Worker"], cwd=repo_dir, timeout=60)
+    config_email = run_cmd(["git", "config", "user.email", "codex-dev-center@example.invalid"], cwd=repo_dir, timeout=60)
+    result["git_config_user_name"] = config_name
+    result["git_config_user_email"] = config_email
     fetch_origin = run_cmd(["git", "fetch", "origin", "main", "--prune"], cwd=repo_dir, timeout=180)
     result["git_clone_fetch"] = fetch_origin
     checkout_ref = "origin/main" if fetch_origin.get("ok") else base_ref
     checkout = run_cmd(["git", "checkout", "-B", branch, checkout_ref], cwd=repo_dir, timeout=180)
     result["git_checkout"] = checkout
     result["repo_git_metadata_local"] = repo_apply_git_metadata_is_local(repo_dir)
-    result["ok"] = bool(set_origin.get("ok") and checkout.get("ok") and result["repo_git_metadata_local"])
+    result["ok"] = bool(
+        set_origin.get("ok")
+        and config_name.get("ok")
+        and config_email.get("ok")
+        and checkout.get("ok")
+        and result["repo_git_metadata_local"]
+    )
     if not result["ok"]:
         result["reason"] = "git_clone_checkout_or_metadata_failed"
     return result
@@ -851,6 +861,7 @@ Beklenen çıktı:
     pipeline_status = "PASS"
     pipeline_results: list[dict[str, Any]] = []
     pr_payload: dict[str, Any] = {}
+    add_result: dict[str, Any] = {}
     commit_result: dict[str, Any] = {}
     push_result: dict[str, Any] = {}
 
@@ -980,8 +991,13 @@ Beklenen çıktı:
         "pull_request_url": pr_payload.get("url", ""),
         "pull_request_number": pr_payload.get("number", ""),
         "pull_request_state": pr_payload.get("state", ""),
+        "git_add_ok": bool(add_result.get("ok")) if add_result else False,
+        "git_add_stderr": add_result.get("stderr", "")[-1000:] if add_result else "",
+        "commit_ok": bool(commit_result.get("ok")) if commit_result else False,
         "commit_stdout": commit_result.get("stdout", "")[-1000:] if commit_result else "",
+        "commit_stderr": commit_result.get("stderr", "")[-1000:] if commit_result else "",
         "push_ok": bool(push_result.get("ok")) if push_result else False,
+        "push_stderr": push_result.get("stderr", "")[-1000:] if push_result else "",
         "repo_apply_allowed": True,
     }
     if status == TASK_STATUS_APPROVAL_REQUIRED:

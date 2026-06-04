@@ -310,7 +310,7 @@ Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task ç
 
 Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
 
-Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
+Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Apply clone icinde repo-local git identity ayarlanir ve commit/push stderr bilgisi metadata'ya yazilir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.
 
 ## 2026-06-04 Pending Dispatch Rebalance Guard
 
