@@ -3289,6 +3289,117 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertEqual(selected, ["worker-1", "worker-2"])
 
+    def test_dispatch_preserves_preassigned_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-4", "status": "IDLE", "current_task": None},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "TASK-PREASSIGNED",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-2",
+                            },
+                            {
+                                "id": "TASK-UNASSIGNED",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": None,
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+
+        tasks = {task["id"]: task for task in queue["tasks"]}
+        worker_map = {worker["id"]: worker for worker in workers["workers"]}
+        self.assertEqual(tasks["TASK-PREASSIGNED"]["assigned_worker"], "worker-2")
+        self.assertEqual(tasks["TASK-PREASSIGNED"]["worker_id"], "worker-2")
+        self.assertEqual(tasks["TASK-PREASSIGNED"]["status"], "ASSIGNED")
+        self.assertEqual(worker_map["worker-2"]["current_task"], "TASK-PREASSIGNED")
+        self.assertEqual(tasks["TASK-UNASSIGNED"]["assigned_worker"], "worker-4")
+        self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-UNASSIGNED")
+
+    def test_wake_now_dispatches_before_starting_worker_services(self):
+        calls = []
+        originals = (
+            lifecycle_manager.selected_workers_for_active_mode,
+            lifecycle_manager.max_parallel_workers,
+            lifecycle_manager.update_worker_state,
+            lifecycle_manager.dispatch,
+            lifecycle_manager.systemctl,
+            lifecycle_manager.update_system_state,
+        )
+        lifecycle_manager.selected_workers_for_active_mode = lambda: ["worker-1"]
+        lifecycle_manager.max_parallel_workers = lambda: 1
+        lifecycle_manager.update_worker_state = lambda worker, status, note="": calls.append(("state", worker, status))
+        lifecycle_manager.dispatch = lambda: calls.append(("dispatch",))
+        lifecycle_manager.systemctl = lambda action, worker: calls.append(("systemctl", action, worker)) or True
+        lifecycle_manager.update_system_state = lambda **updates: calls.append(("system_state", updates))
+        try:
+            result = lifecycle_manager.wake_now()
+        finally:
+            (
+                lifecycle_manager.selected_workers_for_active_mode,
+                lifecycle_manager.max_parallel_workers,
+                lifecycle_manager.update_worker_state,
+                lifecycle_manager.dispatch,
+                lifecycle_manager.systemctl,
+                lifecycle_manager.update_system_state,
+            ) = originals
+
+        self.assertTrue(result["ok"])
+        dispatch_index = calls.index(("dispatch",))
+        first_start_index = next(
+            index for index, call in enumerate(calls)
+            if call[0] == "systemctl" and call[1] == "start"
+        )
+        self.assertLess(dispatch_index, first_start_index)
+        self.assertIn(("state", "worker-1", "IDLE"), calls[:dispatch_index])
+
     def test_no_standard_candidate_uses_autonomous_backlog_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)

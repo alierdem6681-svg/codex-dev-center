@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 try:
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_ASSIGNED,
@@ -20,6 +21,7 @@ try:
         normalize_status,
     )
 except ImportError:
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_ASSIGNED,
@@ -130,30 +132,55 @@ def dispatch(_args):
     workers_path = STATE_DIR / "workers.json"
     queue_path = STATE_DIR / "task_queue.json"
 
-    workers = read_json(workers_path, {"workers": []})
-    queue = read_json(queue_path, {"tasks": []})
+    with state_file_lock(queue_path):
+        with state_file_lock(workers_path):
+            workers = read_json(workers_path, {"workers": []})
+            queue = read_json(queue_path, {"tasks": []})
 
-    idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
-    queue, _changes = normalize_queue_payload(queue)
-    dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
-    pending_tasks = [
-        t
-        for t in queue.get("tasks", [])
-        if is_worker_eligible_task(t) and normalize_status(t.get("status")) in dispatchable_statuses
-    ]
+            idle_workers = [w for w in workers.get("workers", []) if w.get("status") in ("IDLE", "READY")]
+            idle_by_id = {str(w.get("id") or ""): w for w in idle_workers}
+            queue, _changes = normalize_queue_payload(queue)
+            dispatchable_statuses = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
+            pending_tasks = [
+                t
+                for t in queue.get("tasks", [])
+                if is_worker_eligible_task(t) and normalize_status(t.get("status")) in dispatchable_statuses
+            ]
 
-    assignments = []
-    for worker, task in zip(idle_workers, pending_tasks):
-        worker["status"] = TASK_STATUS_ASSIGNED
-        worker["current_task"] = task["id"]
-        worker["last_seen"] = now()
-        task["status"] = TASK_STATUS_ASSIGNED
-        task["assigned_worker"] = worker["id"]
-        task["updated_at"] = now()
-        assignments.append({"worker": worker["id"], "task": task["id"]})
+            assignments = []
+            assigned_task_ids = set()
 
-    write_json(workers_path, workers)
-    write_json(queue_path, queue)
+            def assign(worker, task):
+                worker["status"] = TASK_STATUS_ASSIGNED
+                worker["current_task"] = task["id"]
+                worker["last_seen"] = now()
+                task["status"] = TASK_STATUS_ASSIGNED
+                task["assigned_worker"] = worker["id"]
+                task["worker_id"] = worker["id"]
+                task["updated_at"] = now()
+                assigned_task_ids.add(task["id"])
+                assignments.append({"worker": worker["id"], "task": task["id"]})
+
+            for task in pending_tasks:
+                preferred = str(task.get("assigned_worker") or "")
+                worker = idle_by_id.get(preferred)
+                if not worker:
+                    continue
+                assign(worker, task)
+                idle_by_id.pop(preferred, None)
+
+            remaining_idle = [w for w in idle_workers if str(w.get("id") or "") in idle_by_id]
+            for task in pending_tasks:
+                if task.get("id") in assigned_task_ids:
+                    continue
+                if str(task.get("assigned_worker") or "").strip():
+                    continue
+                if not remaining_idle:
+                    break
+                assign(remaining_idle.pop(0), task)
+
+            write_json(queue_path, queue)
+            write_json(workers_path, workers)
 
     for item in assignments:
         log(f"DISPATCH worker={item['worker']} task={item['task']}")

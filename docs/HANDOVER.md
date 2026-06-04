@@ -750,3 +750,17 @@ Eklenenler:
 
 Test:
 - `tests/test_runtime_status_model.py` action routing ve 10 görev backlog üretimini regresyon testiyle sabitler.
+
+---
+
+## Worker Dispatch Claim Race Guard
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- Lifecycle `wake-now` akışı worker servislerini başlatmadan önce worker state'i IDLE yapar ve dispatch'i çalıştırır; servisler dispatch sonrasında başlatılır.
+- `supervisor_cli dispatch` queue/workers state dosyalarını lock altında günceller ve mevcut `assigned_worker` değerini başka workera ezmez.
+- Bu guard, aynı task'ın iki worker tarafından claim edilmesi ve recovery/apply çoğalması riskini azaltır.
+
+Test:
+- `tests/test_runtime_status_model.py` dispatch'in preassigned worker'ı korumasını ve wake sırasının dispatch-before-start olmasını sabitler.

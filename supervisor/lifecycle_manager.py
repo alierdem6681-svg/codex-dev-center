@@ -12,6 +12,7 @@ from typing import Any
 try:
     from . import cto_autonomous_delivery
     from .critical_operation_policy import approval_required_payload
+    from .state_file_lock import state_file_lock
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -39,6 +40,7 @@ try:
 except ImportError:
     import cto_autonomous_delivery
     from critical_operation_policy import approval_required_payload
+    from state_file_lock import state_file_lock
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -143,34 +145,35 @@ def systemctl_is_active(worker):
         return False
 
 def update_worker_state(worker_id, status, note=""):
-    data = read_json(WORKERS_PATH, {"workers": []})
-    found = False
-    for w in data.get("workers", []):
-        if w.get("id") == worker_id:
-            if status == "IDLE" and str(w.get("status", "")).upper() == "RUNNING" and w.get("current_task"):
+    with state_file_lock(WORKERS_PATH):
+        data = read_json(WORKERS_PATH, {"workers": []})
+        found = False
+        for w in data.get("workers", []):
+            if w.get("id") == worker_id:
+                if status == "IDLE" and str(w.get("status", "")).upper() == "RUNNING" and w.get("current_task"):
+                    w["last_seen"] = now()
+                    w["note"] = note
+                    found = True
+                    break
+                w["status"] = status
+                if status in {"IDLE", "SLEEPING", "STOPPED"}:
+                    w["current_task"] = None
+                else:
+                    w["current_task"] = w.get("current_task")
                 w["last_seen"] = now()
                 w["note"] = note
                 found = True
                 break
-            w["status"] = status
-            if status in {"IDLE", "SLEEPING", "STOPPED"}:
-                w["current_task"] = None
-            else:
-                w["current_task"] = w.get("current_task")
-            w["last_seen"] = now()
-            w["note"] = note
-            found = True
-            break
-    if not found:
-        data.setdefault("workers", []).append({
-            "id": worker_id,
-            "role": "Auto worker",
-            "status": status,
-            "current_task": None,
-            "last_seen": now(),
-            "note": note
-        })
-    write_json(WORKERS_PATH, data)
+        if not found:
+            data.setdefault("workers", []).append({
+                "id": worker_id,
+                "role": "Auto worker",
+                "status": status,
+                "current_task": None,
+                "last_seen": now(),
+                "note": note
+            })
+        write_json(WORKERS_PATH, data)
 
 def queue_counts():
     q = read_json(QUEUE_PATH, {"tasks": []})
@@ -675,12 +678,15 @@ def wake_now():
     log(f"WAKE_NOW requested selected={','.join(sorted(selected))}")
     for w in WORKERS:
         if w in selected:
-            systemctl("start", w)
             update_worker_state(w, "IDLE", "woken_by_lifecycle_active_mode")
         else:
             update_worker_state(w, "SLEEPING", "single_mode_not_selected")
-            systemctl("stop", w)
     dispatch()
+    for w in WORKERS:
+        if w in selected:
+            systemctl("start", w)
+        else:
+            systemctl("stop", w)
     update_system_state(
         worker_sleep_wake_implemented=True,
         worker_fleet_mode="AWAKE_PARALLEL" if max_workers > 1 else "AWAKE_SINGLE",

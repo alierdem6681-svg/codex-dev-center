@@ -299,3 +299,9 @@ Local `git add` git metadata dizini read-only olduğu için çalışmadı. GitHu
 Direct CTO Telegram hattı artık `görev olarak aç`, `görevleri aç`, `kendine görev` ve `görevlendir` gibi açık görev üretme ifadelerini action-command olarak ele alır. “10 hata/eksik/sorunu görev olarak aç” sınıfındaki istekler read-only raporla kalmaz; `direct_cto_action_mode` üzerinden 10 parçalı gözlem backlog paketi üretir.
 
 Bu paket read-only/dry-run test modu, güvenli scratch standardı, dashboard quality gate kontratı, drift registry, repo-apply no-change, pipeline failed kök neden raporu, production readiness misroute, worker workspace bootstrap, timeout/backoff ve atomic JSON state audit görevlerini worker'lara dağıtacak şekilde sabitlendi. Davranış `tests/test_runtime_status_model.py` regresyon testleriyle korunur.
+
+## 2026-06-04 Worker Dispatch Claim Race Guard
+
+Worker lifecycle `wake-now` artık worker servislerini başlatmadan önce state'i IDLE yapıp dispatch'i çalıştırır; servis başlatma dispatch sonrasına alınmıştır. `supervisor_cli dispatch` queue/workers dosyalarını lock altında günceller ve önceden atanmış `assigned_worker` değerini idle worker sırası farklı diye başka workera ezmez.
+
+Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task çoğalması ve apply assignment/worker_id tutarsızlığı riskini kapatır. Davranış `tests/test_runtime_status_model.py` içindeki dispatch ve wake-order regresyon testleriyle sabitlendi.
