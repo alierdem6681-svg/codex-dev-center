@@ -1,11 +1,12 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-04T06:20:24+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
     "compact_mode": true,
     "theme": "soft_neutral",
-    "auth_mode": "username_password"
+    "auth_mode": "username_password",
+    "show_account_menu": true
   },
   "panel_auth": {
     "mode": "username_password",
@@ -13,7 +14,10 @@
     "session_cookie_name": "codex_panel_session",
     "password_hash": "pbkdf2_sha256",
     "remote_first_setup_enabled": false,
-    "runtime_state_file": "state/panel_auth.json"
+    "runtime_state_file": "state/panel_auth.json",
+    "account_endpoint": "/api/account/me",
+    "account_logout_alias": "/api/account/logout",
+    "safe_account_payload_only": true
   },
   "production": {
     "automatic_production_enabled": true,

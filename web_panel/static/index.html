@@ -77,6 +77,36 @@
       button.primary { background: #dcebf0; border-color: #c8dce5; }
       .controls { display: grid; gap: 8px; grid-template-columns: 1.3fr repeat(4, minmax(120px, .6fr)); margin-bottom: 10px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .header-actions { align-items: center; position: relative; }
+      .account-menu { position: relative; }
+      .account-button {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .account-panel {
+        position: absolute;
+        right: 0;
+        top: 42px;
+        width: min(280px, calc(100vw - 28px));
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 12px 28px rgba(32, 36, 44, .16);
+        padding: 12px;
+        z-index: 20;
+      }
+      .account-panel[hidden] { display: none; }
+      .account-panel button { width: 100%; margin-top: 10px; text-align: left; }
+      .account-name { font-weight: 700; overflow-wrap: anywhere; }
+      .account-meta { margin-top: 8px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
@@ -87,6 +117,7 @@
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
+        .header-actions { width: 100%; justify-content: space-between; }
       }
     </style>
   </head>
@@ -96,9 +127,19 @@
         <h1>Codex Dev Center Yönetim Paneli</h1>
         <div class="muted">Canlıya alma, görevler, çalışanlar, toparlama ve güvenli GitHub akışı</div>
       </div>
-      <div class="actions">
+      <div class="actions header-actions">
         <span id="clock" class="badge">Yükleniyor</span>
-        <button onclick="logout()">Çıkış</button>
+        <div id="accountMenu" class="account-menu">
+          <button id="accountButton" class="account-button" type="button" title="Hesap" aria-haspopup="menu" aria-expanded="false" onclick="toggleAccountMenu(event)">
+            <span id="accountInitial">?</span>
+          </button>
+          <div id="accountPanel" class="account-panel" role="menu" hidden>
+            <div id="accountName" class="account-name">-</div>
+            <div id="accountRole" class="muted">-</div>
+            <div id="accountSession" class="muted account-meta">-</div>
+            <button type="button" onclick="logout()">Çıkış</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -236,6 +277,37 @@
         if (['PENDING','QUEUED','ASSIGNED','RUNNING','BLOCKED','WARN'].includes(u)) cls += ' warn';
         if (['FAIL','FAILED','ERROR','FALSE','INACTIVE','STALLED'].includes(u)) cls += ' bad';
         return `<span class="${cls}">${esc(tr[u] || s)}</span>`;
+      }
+      function accountLetter(value){
+        const clean = String(value || '?').trim();
+        return (clean[0] || '?').toUpperCase();
+      }
+      function renderAccount(data){
+        const account = data.account || {};
+        const session = account.session || {};
+        const remaining = session.seconds_remaining;
+        accountInitial.textContent = accountLetter(account.display_name || account.username);
+        accountName.textContent = account.display_name || account.username || '-';
+        accountRole.textContent = account.role_label || account.role || '-';
+        accountSession.textContent = remaining === null || remaining === undefined ? '-' : `Oturum: ${Math.ceil(remaining / 60)} dk`;
+      }
+      async function refreshAccount(){
+        const res = await fetch('/api/account/me', {cache:'no-store'});
+        if (res.status === 401) {
+          location.href = '/login';
+          return;
+        }
+        if (res.ok) renderAccount(await res.json());
+      }
+      function closeAccountMenu(){
+        accountPanel.hidden = true;
+        accountButton.setAttribute('aria-expanded', 'false');
+      }
+      function toggleAccountMenu(event){
+        event.stopPropagation();
+        const willOpen = accountPanel.hidden;
+        accountPanel.hidden = !willOpen;
+        accountButton.setAttribute('aria-expanded', String(willOpen));
       }
       function taskTime(t){return Date.parse(t.updated_at || t.created_at || 0) || 0}
       function tasks(){ return ((latest.tasks || latest.queue || {}).tasks || []).slice(); }
@@ -390,6 +462,7 @@
       async function refresh(){
         const res = await fetch('/api/status', {cache:'no-store'});
         render(await res.json());
+        await refreshAccount();
       }
       async function runAction(action){
         actionResult.textContent = 'Çalışıyor...';
@@ -398,9 +471,15 @@
         await refresh();
       }
       async function logout(){
-        await fetch('/api/auth/logout', {method:'POST'});
+        await fetch('/api/account/logout', {method:'POST'});
         location.href = '/login';
       }
+      document.addEventListener('click', event => {
+        if (!accountMenu.contains(event.target)) closeAccountMenu();
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeAccountMenu();
+      });
       [search, statusFilter, workerFilter, riskFilter, sortMode].forEach(el => el.addEventListener('input', renderTasks));
       refresh();
       setInterval(refresh, 5000);

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T19:22:54+00:00",
+  "updated_at": "2026-06-04T06:20:24+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -16,6 +16,17 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false
+    },
+    {
+      "id": "panel_account_me",
+      "label": "Panel Hesap Özeti",
+      "module": "panel_auth",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "read_only": true,
+      "endpoint": "/api/account/me",
+      "safe_account_payload_only": true
     },
     {
       "id": "panel_first_user_setup",

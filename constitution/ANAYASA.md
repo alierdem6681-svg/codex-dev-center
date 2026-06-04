@@ -65,6 +65,8 @@ Dashboard controlled execution proposal görünürlüğü salt okunurdur. Propos
 
 Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy panel `/api/status` payload'larında GitHub Actions ve pipeline marker durumunu göstermek production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 
+Dashboard hesap menüsü salt okunur hesap ve oturum özeti gösterebilir. Bu görünürlük parola hash'i, salt, session cookie, secret/env/token/private key veya kritik altyapı yetkisi gösterme/değiştirme izni vermez.
+
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.
 
 Kalite kapısı standart raporu mevcut readiness artefact'lerinden `pass` veya `fail` kararı üretir. Eksik artefact, başarısız test veya dry-run dışı simülasyon kanıtı production deploy izni sayılmaz ve canlı mutasyon yetkisi vermez.

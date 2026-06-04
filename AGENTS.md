@@ -152,6 +152,10 @@ Dashboard `/api/status` payload'u controlled execution proposal durumunu salt ok
 
 Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.json` ve `pipeline_status.json` dosyalarini salt okunur `github_actions` ve `pipeline_status` alanlariyla gosterir. Bu gorunurluk production deploy veya kritik altyapi islemi yetkisi vermez.
 
+## DASHBOARD ACCOUNT MENU V1
+
+Ana panel sag ust hesap menusu `GET /api/account/me` uzerinden yalnizca secret icermeyen kullanici ve oturum ozeti gosterir. Password/hash/salt/session cookie degeri, secret/env/token/private key veya kritik altyapi yetkisi gosterilmez, degistirilmez ve Telegram'a teknik cikti olarak aktarilmaz.
+
 ## QUALITY GATE STANDARD REPORT V1
 
 `supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

@@ -210,11 +210,15 @@ def parse_cookie(header: str) -> dict[str, str]:
 
 
 def user_from_cookie(header: str) -> str | None:
-    value = parse_cookie(header).get(COOKIE_NAME, "")
-    session = verify_session(value)
+    session = session_from_cookie(header)
     if not session:
         return None
     return str(session.get("sub") or "") or None
+
+
+def session_from_cookie(header: str) -> dict[str, Any] | None:
+    value = parse_cookie(header).get(COOKIE_NAME, "")
+    return verify_session(value)
 
 
 def session_cookie_header(username: str) -> str:
@@ -225,12 +229,58 @@ def clear_cookie_header() -> str:
     return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
 
 
+def timestamp_iso(value: Any) -> str | None:
+    try:
+        timestamp = int(value)
+    except Exception:
+        return None
+    if timestamp <= 0:
+        return None
+    return datetime.fromtimestamp(timestamp, timezone.utc).replace(microsecond=0).isoformat()
+
+
 def public_auth_state(username: str | None = None) -> dict[str, Any]:
     config = read_json(AUTH_FILE, {})
+    configured = bool(config.get("username") and config.get("password"))
     return {
         "auth_mode": "username_password",
-        "configured": bool((username or config.get("username")) and config.get("password", True)),
+        "configured": configured,
         "username": username or config.get("username"),
         "token_login_enabled": False,
         "remote_setup_allowed": os.environ.get("CODEX_PANEL_ALLOW_REMOTE_SETUP", "") == "1",
+    }
+
+
+def public_account_state(
+    username: str | None = None,
+    session: dict[str, Any] | None = None,
+    current_time: int | None = None,
+) -> dict[str, Any]:
+    session = session or {}
+    subject = username or str(session.get("sub") or "") or None
+    current = int(current_time if current_time is not None else time.time())
+    expires_at = int(session.get("exp", 0) or 0)
+    role = "automation" if subject == "__automation__" else "operator"
+    role_label = "Automation" if role == "automation" else "Operator"
+    auth_state = public_auth_state(username=subject)
+    return {
+        "ok": True,
+        "auth": auth_state,
+        "account": {
+            "username": subject,
+            "display_name": subject or "Unknown",
+            "role": role,
+            "role_label": role_label,
+            "auth_mode": auth_state["auth_mode"],
+            "session": {
+                "ttl_seconds": SESSION_TTL_SECONDS,
+                "issued_at": timestamp_iso(session.get("iat")),
+                "expires_at": timestamp_iso(expires_at),
+                "seconds_remaining": max(0, expires_at - current) if expires_at else None,
+            },
+            "menu": [
+                {"id": "account_settings", "label": "Account settings", "enabled": False},
+                {"id": "logout", "label": "Logout", "enabled": True},
+            ],
+        },
     }

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T19:22:54+00:00",
+  "updated_at": "2026-06-04T06:20:24+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -23,7 +23,8 @@
     "show_last_smoke_run": true,
     "show_backup_status": true,
     "show_task_to_deploy_status": true,
-    "show_controlled_execution_status": true
+    "show_controlled_execution_status": true,
+    "show_account_menu": true
   },
   "panel_auth": {
     "enabled": true,
@@ -34,7 +35,11 @@
     "remote_first_setup_enabled": false,
     "password_hash_algorithm": "pbkdf2_sha256",
     "runtime_auth_file": "state/panel_auth.json",
-    "runtime_session_secret_file": "state/panel_session_secret.txt"
+    "runtime_session_secret_file": "state/panel_session_secret.txt",
+    "account_menu_enabled": true,
+    "account_endpoint": "/api/account/me",
+    "account_logout_alias": "/api/account/logout",
+    "safe_account_payload_only": true
   },
   "supervisor": {
     "auto_dispatch_low_risk": true,

@@ -184,3 +184,9 @@ Codex quality gate artik production readiness artefact'ini standart kalite rapor
 Simulasyon dry-run kaniti icin `production_deploy_performed=false`, `staging_deploy_performed=false` ve `mutating_cloud_operations_performed=false` bayraklari zorunludur. Bu paket production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local git metadata dizini read-only oldugu icin commit hazirlanamadi. GitHub connector branch/PR cagrisinin iptal edilmesi nedeniyle PR acma adimi tamamlanamadi.
+
+## 2026-06-04 Dashboard Account Menu Apply
+
+Ana dashboard header'ina profil/avatar menusu eklendi. `GET /api/account/me` yalnizca kullanici adi, rol etiketi ve oturum zaman ozeti gibi read-only bilgileri dondurur; password/hash/salt/session cookie degeri payload'a girmez.
+
+`POST /api/account/logout` mevcut `/api/auth/logout` davranisina alias olarak eklendi. Davranis `tests/test_dashboard_account_menu.py` icinde public account payload sizinti testiyle sabitlendi. Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.

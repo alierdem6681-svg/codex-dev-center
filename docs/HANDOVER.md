@@ -426,3 +426,23 @@ Test:
 Not:
 - Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Local `git add` işlemi git metadata dizini read-only olduğu için başarısız oldu; GitHub connector branch/PR çağrısı iptal edildiği için PR açılamadı.
+
+---
+
+## Dashboard Account Menu Apply
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-062022 / CTO-BACKLOG-20260604-061520-132848-TELEGRAM-ACTION-COMMAND
+
+Eklenenler:
+- Ana panel header'inda profil/avatar butonu ve hesap menusu eklendi.
+- `web_panel/auth.py` secret icermeyen `public_account_state()` payload'u uretir.
+- `web_panel/panel_server.py` `GET /api/account/me` ve `POST /api/account/logout` endpointlerini sunar.
+- `web_panel/static/index.html` hesap menusunu `/api/account/me` ile doldurur ve cikis icin account logout alias'ini kullanir.
+- `tests/test_dashboard_account_menu.py` public account payload'unun password/hash/salt/cookie degeri sizdirmedigini dogrular.
+
+Not:
+- Production deploy calistirilmadi.
+- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Repo worktree icindeki `state_templates/` kayitlari guncellendi; bu worktree'de runtime `state/` dizini bulunmuyor.

@@ -91,8 +91,16 @@ def setup_allowed(handler: BaseHTTPRequestHandler) -> bool:
     return is_loopback(handler) or os.environ.get("CODEX_PANEL_ALLOW_REMOTE_SETUP", "") == "1"
 
 
+def authenticated_session(handler: BaseHTTPRequestHandler):
+    return panel_auth.session_from_cookie(handler.headers.get("Cookie", ""))
+
+
 def authorized(handler: BaseHTTPRequestHandler) -> bool:
-    return bool(panel_auth.user_from_cookie(handler.headers.get("Cookie", "")))
+    return bool(authenticated_session(handler))
+
+
+def account_payload(handler: BaseHTTPRequestHandler):
+    return panel_auth.public_account_state(session=authenticated_session(handler))
 
 
 def run_cmd(cmd: list[str], timeout: int = 180):
@@ -423,6 +431,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
             return
+        if parsed.path == "/api/account/me":
+            self.send_json(account_payload(self))
+            return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
             return
@@ -455,7 +466,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"ok": False, "error": "invalid_credentials", "message": "Kullanıcı adı veya şifre hatalı."}, 401)
             return
-        if parsed.path == "/api/auth/logout":
+        if parsed.path in ("/api/auth/logout", "/api/account/logout"):
             self.send_logout()
             return
         if not authorized(self):

@@ -100,6 +100,8 @@ Dashboard status API notu:
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
 - Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
 - Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.
+- Ana panel `GET /api/account/me` ile secret icermeyen hesap/oturum ozeti dondurur ve `POST /api/account/logout` mevcut logout akisi icin alias olarak calisir.
+- Account payload password/hash/salt/session cookie degeri gostermemeli; yalnizca read-only kullanici adi, rol etiketi ve oturum zaman ozeti dondurmelidir.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.

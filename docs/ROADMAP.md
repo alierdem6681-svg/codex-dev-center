@@ -172,3 +172,10 @@ Faz 19B-10A Model Policy
 - [x] Queue task status normalizer case, bosluk, tire ve noktalama ayirici aliaslarini standart enumlara cevirir.
 - [x] `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED-TIMEOUT`, `FAILED.TIMEOUT`, `in-progress` ve `completed` varyantlari unit test ile sabitlendi.
 - [x] CTO router normalizasyon davranisi onboarding, handover, memory ve state template kayitlarina islendi.
+
+## Faz 33 - Dashboard Account Menu
+
+- [x] Ana panelde sag ust hesap/avatar menusu eklendi.
+- [x] `GET /api/account/me` secret icermeyen hesap ve oturum payload'u dondurur.
+- [x] `POST /api/account/logout` mevcut logout akisi icin alias olarak eklendi.
+- [x] Panel auth payload'unun password/hash/salt/cookie degeri sizdirmadigi unit test ile sabitlendi.
