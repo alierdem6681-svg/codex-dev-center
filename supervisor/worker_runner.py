@@ -495,6 +495,49 @@ def run_cmd(
         return {"ok": False, "returncode": 1, "stdout": "", "stderr": redact_sensitive_text(str(exc))[:1000], "cmd": " ".join(args)}
 
 
+def repo_apply_git_metadata_is_local(repo_dir: Path) -> bool:
+    return (repo_dir / ".git").is_dir()
+
+
+def create_isolated_repo_clone(source_root: Path, repo_dir: Path, branch: str, base_ref: str) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": False,
+        "repo_dir": str(repo_dir),
+        "branch": branch,
+        "base_ref": base_ref,
+    }
+    if repo_dir.exists():
+        result["reason"] = "repo_clone_path_already_exists"
+        return result
+
+    remote = run_cmd(["git", "config", "--get", "remote.origin.url"], cwd=source_root, timeout=60)
+    result["git_remote_origin"] = remote
+    remote_url = str(remote.get("stdout") or "").strip()
+    if not remote.get("ok") or not remote_url:
+        result["reason"] = "source_remote_origin_missing"
+        return result
+
+    repo_dir.parent.mkdir(parents=True, exist_ok=True)
+    clone = run_cmd(["git", "clone", "--no-hardlinks", str(source_root), str(repo_dir)], cwd=source_root, timeout=300)
+    result["git_clone"] = clone
+    if not clone.get("ok"):
+        result["reason"] = "git_clone_failed"
+        return result
+
+    set_origin = run_cmd(["git", "remote", "set-url", "origin", remote_url], cwd=repo_dir, timeout=60)
+    result["git_remote_set_origin"] = set_origin
+    fetch_origin = run_cmd(["git", "fetch", "origin", "main", "--prune"], cwd=repo_dir, timeout=180)
+    result["git_clone_fetch"] = fetch_origin
+    checkout_ref = "origin/main" if fetch_origin.get("ok") else base_ref
+    checkout = run_cmd(["git", "checkout", "-B", branch, checkout_ref], cwd=repo_dir, timeout=180)
+    result["git_checkout"] = checkout
+    result["repo_git_metadata_local"] = repo_apply_git_metadata_is_local(repo_dir)
+    result["ok"] = bool(set_origin.get("ok") and checkout.get("ok") and result["repo_git_metadata_local"])
+    if not result["ok"]:
+        result["reason"] = "git_clone_checkout_or_metadata_failed"
+    return result
+
+
 def safe_branch_fragment(value: Any, limit: int = 64) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "task").strip()).strip("-._").lower()
     return (cleaned[:limit].strip("-._") or "task")
@@ -715,22 +758,14 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
         )
         return TASK_STATUS_FAILED_RETRYABLE, "source_git_repo_not_found", str(report_path), metadata
 
-    append_log(task_log, f"{now()} WORKER={worker_id} TASK={task_id} REPO_APPLY_START branch={branch} worktree={worktree}")
+    append_log(task_log, f"{now()} WORKER={worker_id} TASK={task_id} REPO_APPLY_START branch={branch} repo_clone={worktree}")
     fetch = run_cmd(["git", "fetch", "origin", "main", "--prune"], cwd=SOURCE_ROOT, timeout=180)
     base_ref = "origin/main" if fetch["ok"] else "HEAD"
-    worktree.parent.mkdir(parents=True, exist_ok=True)
-    prune_before = run_cmd(["git", "worktree", "prune"], cwd=SOURCE_ROOT, timeout=120)
-    add_worktree = run_cmd(["git", "worktree", "add", "-b", branch, str(worktree), base_ref], cwd=SOURCE_ROOT, timeout=180)
-    prune_after: dict[str, Any] = {}
-    if not add_worktree["ok"]:
-        prune_after = run_cmd(["git", "worktree", "prune", "--expire", "now"], cwd=SOURCE_ROOT, timeout=120)
-        add_worktree = run_cmd(["git", "worktree", "add", "-b", branch, str(worktree), base_ref], cwd=SOURCE_ROOT, timeout=180)
-    if not add_worktree["ok"]:
+    clone_result = create_isolated_repo_clone(SOURCE_ROOT, worktree, branch, base_ref)
+    if not clone_result.get("ok"):
         metadata = {
             "git_fetch": fetch,
-            "git_worktree_prune_before": prune_before,
-            "git_worktree_prune_after": prune_after,
-            "git_worktree": add_worktree,
+            "git_clone": clone_result,
             "production_deployed": False,
             "repo_applied": False,
             "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
@@ -740,10 +775,10 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
         report_path.write_text(
             "# WORKER REPO APPLY REPORT\n\n"
             f"Tarih: {now()}\nWorker: {worker_id}\nTask: {task_id}\nSonuç: FAILED_RETRYABLE\n"
-            "Neden: git worktree oluşturulamadı.\n",
+            "Neden: izole repo clone olusturulamadi veya .git metadata yerel degil.\n",
             encoding="utf-8",
         )
-        return TASK_STATUS_FAILED_RETRYABLE, "git_worktree_create_failed", str(report_path), metadata
+        return TASK_STATUS_FAILED_RETRYABLE, "git_repo_clone_create_failed", str(report_path), metadata
 
     evidence = proposal_evidence_excerpt(task)
     prompt = f"""
@@ -761,11 +796,11 @@ Açıklama:
 Risk:
 {risk}
 
-Bu çalışma ayrı bir git worktree ve branch üzerindedir:
+Bu calisma ayri bir izole repo clone ve branch uzerindedir:
 {branch}
 
 Kurallar:
-- Bu worktree içindeki repo dosyalarını değiştirebilirsin.
+- Bu izole repo clone icindeki repo dosyalarini degistirebilirsin.
 - Main branch'e doğrudan push yapma.
 - Production deploy yapma.
 - Secret/env/token/private key değerlerini okuma, yazma, gösterme veya değiştirme.
@@ -883,7 +918,7 @@ Beklenen çıktı:
         f"Worker: {worker_id}",
         f"Task: {task_id}",
         f"Branch: {branch}",
-        f"Worktree: {worktree}",
+        f"Repo clone: {worktree}",
         f"Sonuç: {status}",
         f"Result: {result}",
         f"Codex return code: {returncode}",
@@ -922,14 +957,16 @@ Beklenen çıktı:
 
     metadata = {
         "workspace": str(worktree),
+        "repo_clone": str(worktree),
         "repo_worktree": str(worktree),
         "branch": branch,
         "changed_files": changed_files,
         "commit_files": commit_files,
         "ignored_generated_files": ignored_generated_files,
         "unsafe_files": unsafe_files,
-        "git_worktree_prune_before": prune_before,
-        "git_worktree_prune_after": prune_after,
+        "git_fetch": fetch,
+        "git_clone": clone_result,
+        "repo_git_metadata_local": repo_apply_git_metadata_is_local(worktree),
         "secret_scan_findings": secret_findings,
         "codex_return_code": returncode,
         "progress_watchdog": progress_result,

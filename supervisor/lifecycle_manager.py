@@ -352,7 +352,7 @@ def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dic
         "description": (
             f"Repo apply child for validated proposal {parent_id}. "
             f"Parent status: {normalize_status(parent.get('status'))}. Evidence: {evidence}. "
-            "Worker must implement the smallest safe repo/app change in an isolated git worktree and branch, "
+            "Worker must implement the smallest safe repo/app change in an isolated repo clone and branch, "
             "then create a PR after local gates pass. Do not deploy production. Do not touch secret/env/token/private key, "
             "IAM, billing, DNS, firewall, destructive database, or advertising platform live-write operations."
         ),

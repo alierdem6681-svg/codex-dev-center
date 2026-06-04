@@ -764,3 +764,21 @@ Eklenenler:
 
 Test:
 - `tests/test_runtime_status_model.py` dispatch'in preassigned worker'ı korumasını ve wake sırasının dispatch-before-start olmasını sabitler.
+
+---
+
+## Repo Apply Isolated Clone Guard
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- Repo apply worker artik `git worktree` yerine sandbox icinde kendi `.git/` metadata dizini olan izole clone hazirlar.
+- Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
+- Apply workspace'inde `.git` dosyasi ile dis metadata'ya isaret eden worktree formu uygun kabul edilmez.
+- Repo apply task aciklamasi ve worker prompt'u izole repo clone kontratina guncellendi.
+
+Neden:
+- Sandbox `git worktree` metadata dizinini kaynak repo `.git/worktrees/...` altinda read-only gordugu icin `git add`/commit/PR adimi `index.lock` hatasiyla takiliyordu.
+
+Test:
+- `tests/test_runtime_status_model.py` apply workspace metadata kontrolunu regresyon testiyle sabitler.

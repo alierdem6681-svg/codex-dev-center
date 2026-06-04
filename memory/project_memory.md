@@ -305,3 +305,9 @@ Bu paket read-only/dry-run test modu, güvenli scratch standardı, dashboard qua
 Worker lifecycle `wake-now` artık worker servislerini başlatmadan önce state'i IDLE yapıp dispatch'i çalıştırır; servis başlatma dispatch sonrasına alınmıştır. `supervisor_cli dispatch` queue/workers dosyalarını lock altında günceller ve önceden atanmış `assigned_worker` değerini idle worker sırası farklı diye başka workera ezmez.
 
 Bu guard, aynı task'ın iki worker tarafından claim edilmesi, recovery task çoğalması ve apply assignment/worker_id tutarsızlığı riskini kapatır. Davranış `tests/test_runtime_status_model.py` içindeki dispatch ve wake-order regresyon testleriyle sabitlendi.
+
+## 2026-06-04 Repo Apply Isolated Clone Guard
+
+Repo apply worker sandbox icinde commit/PR uretebilsin diye apply workspace artik `git worktree` degil, kendi `.git/` metadata dizini olan izole repo clone olarak hazirlanir. Clone origin remote'u kaynak repo remote'una cevrilir, `origin/main` fetch edilir ve worker branch bu referanstan acilir.
+
+Bu guard, `git add` sirasinda sandbox disindaki `.git/worktrees/.../index.lock` yoluna yazma denemesi yuzunden olusan commit/PR hatasini kapatir. Davranis `tests/test_runtime_status_model.py` icindeki metadata regresyon testiyle sabitlendi.

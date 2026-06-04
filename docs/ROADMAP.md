@@ -242,3 +242,10 @@ Faz 19B-10A Model Policy
 - [x] Dokuman MIME allowlist, dosya boyutu limiti, caption uzunluk limiti ve dosya adi sanitization davranisi unit test ile sabitlendi.
 - [x] Dosya indirme, kalici saklama, checksum ve malware scan sonraki asset processing asamasina birakildi.
 - [ ] Telegram Asset Storage And Manifest paketi sonraki kucuk kapsam olarak uygulanacak.
+
+## Faz 41 - Repo Apply Isolated Clone Guard
+
+- [x] Repo apply worker `git worktree` yerine sandbox icinde yerel `.git/` metadata dizini olan izole repo clone kullanir.
+- [x] Clone origin'i GitHub remote'a cevrilir, worker branch `origin/main` tabanindan acilir.
+- [x] `.git` dosyasi ile dis metadata'ya isaret eden worktree formu apply icin reddedilir.
+- [x] Metadata kontrati unit test ile sabitlendi.

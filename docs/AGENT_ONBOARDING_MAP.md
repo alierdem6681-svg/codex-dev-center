@@ -115,7 +115,7 @@ Dashboard status API notu:
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 
 Controlled apply notu:
-- Validated proposal apply isleri izole git worktree/worker branch uzerinde calisir.
+- Validated proposal apply isleri izole repo clone/worker branch uzerinde calisir; apply clone icinde yerel `.git/` metadata dizini bulunmalidir.
 - Tekil allowlist dosyalari exact match ister; `AGENTS.md.bak` ve `AGENTS.md/child` guvenli repo apply path'i sayilmaz.
 - Runtime `state/`, `logs/`, `reports/`, `workspaces/` ve secret/env/token/private key kapsami PR apply disinda kalir.
 - Apply raporu `Controlled Apply Checklist` ve `Rollback Note` bolumleriyle patch scope, diff review, secret scan, local pipeline ve production deploy yapılmadı kanitini yazmalidir.

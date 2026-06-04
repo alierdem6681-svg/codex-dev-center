@@ -272,6 +272,18 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("state_templates/module_registry.json"))
         self.assertFalse(worker_runner.is_ignorable_repo_apply_artifact("docs/ROADMAP.md"))
 
+    def test_repo_apply_requires_local_git_metadata_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+            self.assertTrue(worker_runner.repo_apply_git_metadata_is_local(repo))
+
+            linked = Path(tmp) / "linked"
+            linked.mkdir()
+            (linked / ".git").write_text("gitdir: ../source/.git/worktrees/linked\n", encoding="utf-8")
+            self.assertFalse(worker_runner.repo_apply_git_metadata_is_local(linked))
+
     def test_repo_apply_report_sections_include_controlled_apply_notes(self):
         sections = worker_runner.repo_apply_control_report_sections(
             risk="medium",
