@@ -158,7 +158,7 @@ Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline st
 
 ## QUALITY GATE STANDARD REPORT V1
 
-`supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+`supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact, basarisiz lint/test/simulasyon dry-run kapisi veya eksik staging/rollback dry-run ve restart/failure static non-mutating kontrat kaniti sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
 ## CONTROLLED APPLY PIPELINE V1
 

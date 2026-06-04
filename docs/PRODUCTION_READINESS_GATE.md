@@ -31,6 +31,7 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - Bu kapılar `static_non_mutating_contract` modunda çalışır ve `production_deploy_performed=false` beyanını korur.
+- `codex_quality_gate.py standard-report` aynı dry-run ve static non-mutating kontrat kanıtı eksikse `simulation_dry_run` sonucunu fail sayar.
 
 ## Otomatik Yayına Alma Kuralı
 

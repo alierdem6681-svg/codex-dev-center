@@ -41,6 +41,25 @@ NON_MUTATING_FLAGS = [
     "mutating_cloud_operations_performed",
 ]
 
+SIMULATION_EVIDENCE_CONTRACTS = {
+    "staging_smoke_test": {
+        "mode": "dry_run_non_mutating_contract",
+        "path": ["details", "contract"],
+    },
+    "rollback_simulation": {
+        "mode": "dry_run_non_mutating_contract",
+        "path": ["details", "contract"],
+    },
+    "restart_simulation": {
+        "mode": "static_non_mutating_contract",
+        "path": ["details"],
+    },
+    "failure_injection_simulation": {
+        "mode": "static_non_mutating_contract",
+        "path": ["details"],
+    },
+}
+
 REQUIRED_FILES = [
     "AGENTS.md",
     "constitution/ANAYASA.md",
@@ -323,20 +342,62 @@ def _summarize_gate_group(payload, check_name, gate_names):
         "gates": gate_names,
     }
 
+def _simulation_evidence_contracts(payload):
+    tests = payload.get("tests")
+    if not isinstance(tests, dict):
+        return ["missing_tests_object"], {}
+
+    evidence = {}
+    failures = []
+
+    for gate_name, expected in SIMULATION_EVIDENCE_CONTRACTS.items():
+        current = tests.get(gate_name)
+        if not isinstance(current, dict):
+            failures.append(f"{gate_name}:missing_gate_payload")
+            evidence[gate_name] = {}
+            continue
+
+        for key in expected["path"]:
+            current = current.get(key) if isinstance(current, dict) else None
+
+        if not isinstance(current, dict):
+            failures.append(f"{gate_name}:missing_contract_payload")
+            evidence[gate_name] = {}
+            continue
+
+        gate_evidence = {
+            "mode": current.get("mode"),
+            "ok": current.get("ok"),
+        }
+        evidence[gate_name] = gate_evidence
+
+        if gate_evidence["ok"] is not True:
+            failures.append(f"{gate_name}:contract_not_ok")
+        if gate_evidence["mode"] != expected["mode"]:
+            failures.append(f"{gate_name}:mode_not_{expected['mode']}")
+
+    return failures, evidence
+
 def _summarize_simulation_group(payload):
     check = _summarize_gate_group(payload, "simulation_dry_run", STANDARD_REPORT_GATES["simulation_dry_run"])
     if check["status"] != "pass":
         return check
 
+    check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
     unsafe_flags = [name for name in NON_MUTATING_FLAGS if payload.get(name) is not False]
     if unsafe_flags:
         check["status"] = "fail"
         check["reason"] = "mutating_flags_not_false:" + ",".join(unsafe_flags)
-        check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
+        return check
+
+    evidence_failures, evidence = _simulation_evidence_contracts(payload)
+    check["simulation_contract_evidence"] = evidence
+    if evidence_failures:
+        check["status"] = "fail"
+        check["reason"] = "missing_simulation_contract_evidence:" + ",".join(evidence_failures)
         return check
 
     check["reason"] = "dry_run_non_mutating_simulation_gates_passed"
-    check["required_false_flags"] = {name: payload.get(name) for name in NON_MUTATING_FLAGS}
     return check
 
 def build_standard_quality_report(root=APP, generated_at=None):

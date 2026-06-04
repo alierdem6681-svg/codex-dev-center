@@ -57,6 +57,40 @@ worker_lifecycle_check = importlib.util.module_from_spec(WORKER_LIFECYCLE_SPEC)
 assert WORKER_LIFECYCLE_SPEC.loader is not None
 WORKER_LIFECYCLE_SPEC.loader.exec_module(worker_lifecycle_check)
 
+STANDARD_QUALITY_REPORT_GATES = [
+    "python_compile_check",
+    "json_validation",
+    "yaml_validation",
+    "secret_leakage_scan",
+    "forbidden_operation_scan",
+    "unit_test",
+    "integration_test",
+    "staging_smoke_test",
+    "rollback_simulation",
+    "restart_simulation",
+    "failure_injection_simulation",
+]
+
+
+def standard_quality_report_tests(include_simulation_contracts=True):
+    tests = {gate: {"ok": True, "status": "PASS"} for gate in STANDARD_QUALITY_REPORT_GATES}
+    if include_simulation_contracts:
+        tests["staging_smoke_test"]["details"] = {
+            "contract": {"ok": True, "mode": "dry_run_non_mutating_contract"}
+        }
+        tests["rollback_simulation"]["details"] = {
+            "contract": {"ok": True, "mode": "dry_run_non_mutating_contract"}
+        }
+        tests["restart_simulation"]["details"] = {
+            "ok": True,
+            "mode": "static_non_mutating_contract",
+        }
+        tests["failure_injection_simulation"]["details"] = {
+            "ok": True,
+            "mode": "static_non_mutating_contract",
+        }
+    return tests
+
 PANEL_SERVER_SPEC = importlib.util.spec_from_file_location(
     "panel_server_test_module",
     ROOT / "web_panel" / "panel_server.py",
@@ -208,23 +242,10 @@ class WorkerStatusModelTest(unittest.TestCase):
             root = Path(tmp)
             state = root / "state"
             state.mkdir()
-            gates = [
-                "python_compile_check",
-                "json_validation",
-                "yaml_validation",
-                "secret_leakage_scan",
-                "forbidden_operation_scan",
-                "unit_test",
-                "integration_test",
-                "staging_smoke_test",
-                "rollback_simulation",
-                "restart_simulation",
-                "failure_injection_simulation",
-            ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
                     {
-                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "tests": standard_quality_report_tests(),
                         "production_deploy_performed": False,
                         "staging_deploy_performed": False,
                         "mutating_cloud_operations_performed": False,
@@ -254,28 +275,40 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual({check["status"] for check in report["checks"]}, {"missing"})
         self.assertTrue(all(check["reason"].startswith("missing_artifact:") for check in report["checks"]))
 
+    def test_standard_quality_report_fails_without_simulation_contract_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir()
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": standard_quality_report_tests(include_simulation_contracts=False),
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+
+        self.assertEqual(report["status"], "fail")
+        simulation = next(check for check in report["checks"] if check["name"] == "simulation_dry_run")
+        self.assertEqual(simulation["status"], "fail")
+        self.assertIn("missing_simulation_contract_evidence", simulation["reason"])
+        self.assertIn("staging_smoke_test:missing_contract_payload", simulation["reason"])
+
     def test_standard_quality_report_fails_on_mutating_simulation_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             state = root / "state"
             state.mkdir()
-            gates = [
-                "python_compile_check",
-                "json_validation",
-                "yaml_validation",
-                "secret_leakage_scan",
-                "forbidden_operation_scan",
-                "unit_test",
-                "integration_test",
-                "staging_smoke_test",
-                "rollback_simulation",
-                "restart_simulation",
-                "failure_injection_simulation",
-            ]
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
                     {
-                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "tests": standard_quality_report_tests(),
                         "production_deploy_performed": False,
                         "staging_deploy_performed": True,
                         "mutating_cloud_operations_performed": False,
