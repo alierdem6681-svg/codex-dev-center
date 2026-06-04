@@ -589,6 +589,33 @@ def main_head() -> str:
     return head or git_head()
 
 
+def fast_forward_main_after_merge() -> dict[str, Any]:
+    root = command_root()
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root, timeout=30)
+    status = run(["git", "status", "--porcelain"], cwd=root, timeout=30)
+    if not branch.get("ok") or not status.get("ok"):
+        return {"ok": False, "status": "GIT_STATUS_UNAVAILABLE", "branch": branch, "worktree_status": status}
+    dirty = [line for line in status.get("stdout", "").splitlines() if line.strip()]
+    if dirty:
+        return {"ok": False, "status": "GIT_WORKTREE_DIRTY", "dirty_files": dirty[:20]}
+    if branch.get("stdout", "").strip() != "main":
+        return {"ok": False, "status": "GIT_BRANCH_NOT_MAIN", "branch": branch.get("stdout", "").strip()}
+    fetch = run(["git", "fetch", "origin", "main", "--prune"], cwd=root, timeout=120)
+    if not fetch.get("ok"):
+        return {"ok": False, "status": "GIT_FETCH_FAILED", "fetch": fetch}
+    before = run(["git", "rev-parse", "HEAD"], cwd=root, timeout=30)
+    ff = run(["git", "merge", "--ff-only", "origin/main"], cwd=root, timeout=120)
+    after = run(["git", "rev-parse", "HEAD"], cwd=root, timeout=30)
+    return {
+        "ok": bool(ff.get("ok")),
+        "status": "FAST_FORWARDED" if before.get("stdout") != after.get("stdout") else "ALREADY_UP_TO_DATE",
+        "before": before.get("stdout", "").strip(),
+        "after": after.get("stdout", "").strip(),
+        "fetch": fetch,
+        "merge": ff,
+    }
+
+
 def workflow_runs(workflow: str) -> dict[str, Any]:
     args = [
         "gh",
@@ -1141,7 +1168,8 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
     if pr.get("state") == "MERGED":
         merge_commit = ((pr.get("mergeCommit") or {}).get("oid") or "").strip()
         marked = mark_task_merged(task_id, merge_commit) if execute else {}
-        return {"ok": True, "status": "ALREADY_MERGED", "task_id": task_id, "pr": pr, "marked": marked}
+        source_sync = fast_forward_main_after_merge() if execute else {}
+        return {"ok": True, "status": "ALREADY_MERGED", "task_id": task_id, "pr": pr, "marked": marked, "source_sync": source_sync}
     if pr.get("state") != "OPEN":
         return {"ok": False, "status": "PR_NOT_OPEN", "task_id": task_id, "pr": pr}
     merge_state = str(pr.get("mergeStateStatus") or "").upper()
@@ -1182,6 +1210,7 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
         if after_pr.get("state") == "MERGED":
             merge_commit = ((after_pr.get("mergeCommit") or {}).get("oid") or "").strip()
             marked = mark_task_merged(task_id, merge_commit)
+            source_sync = fast_forward_main_after_merge()
             return {
                 "ok": True,
                 "status": "ALREADY_MERGED",
@@ -1190,6 +1219,7 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
                 "merge": merged,
                 "after_failure": after_failure,
                 "marked": marked,
+                "source_sync": source_sync,
             }
         conflict_pr = after_pr or pr
         conflict_reason = merge_failure_conflict_reason(merged, conflict_pr)
@@ -1218,6 +1248,7 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
     if not merge_commit:
         merge_commit = main_head()
     marked = mark_task_merged(task_id, merge_commit)
+    source_sync = fast_forward_main_after_merge()
     return {
         "ok": True,
         "status": "PR_MERGED",
@@ -1226,6 +1257,7 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
         "merge": merged,
         "after": after_payload,
         "marked": marked,
+        "source_sync": source_sync,
     }
 
 
