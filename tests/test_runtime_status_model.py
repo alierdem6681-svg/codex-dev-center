@@ -2883,6 +2883,11 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "pipeline_failed_requires_root_cause_mode")
 
+    def test_done_task_is_not_backlog_candidate(self):
+        task = {"id": "DONE-PARENT", "status": TASK_STATUS_DONE, "risk": "low", "title": "safe completed work"}
+
+        self.assertEqual(cto_autonomous_delivery.backlog_candidate_reason(task), "done_task_not_backlog_candidate")
+
     def test_backlog_candidate_skips_parent_with_existing_repo_apply_child(self):
         task = {
             "id": "PARENT",

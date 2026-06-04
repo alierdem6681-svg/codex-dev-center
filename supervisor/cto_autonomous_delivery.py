@@ -282,6 +282,8 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         return "already_child_task"
     if str(task.get("source", "")).lower() == "telegram" and status in ACTIVE_TASK_STATUSES:
         return "active_telegram_parent_reserved_for_cto"
+    if status == TASK_STATUS_DONE:
+        return "done_task_not_backlog_candidate"
     if status not in {
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED,
@@ -292,7 +294,6 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         TASK_STATUS_PROPOSAL_READY,
         TASK_STATUS_READY_FOR_VALIDATION,
         TASK_STATUS_VALIDATION_FAILED,
-        TASK_STATUS_DONE,
     }:
         return "status_not_recoverable_for_backlog_pilot"
     if status == TASK_STATUS_PIPELINE_FAILED and (
@@ -326,7 +327,6 @@ def select_backlog_candidate(queue: dict[str, Any]) -> dict[str, Any] | None:
         TASK_STATUS_PROPOSAL_READY: 6,
         TASK_STATUS_PROPOSAL_DONE: 7,
         TASK_STATUS_READY_FOR_VALIDATION: 8,
-        TASK_STATUS_DONE: 9,
     }
     candidates = [task for task in queue.get("tasks", []) if isinstance(task, dict) and is_backlog_candidate(task)]
     candidates.sort(
