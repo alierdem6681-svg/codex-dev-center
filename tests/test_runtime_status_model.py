@@ -3432,6 +3432,53 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertEqual(updated["smoke_run_url"], "https://example.invalid/runs/201")
         self.assertEqual(updated["smoke_commit"], "origin-main-sha")
 
+    def test_mark_task_deployed_propagates_to_parent_chain(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = {
+                "id": "ROOT",
+                "status": TASK_STATUS_PROPOSAL_READY,
+                "risk": "medium",
+                "delivery_level": "ROUTED",
+                "root_task_id": "ROOT",
+            }
+            backlog = {
+                "id": "BACKLOG",
+                "status": TASK_STATUS_PROPOSAL_DONE,
+                "risk": "medium",
+                "parent_task_id": "ROOT",
+                "root_task_id": "ROOT",
+                "delivery_level": "PROPOSAL_DONE",
+            }
+            apply_child = self.deployable_task("APPLY")
+            apply_child.update(
+                {
+                    "parent_task_id": "BACKLOG",
+                    "root_task_id": "BACKLOG",
+                    "source": "cto_backlog_dispatcher",
+                    "delivery_level": "READY_FOR_DEPLOY",
+                }
+            )
+            deploy_run = {
+                "databaseId": "300",
+                "url": "https://example.invalid/runs/300",
+                "headSha": "deploy-sha",
+                "status": "completed",
+                "conclusion": "success",
+            }
+            with self.patched_delivery_runtime(tmp, [root, backlog, apply_child]) as queue_path:
+                result = cto_autonomous_delivery.mark_task_deployed("APPLY", deploy_run, None)
+                queue = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        tasks = {task["id"]: task for task in queue["tasks"]}
+        self.assertEqual(result["propagated_parent_task_ids"], ["BACKLOG", "ROOT"])
+        self.assertEqual(tasks["APPLY"]["status"], TASK_STATUS_DEPLOYED)
+        self.assertEqual(tasks["BACKLOG"]["status"], TASK_STATUS_DEPLOYED)
+        self.assertEqual(tasks["ROOT"]["status"], TASK_STATUS_DEPLOYED)
+        self.assertEqual(tasks["BACKLOG"]["deployed_child_task_id"], "APPLY")
+        self.assertEqual(tasks["ROOT"]["deployed_child_task_id"], "APPLY")
+        self.assertEqual(tasks["ROOT"]["deploy_commit"], "deploy-sha")
+        self.assertEqual(tasks["ROOT"]["deploy_run_id"], "300")
+
     def test_deploy_success_without_successful_smoke_is_not_deployed(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-SMOKE-PENDING")

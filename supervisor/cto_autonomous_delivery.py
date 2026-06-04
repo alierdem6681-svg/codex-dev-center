@@ -887,34 +887,98 @@ def record_task_workflow_run(task_id: str, kind: str, run_payload: dict[str, Any
     return {"ok": True, "task_id": task_id, "kind": prefix, "run_id": run_id, "run_url": run_url}
 
 
-def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict[str, Any] | None = None) -> dict[str, Any]:
-    queue, task = find_task(task_id)
-    if not task:
-        return {"ok": False, "error": "task_not_found"}
+DEPLOY_PROPAGATION_BLOCKED_STATUSES = {
+    "ARCHIVED",
+    "ARCHIVED_STALE",
+    "CANCELLED",
+    "CANCELLED_BY_OWNER_CLEANUP",
+    "APPROVAL_REQUIRED",
+    "REQUIRES_APPROVAL",
+    "BLOCKED",
+}
+
+
+def task_index_by_id(queue: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {str(task.get("id") or ""): task for task in queue.get("tasks", []) if isinstance(task, dict)}
+
+
+def deploy_run_id(deploy_run: dict[str, Any]) -> str:
+    return str(deploy_run.get("databaseId") or deploy_run.get("run", {}).get("databaseId") or "")
+
+
+def deploy_run_url(deploy_run: dict[str, Any]) -> str:
+    return str(deploy_run.get("url") or deploy_run.get("run", {}).get("url") or "")
+
+
+def deploy_run_head_sha(deploy_run: dict[str, Any]) -> str:
+    return str(deploy_run.get("headSha") or deploy_run.get("run", {}).get("headSha") or "")
+
+
+def mark_deployed_fields(task: dict[str, Any], deploy_run: dict[str, Any], smoke_run: dict[str, Any] | None = None) -> None:
     task["status"] = TASK_STATUS_DEPLOYED
     task["production_deployed"] = True
+    task["repo_applied"] = True
+    task["branch_merged"] = True
     task["delivery_level"] = "DEPLOYED"
     task["deploy_in_progress"] = False
     task["deploy_retry_required"] = False
     task.pop("last_deploy_failure_status", None)
     task["deployment_status"] = "DEPLOYED"
-    task["deploy_run_id"] = str(deploy_run.get("databaseId") or deploy_run.get("run", {}).get("databaseId") or "")
-    task["deploy_run_url"] = deploy_run.get("url") or deploy_run.get("run", {}).get("url") or ""
+    task["deploy_run_id"] = deploy_run_id(deploy_run)
+    task["deploy_run_url"] = deploy_run_url(deploy_run)
     task["deploy_workflow_status"] = str(deploy_run.get("status") or "")
     task["deploy_workflow_conclusion"] = str(deploy_run.get("conclusion") or "")
     if deploy_run.get("local_vm_fallback"):
         task["local_vm_deploy_fallback_used"] = True
         task["local_vm_deploy_fallback_status"] = str(deploy_run.get("controller_status") or "PASS")
-    if deploy_run.get("headSha"):
-        task["deploy_commit"] = str(deploy_run.get("headSha"))
+    head_sha = deploy_run_head_sha(deploy_run)
+    if head_sha:
+        task["deploy_commit"] = head_sha
     if smoke_run:
         task["smoke_run_id"] = str(smoke_run.get("databaseId") or smoke_run.get("run", {}).get("databaseId") or "")
         task["smoke_run_url"] = smoke_run.get("url") or smoke_run.get("run", {}).get("url") or ""
         task["smoke_workflow_status"] = str(smoke_run.get("status") or "")
         task["smoke_workflow_conclusion"] = str(smoke_run.get("conclusion") or "")
-        if smoke_run.get("headSha"):
-            task["smoke_commit"] = str(smoke_run.get("headSha"))
+        smoke_head = str(smoke_run.get("headSha") or smoke_run.get("run", {}).get("headSha") or "")
+        if smoke_head:
+            task["smoke_commit"] = smoke_head
     task["updated_at"] = now()
+
+
+def propagate_deploy_to_parent_chain(queue: dict[str, Any], deployed_task: dict[str, Any], deploy_run: dict[str, Any], smoke_run: dict[str, Any] | None = None) -> list[str]:
+    by_id = task_index_by_id(queue)
+    changed: list[str] = []
+    visited: set[str] = set()
+    next_id = str(deployed_task.get("parent_task_id") or deployed_task.get("parent_task") or "")
+    if not next_id:
+        root_id = str(deployed_task.get("root_task_id") or "")
+        next_id = root_id if root_id and root_id != deployed_task.get("id") else ""
+
+    while next_id and next_id not in visited:
+        visited.add(next_id)
+        parent = by_id.get(next_id)
+        if not parent:
+            break
+        if normalize_status(parent.get("status")) in DEPLOY_PROPAGATION_BLOCKED_STATUSES:
+            break
+        mark_deployed_fields(parent, deploy_run, smoke_run)
+        parent["result"] = "deployed_via_child_task"
+        parent["deployed_child_task_id"] = deployed_task.get("id")
+        changed.append(str(parent.get("id") or ""))
+        parent_next = str(parent.get("parent_task_id") or parent.get("parent_task") or "")
+        root_id = str(parent.get("root_task_id") or "")
+        if not parent_next and root_id and root_id != parent.get("id"):
+            parent_next = root_id
+        next_id = parent_next
+    return changed
+
+
+def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict[str, Any] | None = None) -> dict[str, Any]:
+    queue, task = find_task(task_id)
+    if not task:
+        return {"ok": False, "error": "task_not_found"}
+    mark_deployed_fields(task, deploy_run, smoke_run)
+    propagated = propagate_deploy_to_parent_chain(queue, task, deploy_run, smoke_run)
     atomic_write_json(QUEUE, queue)
 
     state = read_json(DELIVERY_STATE, {})
@@ -929,7 +993,7 @@ def mark_task_deployed(task_id: str, deploy_run: dict[str, Any], smoke_run: dict
         }
     )
     atomic_write_json(DELIVERY_STATE, state)
-    return {"ok": True, "task": task}
+    return {"ok": True, "task": task, "propagated_parent_task_ids": propagated}
 
 
 def mark_task_merged(task_id: str, commit: str = "") -> dict[str, Any]:
