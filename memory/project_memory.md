@@ -389,3 +389,9 @@ Bu paket production deploy, staging deploy, gercek worker servisi restart, runti
 Worker claim ve finish akislari queue/worker state tutarliligi icin ortak transaction lock altina alindi. `worker_runner.claim_task()` artik queue task'ini `RUNNING` yaparken ayni kritik bolumde `workers.json.current_task`, worker status ve `last_seen` alanlarini yazar; worker zaten aktif `current_task` tasiyorsa ikinci task claim etmez.
 
 `worker_runner.finish_task()` queue terminal statusu ve worker `current_task=None` temizligini birlikte yazar. `supervisor_cli.dispatch()` ayni transaction lock sirasi altina alindi. Davranis `tests/test_runtime_status_model.py` claim/current_task regresyon testleriyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
+
+## 2026-06-04 Parallel Worker Lifecycle Recovery Apply
+
+Fleet ve lifecycle apply workspace'leri worker servis restart'i nedeniyle `FAILED_RETRYABLE` kaldiktan sonra current main uzerine elle entegre edildi. `lifecycle_manager.ensure_single_backlog_task()` artik bos paralel slot kadar repo-apply/dispatch child uretebilir; `worker_wake_plan()` pending ve aktif claim sayisini birlikte kullanarak sadece gereken worker servislerini start/stop eder.
+
+Delivery finalizer aktif worker task varken deploy veya local VM fallback denemez. Bu guard, deploy finalizer'in calisan worker servislerini restart edip `worker_service_restarted_before_completion` uretmesini engeller. Davranis paralel child creation, wake/sleep ve active-worker delivery guard regresyon testleriyle sabitlendi.

@@ -5,6 +5,8 @@
   "cto_role": "orchestrate_plan_assign_review_gate_deploy_health_rollback",
   "worker_role": "implement_or_prepare_changes_in_isolated_task_flow",
   "max_parallel_tasks": 4,
+  "backlog_dispatcher_parallel_slots": true,
+  "deploy_finalizer_requires_no_active_worker_tasks": true,
   "stable_successful_low_risk_deploy_threshold": 3,
   "allow_parallel_increase_after_stable": true,
   "production_deploy_requires_user_approval_for_normal_app_changes": false,

@@ -335,3 +335,11 @@ Faz 19B-10A Model Policy
 - [x] Worker finish akisi queue terminal status ve worker `current_task=None` temizligini ayni transaction altinda yapar.
 - [x] Dispatch de ayni transaction lock sirasi altina alinarak claim/assign yaris riski azaltildi.
 - [x] Worker current_task varken ayni worker'in ikinci task claim etmemesi unit test ile sabitlendi.
+
+## Faz 53 - Parallel Worker Lifecycle Recovery
+
+- [x] Backlog dispatcher bos paralel slot sayisi kadar apply/dispatch child uretebilir.
+- [x] Wake plan pending ve aktif worker task sayisini birlikte kullanir; aktif claim tasiyan worker korunur.
+- [x] Sleep karari pending ve aktif worker task sayisi sifir olmadan verilmez.
+- [x] Delivery finalizer aktif worker task varken deploy/local fallback denemez.
+- [x] Runtime status regresyon testleri paralel child creation, wake/sleep guard ve delivery guard davranislarini kapsar.

@@ -4,6 +4,9 @@
   "supervisor_assigns_tasks": true,
   "current_sleep_mode_implemented": true,
   "current_wake_mode_implemented": true,
+  "wake_plan_uses_pending_and_active_counts": true,
+  "sleep_requires_no_pending_or_active_worker_tasks": true,
+  "deploy_finalizer_waits_for_no_active_worker_tasks": true,
   "next_step": "implement_worker_sleep_wake_services",
   "updated_at": "2026-06-01T10:12:49.039459+00:00",
   "daemon_service": "codex-lifecycle.service"

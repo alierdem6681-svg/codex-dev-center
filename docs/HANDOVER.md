@@ -1028,3 +1028,23 @@ Test:
 Not:
 - Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.
+
+---
+
+## Parallel Worker Lifecycle Recovery Apply
+
+Tarih: 2026-06-04
+Görevler:
+- CTO-APPLY-20260604-163056 / CTO-TASK-20260604-162645-088956-WORKER-FLEET-PARALLEL-DISPATCH-CONTRACT
+- CTO-APPLY-20260604-163057 / CTO-TASK-20260604-162645-157342-WORKER-LIFECYCLE-MULTI-WAKE-FIX
+
+Eklenenler:
+- `supervisor/lifecycle_manager.py` backlog dispatcher bos slot sayisi kadar apply/dispatch child uretebilir; 4 worker bos ise 4 uygun is tek turda worker'a hazirlanir.
+- Wake plan pending ve aktif worker task sayisini birlikte kullanir; aktif claim tasiyan worker uykuya alinmaz.
+- Delivery finalizer aktif worker task varken deploy/fallback denemez; worker isleri tamamlanana kadar bekler.
+- `tests/test_runtime_status_model.py` paralel child creation, wake plan, sleep guard, dispatch fill ve active-worker delivery guard regresyon testleriyle genisletildi.
+- `state_templates/cto_delivery_policy.json`, `state_templates/worker_lifecycle_policy.json` ve module settings kontrat bayraklari guncellendi.
+
+Not:
+- Bu recovery, worker servis restart'i nedeniyle `FAILED_RETRYABLE` kalan iki apply workspace'inin kod/test ciktisini current main uzerine elle entegre etti.
+- Production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu commit icinde yapilmadi.

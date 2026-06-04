@@ -16,6 +16,7 @@ try:
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
@@ -26,7 +27,9 @@ try:
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
         TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_QUEUED,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_RUNNING,
         TASK_STATUS_STALLED,
         TASK_STATUS_VALIDATION_FAILED,
         atomic_write_json,
@@ -44,6 +47,7 @@ except ImportError:
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
+        TASK_STATUS_ASSIGNED,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
@@ -54,7 +58,9 @@ except ImportError:
         TASK_STATUS_PIPELINE_FAILED,
         TASK_STATUS_PROPOSAL_DONE,
         TASK_STATUS_PROPOSAL_READY,
+        TASK_STATUS_QUEUED,
         TASK_STATUS_READY_FOR_VALIDATION,
+        TASK_STATUS_RUNNING,
         TASK_STATUS_STALLED,
         TASK_STATUS_VALIDATION_FAILED,
         atomic_write_json,
@@ -74,6 +80,14 @@ QUEUE_PATH = STATE / "task_queue.json"
 SYSTEM_STATE_PATH = STATE / "system_state.json"
 
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
+PENDING_WORKER_STATUSES = {TASK_STATUS_PENDING, TASK_STATUS_QUEUED}
+CLAIMED_WORKER_STATUSES = {TASK_STATUS_ASSIGNED, TASK_STATUS_RUNNING}
+WAKE_SELECTION_STATUSES = [
+    TASK_STATUS_RUNNING,
+    TASK_STATUS_ASSIGNED,
+    TASK_STATUS_PENDING,
+    TASK_STATUS_QUEUED,
+]
 POLL_SECONDS = 5
 SLEEP_AFTER_IDLE_CYCLES = 4
 BACKLOG_DISPATCHER_SOURCE = "cto_backlog_dispatcher"
@@ -144,6 +158,9 @@ def systemctl_is_active(worker):
         log(f"SYSTEMCTL_IS_ACTIVE_ERROR worker={worker} err={exc}")
         return False
 
+def active_worker_services() -> set[str]:
+    return {worker for worker in WORKERS if systemctl_is_active(worker)}
+
 def update_worker_state(worker_id, status, note=""):
     with state_file_lock(WORKERS_PATH):
         data = read_json(WORKERS_PATH, {"workers": []})
@@ -175,16 +192,18 @@ def update_worker_state(worker_id, status, note=""):
             })
         write_json(WORKERS_PATH, data)
 
-def queue_counts():
+def worker_lifecycle_snapshot() -> dict[str, list[dict[str, Any]]]:
     q = read_json(QUEUE_PATH, {"tasks": []})
     q, _changes = normalize_queue_payload(q)
     tasks = q.get("tasks", [])
     worker_tasks = [t for t in tasks if is_worker_eligible_task(t)]
-    pending = [t for t in worker_tasks if normalize_status(t.get("status")) in ("PENDING", "QUEUED")]
-    assigned = [t for t in worker_tasks if normalize_status(t.get("status")) == "ASSIGNED"]
-    running = [t for t in worker_tasks if normalize_status(t.get("status")) == "RUNNING"]
-    active = pending + assigned + running
-    return len(pending), len(running), len(active)
+    pending = [t for t in worker_tasks if normalize_status(t.get("status")) in PENDING_WORKER_STATUSES]
+    claimed = [t for t in worker_tasks if normalize_status(t.get("status")) in CLAIMED_WORKER_STATUSES]
+    return {
+        "pending_tasks": pending,
+        "active_tasks": claimed,
+        "wake_tasks": claimed + pending,
+    }
 
 def choose_worker(title):
     text = str(title or "").lower()
@@ -203,16 +222,13 @@ def max_parallel_workers() -> int:
         configured = 1
     return max(1, min(len(WORKERS), configured))
 
-def selected_workers_for_active_mode() -> list[str]:
-    queue = read_json(QUEUE_PATH, {"tasks": []})
-    queue, _changes = normalize_queue_payload(queue)
-    tasks = [
-        task
-        for task in queue.get("tasks", [])
-        if is_worker_eligible_task(task) and normalize_status(task.get("status")) in {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
-    ]
+def _select_workers_for_tasks(
+    tasks: list[dict[str, Any]],
+    max_workers: int,
+    fallback_to_default: bool,
+) -> list[str]:
     selected: list[str] = []
-    max_workers = max_parallel_workers()
+
     def append_worker(worker_id: str) -> bool:
         chosen = worker_id if worker_id in WORKERS else ""
         if not chosen or chosen in selected:
@@ -225,7 +241,7 @@ def selected_workers_for_active_mode() -> list[str]:
         selected.append(chosen)
         return len(selected) >= max_workers
 
-    for status in ["RUNNING", "ASSIGNED", "PENDING", "QUEUED"]:
+    for status in WAKE_SELECTION_STATUSES:
         for task in tasks:
             if normalize_status(task.get("status")) != status:
                 continue
@@ -236,7 +252,49 @@ def selected_workers_for_active_mode() -> list[str]:
                 preferred = choose_worker(task.get("title") or task.get("id"))
             if append_worker(preferred):
                 return selected
-    return selected or ["worker-1"]
+    if selected or not fallback_to_default:
+        return selected
+    return ["worker-1"]
+
+def selected_workers_for_active_mode(fallback_to_default: bool = True) -> list[str]:
+    snapshot = worker_lifecycle_snapshot()
+    return _select_workers_for_tasks(snapshot["wake_tasks"], max_parallel_workers(), fallback_to_default)
+
+def worker_wake_plan(active_services: set[str] | None = None) -> dict[str, Any]:
+    snapshot = worker_lifecycle_snapshot()
+    max_workers = max_parallel_workers()
+    pending_count = len(snapshot["pending_tasks"])
+    active_count = len(snapshot["active_tasks"])
+    desired_worker_count = min(pending_count + active_count, max_workers)
+    selected = _select_workers_for_tasks(
+        snapshot["wake_tasks"],
+        desired_worker_count,
+        fallback_to_default=False,
+    )
+    awake = set(active_services) if active_services is not None else active_worker_services()
+    selected_set = set(selected)
+    workers_to_start = [worker for worker in selected if worker not in awake]
+    workers_to_stop = [worker for worker in WORKERS if worker in awake and worker not in selected_set]
+    return {
+        "pending_worker_eligible_count": pending_count,
+        "active_worker_eligible_count": active_count,
+        "desired_worker_count": desired_worker_count,
+        "awake_worker_count": len(awake),
+        "selected_workers": selected,
+        "workers_to_start": workers_to_start,
+        "workers_to_stop": workers_to_stop,
+        "parallel_limit": max_workers,
+    }
+
+def queue_counts():
+    snapshot = worker_lifecycle_snapshot()
+    pending = snapshot["pending_tasks"]
+    active = snapshot["active_tasks"]
+    running = [t for t in active if normalize_status(t.get("status")) == TASK_STATUS_RUNNING]
+    return len(pending), len(running), len(pending) + len(active)
+
+def should_sleep_workers(pending_count: int, active_count: int) -> bool:
+    return pending_count == 0 and active_count == 0
 
 def active_child_exists(tasks: list[dict[str, Any]], child_id: str | None) -> bool:
     if not child_id:
@@ -416,11 +474,13 @@ def dispatcher_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
         return task
     return None
 
-def ensure_autonomous_backlog_fallback() -> bool:
+def ensure_autonomous_backlog_fallback(state_updates: dict[str, Any] | None = None) -> bool:
+    state_updates = state_updates or {}
     try:
         payload = cto_autonomous_delivery.start_next_backlog(execute=True)
     except Exception as exc:
         update_system_state(
+            **state_updates,
             backlog_dispatcher_last_result="autonomous_backlog_error",
             backlog_dispatcher_fallback_error=str(exc)[:300],
         )
@@ -431,6 +491,7 @@ def ensure_autonomous_backlog_fallback() -> bool:
     if payload.get("ok") and status == "BACKLOG_CONTINUATION_CREATED":
         child = payload.get("child_task") or {}
         update_system_state(
+            **state_updates,
             backlog_dispatcher_last_result="autonomous_backlog_created",
             backlog_dispatcher_last_parent=payload.get("parent_task_id"),
             backlog_dispatcher_last_child=child.get("id"),
@@ -443,6 +504,7 @@ def ensure_autonomous_backlog_fallback() -> bool:
         return True
 
     update_system_state(
+        **state_updates,
         backlog_dispatcher_last_result=f"autonomous_backlog_{status.lower()}",
         backlog_dispatcher_fallback_ok=bool(payload.get("ok")),
     )
@@ -459,11 +521,15 @@ def ensure_single_backlog_task() -> bool:
         for t in worker_pending
         if normalize_status(t.get("status")) in {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
     ]
+    max_workers = max_parallel_workers()
+    available_slots = max(0, max_workers - len(worker_active))
     state_updates = {
         "backlog_dispatcher_active": True,
-        "backlog_dispatcher_mode": "single",
+        "backlog_dispatcher_mode": "parallel" if max_workers > 1 else "single",
+        "backlog_dispatcher_max_parallel_tasks": max_workers,
         "backlog_dispatcher_last_tick": now(),
         "backlog_dispatcher_worker_active": len(worker_active),
+        "backlog_dispatcher_available_slots": available_slots,
     }
     root_cause = cto_autonomous_delivery.root_cause_mode_status(queue)
     if root_cause.get("active"):
@@ -478,92 +544,125 @@ def ensure_single_backlog_task() -> bool:
             f"pipeline_failed={len(root_cause.get('pipeline_failed_child_ids', []))}"
         )
         return False
-    if len(worker_active) >= max_parallel_workers():
+    if available_slots <= 0:
         update_system_state(**state_updates, backlog_dispatcher_last_result="worker_active")
         return False
 
-    apply_parent = repo_apply_candidate(tasks)
-    if apply_parent:
-        evaluation = approval_required_payload(task_text(apply_parent))
-        if evaluation["approval_required"]:
-            mark_approval_required(apply_parent, evaluation["critical_operation_findings"])
-            write_json(QUEUE_PATH, queue)
-            update_system_state(
-                **state_updates,
-                backlog_dispatcher_last_result="repo_apply_approval_required",
-                backlog_dispatcher_last_parent=apply_parent.get("id"),
-            )
-            log(f"BACKLOG_DISPATCH repo_apply_approval_required parent={apply_parent.get('id')}")
-            return False
-        child = create_repo_apply_task(queue, apply_parent)
+    created_children: list[dict[str, str]] = []
+    approval_parent_id = ""
+    queue_changed = False
+
+    def remember_child(parent_id: str, child: dict[str, Any], mode: str) -> None:
+        created_children.append(
+            {
+                "parent": parent_id,
+                "child": str(child.get("id") or ""),
+                "mode": mode,
+                "worker": str(child.get("assigned_worker") or ""),
+            }
+        )
+        worker_active.append(child)
+
+    while len(created_children) < available_slots:
+        apply_parent = repo_apply_candidate(tasks)
+        if apply_parent:
+            evaluation = approval_required_payload(task_text(apply_parent))
+            if evaluation["approval_required"]:
+                mark_approval_required(apply_parent, evaluation["critical_operation_findings"])
+                approval_parent_id = str(apply_parent.get("id") or "")
+                queue_changed = True
+                log(f"BACKLOG_DISPATCH repo_apply_approval_required parent={approval_parent_id}")
+                continue
+            child = create_repo_apply_task(queue, apply_parent)
+            remember_child(str(apply_parent.get("id") or ""), child, "apply")
+            queue_changed = True
+            log(f"BACKLOG_DISPATCH repo_apply_created child={child.get('id')} parent={apply_parent.get('id')}")
+            continue
+
+        parent = dispatcher_candidate(tasks)
+        if not parent:
+            break
+
+        parent_id = str(parent.get("id") or "TASK")
+        mode = backlog_dispatch_mode(normalize_status(parent.get("status")))
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        child_id = f"CTO-DISPATCH-{stamp}-{safe_id(parent_id)}"
+        risk = normalize_risk(parent.get("risk") or parent.get("risk_level") or "medium")
+        if risk in {"high", "critical"}:
+            mark_approval_required(parent, ["risk_requires_approval"])
+            approval_parent_id = parent_id
+            queue_changed = True
+            log(f"BACKLOG_DISPATCH approval_required parent={parent_id} risk={risk}")
+            continue
+
+        title = parent.get("title") or parent_id
+        child = {
+            "id": child_id,
+            "title": f"{mode.title()}: {str(title)[:80]}",
+            "description": backlog_description(parent, mode),
+            "status": TASK_STATUS_PENDING,
+            "source": BACKLOG_DISPATCHER_SOURCE,
+            "parent_task": parent_id,
+            "risk": risk,
+            "risk_level": risk,
+            "assigned_worker": choose_worker(title),
+            "worker_eligible": True,
+            "dispatcher_mode": mode,
+            "created_at": now(),
+            "updated_at": now(),
+            "repo_applied": False,
+            "production_deployed": False,
+            "validation_status": "PENDING" if mode == "validation" else "NOT_READY",
+            "pipeline_status": "NOT_RUN",
+            "delivery_level": "BACKLOG_DISPATCH",
+        }
+        tasks.append(child)
+        parent["backlog_dispatcher_child"] = child_id
+        parent["backlog_dispatcher_attempts"] = int(parent.get("backlog_dispatcher_attempts", 0) or 0) + 1
+        parent["backlog_dispatcher_last_mode"] = mode
+        parent["updated_at"] = now()
+        remember_child(parent_id, child, mode)
+        queue_changed = True
+        log(f"BACKLOG_DISPATCH created child={child_id} parent={parent_id} mode={mode}")
+
+    if created_children:
+        write_json(QUEUE_PATH, queue)
+        last_child = created_children[-1]
+        result = "parallel_children_created"
+        if len(created_children) == 1:
+            result = "repo_apply_created" if last_child["mode"] == "apply" else "created"
+        final_state_updates = {
+            **state_updates,
+            "backlog_dispatcher_last_result": result,
+            "backlog_dispatcher_last_parent": last_child["parent"],
+            "backlog_dispatcher_last_child": last_child["child"],
+            "backlog_dispatcher_last_children": created_children,
+            "backlog_dispatcher_created_count": len(created_children),
+            "backlog_dispatcher_last_mode": last_child["mode"],
+            "backlog_dispatcher_worker_active": len(worker_active),
+            "backlog_dispatcher_available_slots": max(0, max_workers - len(worker_active)),
+        }
+        update_system_state(**final_state_updates)
+        return True
+
+    if queue_changed:
         write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
-            backlog_dispatcher_last_result="repo_apply_created",
-            backlog_dispatcher_last_parent=apply_parent.get("id"),
-            backlog_dispatcher_last_child=child.get("id"),
-            backlog_dispatcher_last_mode="apply",
+            backlog_dispatcher_last_result="approval_required",
+            backlog_dispatcher_last_parent=approval_parent_id,
         )
-        log(f"BACKLOG_DISPATCH repo_apply_created child={child.get('id')} parent={apply_parent.get('id')}")
+        return False
+
+    if ensure_autonomous_backlog_fallback(state_updates):
         return True
-
-    parent = dispatcher_candidate(tasks)
-    if not parent:
-        if ensure_autonomous_backlog_fallback():
-            return True
-        recoverable = sum(1 for t in tasks if normalize_status(t.get("status")) in BACKLOG_RECOVERABLE_STATUSES)
-        update_system_state(
-            **state_updates,
-            backlog_dispatcher_last_result="no_recoverable_worker_eligible_task",
-            backlog_dispatcher_recoverable_count=recoverable,
-        )
-        return False
-
-    parent_id = str(parent.get("id") or "TASK")
-    mode = backlog_dispatch_mode(normalize_status(parent.get("status")))
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    child_id = f"CTO-DISPATCH-{stamp}-{safe_id(parent_id)}"
-    risk = normalize_risk(parent.get("risk") or parent.get("risk_level") or "medium")
-    if risk in {"high", "critical"}:
-        update_system_state(**state_updates, backlog_dispatcher_last_result="approval_required")
-        return False
-
-    title = parent.get("title") or parent_id
-    child = {
-        "id": child_id,
-        "title": f"{mode.title()}: {str(title)[:80]}",
-        "description": backlog_description(parent, mode),
-        "status": TASK_STATUS_PENDING,
-        "source": BACKLOG_DISPATCHER_SOURCE,
-        "parent_task": parent_id,
-        "risk": risk,
-        "risk_level": risk,
-        "assigned_worker": choose_worker(title),
-        "worker_eligible": True,
-        "dispatcher_mode": mode,
-        "created_at": now(),
-        "updated_at": now(),
-        "repo_applied": False,
-        "production_deployed": False,
-        "validation_status": "PENDING" if mode == "validation" else "NOT_READY",
-        "pipeline_status": "NOT_RUN",
-        "delivery_level": "BACKLOG_DISPATCH",
-    }
-    tasks.append(child)
-    parent["backlog_dispatcher_child"] = child_id
-    parent["backlog_dispatcher_attempts"] = int(parent.get("backlog_dispatcher_attempts", 0) or 0) + 1
-    parent["backlog_dispatcher_last_mode"] = mode
-    parent["updated_at"] = now()
-    write_json(QUEUE_PATH, queue)
+    recoverable = sum(1 for t in tasks if normalize_status(t.get("status")) in BACKLOG_RECOVERABLE_STATUSES)
     update_system_state(
         **state_updates,
-        backlog_dispatcher_last_result="created",
-        backlog_dispatcher_last_parent=parent_id,
-        backlog_dispatcher_last_child=child_id,
-        backlog_dispatcher_last_mode=mode,
+        backlog_dispatcher_last_result="no_recoverable_worker_eligible_task",
+        backlog_dispatcher_recoverable_count=recoverable,
     )
-    log(f"BACKLOG_DISPATCH created child={child_id} parent={parent_id} mode={mode}")
-    return True
+    return False
 
 def validation_candidate_count() -> int:
     queue = read_json(QUEUE_PATH, {"tasks": []})
@@ -640,7 +739,9 @@ def run_delivery_finalizer() -> bool:
         log(f"DELIVERY_FINALIZER_ERROR {exc}")
         return False
 
-def maybe_run_delivery(last_delivery: float) -> tuple[float, bool]:
+def maybe_run_delivery(last_delivery: float, active_worker_task_count: int) -> tuple[float, bool]:
+    if active_worker_task_count > 0:
+        return last_delivery, False
     current = time.monotonic()
     if current - last_delivery < DELIVERY_INTERVAL_SECONDS:
         return last_delivery, False
@@ -673,20 +774,57 @@ def sleep_now():
     return {"ok": True, "mode": "SLEEPING"}
 
 def wake_now():
-    selected = set(selected_workers_for_active_mode())
-    max_workers = max_parallel_workers()
-    log(f"WAKE_NOW requested selected={','.join(sorted(selected))}")
+    plan = worker_wake_plan()
+    selected = set(plan["selected_workers"])
+    max_workers = int(plan["parallel_limit"])
+    log(
+        "WAKE_NOW requested "
+        f"pending={plan['pending_worker_eligible_count']} "
+        f"active={plan['active_worker_eligible_count']} "
+        f"awake={plan['awake_worker_count']} "
+        f"desired={plan['desired_worker_count']} "
+        f"selected={','.join(plan['selected_workers'])}"
+    )
+    if not selected:
+        for w in WORKERS:
+            update_worker_state(w, "SLEEPING", "wake_plan_no_worker_eligible_work")
+        for w in plan["workers_to_stop"]:
+            systemctl("stop", w)
+        update_system_state(
+            worker_sleep_wake_implemented=True,
+            worker_fleet_mode="SLEEPING",
+            worker_single_mode_active=False,
+            worker_parallel_mode_active=False,
+            worker_parallel_limit=max_workers,
+            worker_single_mode_selected=[],
+            worker_lifecycle_pending_count=plan["pending_worker_eligible_count"],
+            worker_lifecycle_active_count=plan["active_worker_eligible_count"],
+            worker_lifecycle_awake_count=plan["awake_worker_count"],
+            worker_lifecycle_desired_count=plan["desired_worker_count"],
+            worker_lifecycle_workers_to_start=[],
+        )
+        return {
+            "ok": True,
+            "mode": "SLEEPING",
+            "selected_workers": [],
+            "workers_to_start": [],
+            "workers_to_stop": plan["workers_to_stop"],
+            "parallel_limit": max_workers,
+            "pending_worker_eligible_count": plan["pending_worker_eligible_count"],
+            "active_worker_eligible_count": plan["active_worker_eligible_count"],
+            "desired_worker_count": plan["desired_worker_count"],
+            "awake_worker_count": plan["awake_worker_count"],
+        }
     for w in WORKERS:
         if w in selected:
             update_worker_state(w, "IDLE", "woken_by_lifecycle_active_mode")
         else:
-            update_worker_state(w, "SLEEPING", "single_mode_not_selected")
+            update_worker_state(w, "SLEEPING", "wake_plan_not_selected")
     dispatch()
-    for w in WORKERS:
-        if w in selected:
-            systemctl("start", w)
-        else:
-            systemctl("stop", w)
+    for w in plan["workers_to_start"]:
+        systemctl("start", w)
+    for w in plan["workers_to_stop"]:
+        systemctl("stop", w)
     update_system_state(
         worker_sleep_wake_implemented=True,
         worker_fleet_mode="AWAKE_PARALLEL" if max_workers > 1 else "AWAKE_SINGLE",
@@ -694,12 +832,23 @@ def wake_now():
         worker_parallel_mode_active=max_workers > 1,
         worker_parallel_limit=max_workers,
         worker_single_mode_selected=sorted(selected),
+        worker_lifecycle_pending_count=plan["pending_worker_eligible_count"],
+        worker_lifecycle_active_count=plan["active_worker_eligible_count"],
+        worker_lifecycle_awake_count=plan["awake_worker_count"],
+        worker_lifecycle_desired_count=plan["desired_worker_count"],
+        worker_lifecycle_workers_to_start=plan["workers_to_start"],
     )
     return {
         "ok": True,
         "mode": "AWAKE_PARALLEL" if max_workers > 1 else "AWAKE_SINGLE",
         "selected_workers": sorted(selected),
+        "workers_to_start": plan["workers_to_start"],
+        "workers_to_stop": plan["workers_to_stop"],
         "parallel_limit": max_workers,
+        "pending_worker_eligible_count": plan["pending_worker_eligible_count"],
+        "active_worker_eligible_count": plan["active_worker_eligible_count"],
+        "desired_worker_count": plan["desired_worker_count"],
+        "awake_worker_count": plan["awake_worker_count"],
     }
 
 def update_system_state(**updates):
@@ -719,7 +868,7 @@ def daemon():
         last_validation, validation_changed = maybe_run_validation(last_validation)
         if validation_changed:
             pending, running, active = queue_counts()
-        last_delivery, _delivery_changed = maybe_run_delivery(last_delivery)
+        last_delivery, _delivery_changed = maybe_run_delivery(last_delivery, active)
 
         if active < max_parallel_workers():
             created = ensure_single_backlog_task()
@@ -731,7 +880,7 @@ def daemon():
             log(f"QUEUE_HAS_PENDING pending={pending}; waking workers")
             wake_now()
 
-        elif active == 0:
+        elif should_sleep_workers(pending, active):
             idle_cycles += 1
             log(f"QUEUE_EMPTY idle_cycles={idle_cycles}")
             if idle_cycles >= SLEEP_AFTER_IDLE_CYCLES:

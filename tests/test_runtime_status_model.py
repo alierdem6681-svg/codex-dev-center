@@ -3801,6 +3801,74 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
         self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
 
+    def test_backlog_dispatcher_creates_apply_children_up_to_parallel_capacity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            system_state_path = state / "system_state.json"
+            parent_titles = [
+                ("PARENT-1", "Backend API contract"),
+                ("PARENT-2", "Dashboard panel contract"),
+                ("PARENT-3", "Deploy service contract"),
+                ("PARENT-4", "Quality gate test contract"),
+            ]
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": task_id,
+                                "status": TASK_STATUS_PROPOSAL_DONE,
+                                "risk": "medium",
+                                "title": title,
+                            }
+                            for task_id, title in parent_titles
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                lifecycle_manager.QUEUE_PATH,
+                lifecycle_manager.SYSTEM_STATE_PATH,
+                lifecycle_manager.max_parallel_workers,
+            )
+            lifecycle_manager.QUEUE_PATH = queue_path
+            lifecycle_manager.SYSTEM_STATE_PATH = system_state_path
+            lifecycle_manager.max_parallel_workers = lambda: 4
+            try:
+                created = lifecycle_manager.ensure_single_backlog_task()
+            finally:
+                (
+                    lifecycle_manager.QUEUE_PATH,
+                    lifecycle_manager.SYSTEM_STATE_PATH,
+                    lifecycle_manager.max_parallel_workers,
+                ) = originals
+
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+            system_state = json.loads(system_state_path.read_text(encoding="utf-8"))
+
+        children = [task for task in queue["tasks"] if task.get("source") == lifecycle_manager.BACKLOG_DISPATCHER_SOURCE]
+        parents = {task["id"]: task for task in queue["tasks"] if task["id"].startswith("PARENT-")}
+        self.assertTrue(created)
+        self.assertEqual(len(children), 4)
+        self.assertEqual([child["status"] for child in children], ["PENDING", "PENDING", "PENDING", "PENDING"])
+        self.assertEqual([child["dispatcher_mode"] for child in children], ["apply", "apply", "apply", "apply"])
+        self.assertEqual([child["execution_mode"] for child in children], ["repo_apply"] * 4)
+        self.assertEqual(
+            [child["assigned_worker"] for child in children],
+            ["worker-1", "worker-2", "worker-3", "worker-4"],
+        )
+        self.assertTrue(all(parents[parent_id].get("repo_apply_child") for parent_id, _title in parent_titles))
+        self.assertEqual(system_state["backlog_dispatcher_mode"], "parallel")
+        self.assertEqual(system_state["backlog_dispatcher_max_parallel_tasks"], 4)
+        self.assertEqual(system_state["backlog_dispatcher_created_count"], 4)
+        self.assertEqual(system_state["backlog_dispatcher_available_slots"], 0)
+        self.assertEqual(system_state["backlog_dispatcher_last_result"], "parallel_children_created")
+
     def test_pr_ready_merge_blocked_child_does_not_create_repo_apply_retry(self):
         tasks = [
             {
@@ -3936,6 +4004,121 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
         self.assertEqual(selected, ["worker-1", "worker-2"])
 
+    def test_wake_plan_uses_pending_count_for_parallel_worker_targets(self):
+        original_queue_path = lifecycle_manager.QUEUE_PATH
+        original_max_parallel = lifecycle_manager.max_parallel_workers
+        lifecycle_manager.max_parallel_workers = lambda: 4
+        try:
+            for pending_count, expected_workers in [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 4)]:
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "task_queue.json"
+                    path.write_text(
+                        json.dumps(
+                            {
+                                "tasks": [
+                                    {
+                                        "id": f"TASK-{index}",
+                                        "status": "PENDING",
+                                        "source": "cto",
+                                        "risk": "low",
+                                        "worker_eligible": True,
+                                        "assigned_worker": lifecycle_manager.WORKERS[index % len(lifecycle_manager.WORKERS)],
+                                    }
+                                    for index in range(pending_count)
+                                ]
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    lifecycle_manager.QUEUE_PATH = path
+                    plan = lifecycle_manager.worker_wake_plan(active_services=set())
+
+                self.assertEqual(plan["pending_worker_eligible_count"], pending_count)
+                self.assertEqual(plan["active_worker_eligible_count"], 0)
+                self.assertEqual(plan["desired_worker_count"], expected_workers)
+                self.assertEqual(len(plan["selected_workers"]), expected_workers)
+                self.assertEqual(len(plan["workers_to_start"]), expected_workers)
+        finally:
+            lifecycle_manager.QUEUE_PATH = original_queue_path
+            lifecycle_manager.max_parallel_workers = original_max_parallel
+
+    def test_wake_plan_keeps_active_claims_and_fills_pending_capacity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "task_queue.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "ACTIVE",
+                                "status": "RUNNING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-1",
+                            },
+                            {
+                                "id": "PENDING-2",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-2",
+                            },
+                            {
+                                "id": "PENDING-3",
+                                "status": "QUEUED",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-3",
+                            },
+                            {
+                                "id": "PENDING-4",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "risk": "low",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-4",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            originals = (lifecycle_manager.QUEUE_PATH, lifecycle_manager.max_parallel_workers)
+            lifecycle_manager.QUEUE_PATH = path
+            lifecycle_manager.max_parallel_workers = lambda: 4
+            try:
+                plan = lifecycle_manager.worker_wake_plan(active_services={"worker-1"})
+            finally:
+                lifecycle_manager.QUEUE_PATH, lifecycle_manager.max_parallel_workers = originals
+
+        self.assertEqual(plan["active_worker_eligible_count"], 1)
+        self.assertEqual(plan["pending_worker_eligible_count"], 3)
+        self.assertEqual(plan["desired_worker_count"], 4)
+        self.assertEqual(set(plan["selected_workers"]), {"worker-1", "worker-2", "worker-3", "worker-4"})
+        self.assertEqual(set(plan["workers_to_start"]), {"worker-2", "worker-3", "worker-4"})
+
+    def test_should_sleep_workers_requires_no_pending_or_active_work(self):
+        self.assertTrue(lifecycle_manager.should_sleep_workers(0, 0))
+        self.assertFalse(lifecycle_manager.should_sleep_workers(1, 0))
+        self.assertFalse(lifecycle_manager.should_sleep_workers(0, 1))
+        self.assertFalse(lifecycle_manager.should_sleep_workers(1, 1))
+
+    def test_delivery_finalizer_waits_while_worker_tasks_are_active(self):
+        calls = []
+        original = lifecycle_manager.run_delivery_finalizer
+        lifecycle_manager.run_delivery_finalizer = lambda: calls.append("finalizer") or True
+        try:
+            last_delivery, changed = lifecycle_manager.maybe_run_delivery(0.0, active_worker_task_count=2)
+        finally:
+            lifecycle_manager.run_delivery_finalizer = original
+
+        self.assertEqual(last_delivery, 0.0)
+        self.assertFalse(changed)
+        self.assertEqual(calls, [])
+
     def test_dispatch_preserves_preassigned_worker(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
@@ -4009,6 +4192,88 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(worker_map["worker-2"]["current_task"], "TASK-PREASSIGNED")
         self.assertEqual(tasks["TASK-UNASSIGNED"]["assigned_worker"], "worker-4")
         self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-UNASSIGNED")
+
+    def test_dispatch_fills_four_idle_workers_in_single_round(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps(
+                    {
+                        "workers": [
+                            {"id": "worker-1", "status": "IDLE", "current_task": None},
+                            {"id": "worker-2", "status": "IDLE", "current_task": None},
+                            {"id": "worker-3", "status": "IDLE", "current_task": None},
+                            {"id": "worker-4", "status": "IDLE", "current_task": None},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": f"TASK-{idx}",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "worker_eligible": True,
+                                "assigned_worker": None,
+                            }
+                            for idx in range(1, 5)
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            try:
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            workers = json.loads((state / "workers.json").read_text(encoding="utf-8"))
+            result = json.loads(output.getvalue())
+
+        self.assertEqual(len(result["assignments"]), 4)
+        self.assertEqual(
+            result["assignments"],
+            [
+                {"worker": "worker-1", "task": "TASK-1"},
+                {"worker": "worker-2", "task": "TASK-2"},
+                {"worker": "worker-3", "task": "TASK-3"},
+                {"worker": "worker-4", "task": "TASK-4"},
+            ],
+        )
+        self.assertEqual([task["status"] for task in queue["tasks"]], ["ASSIGNED"] * 4)
+        self.assertEqual(
+            [task["assigned_worker"] for task in queue["tasks"]],
+            ["worker-1", "worker-2", "worker-3", "worker-4"],
+        )
+        self.assertEqual(
+            [worker["current_task"] for worker in workers["workers"]],
+            ["TASK-1", "TASK-2", "TASK-3", "TASK-4"],
+        )
 
     def test_dispatch_rebalances_pending_task_when_preassigned_worker_is_busy(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -4306,15 +4571,22 @@ class BacklogDispatcherModelTest(unittest.TestCase):
     def test_wake_now_dispatches_before_starting_worker_services(self):
         calls = []
         originals = (
-            lifecycle_manager.selected_workers_for_active_mode,
-            lifecycle_manager.max_parallel_workers,
+            lifecycle_manager.worker_wake_plan,
             lifecycle_manager.update_worker_state,
             lifecycle_manager.dispatch,
             lifecycle_manager.systemctl,
             lifecycle_manager.update_system_state,
         )
-        lifecycle_manager.selected_workers_for_active_mode = lambda: ["worker-1"]
-        lifecycle_manager.max_parallel_workers = lambda: 1
+        lifecycle_manager.worker_wake_plan = lambda: {
+            "pending_worker_eligible_count": 1,
+            "active_worker_eligible_count": 0,
+            "desired_worker_count": 1,
+            "awake_worker_count": 0,
+            "selected_workers": ["worker-1"],
+            "workers_to_start": ["worker-1"],
+            "workers_to_stop": [],
+            "parallel_limit": 1,
+        }
         lifecycle_manager.update_worker_state = lambda worker, status, note="": calls.append(("state", worker, status))
         lifecycle_manager.dispatch = lambda: calls.append(("dispatch",))
         lifecycle_manager.systemctl = lambda action, worker: calls.append(("systemctl", action, worker)) or True
@@ -4323,8 +4595,7 @@ class BacklogDispatcherModelTest(unittest.TestCase):
             result = lifecycle_manager.wake_now()
         finally:
             (
-                lifecycle_manager.selected_workers_for_active_mode,
-                lifecycle_manager.max_parallel_workers,
+                lifecycle_manager.worker_wake_plan,
                 lifecycle_manager.update_worker_state,
                 lifecycle_manager.dispatch,
                 lifecycle_manager.systemctl,
@@ -4339,6 +4610,46 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         )
         self.assertLess(dispatch_index, first_start_index)
         self.assertIn(("state", "worker-1", "IDLE"), calls[:dispatch_index])
+
+    def test_wake_now_sleeps_without_dispatch_when_no_worker_eligible_work_exists(self):
+        calls = []
+        originals = (
+            lifecycle_manager.worker_wake_plan,
+            lifecycle_manager.update_worker_state,
+            lifecycle_manager.dispatch,
+            lifecycle_manager.systemctl,
+            lifecycle_manager.update_system_state,
+        )
+        lifecycle_manager.worker_wake_plan = lambda: {
+            "pending_worker_eligible_count": 0,
+            "active_worker_eligible_count": 0,
+            "desired_worker_count": 0,
+            "awake_worker_count": 1,
+            "selected_workers": [],
+            "workers_to_start": [],
+            "workers_to_stop": ["worker-1"],
+            "parallel_limit": 4,
+        }
+        lifecycle_manager.update_worker_state = lambda worker, status, note="": calls.append(("state", worker, status))
+        lifecycle_manager.dispatch = lambda: calls.append(("dispatch",))
+        lifecycle_manager.systemctl = lambda action, worker: calls.append(("systemctl", action, worker)) or True
+        lifecycle_manager.update_system_state = lambda **updates: calls.append(("system_state", updates))
+        try:
+            result = lifecycle_manager.wake_now()
+        finally:
+            (
+                lifecycle_manager.worker_wake_plan,
+                lifecycle_manager.update_worker_state,
+                lifecycle_manager.dispatch,
+                lifecycle_manager.systemctl,
+                lifecycle_manager.update_system_state,
+            ) = originals
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["mode"], "SLEEPING")
+        self.assertNotIn(("dispatch",), calls)
+        self.assertIn(("systemctl", "stop", "worker-1"), calls)
+        self.assertTrue(all(call[2] == "SLEEPING" for call in calls if call[0] == "state"))
 
     def test_no_standard_candidate_uses_autonomous_backlog_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
