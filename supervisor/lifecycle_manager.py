@@ -706,7 +706,11 @@ def daemon():
             idle_cycles += 1
             log(f"QUEUE_EMPTY idle_cycles={idle_cycles}")
             if idle_cycles >= SLEEP_AFTER_IDLE_CYCLES:
-                sleep_now()
+                state = read_json(SYSTEM_STATE_PATH, {})
+                if state.get("worker_fleet_mode") == "SLEEPING":
+                    log("QUEUE_EMPTY workers_already_sleeping")
+                else:
+                    sleep_now()
                 idle_cycles = SLEEP_AFTER_IDLE_CYCLES
         else:
             idle_cycles = 0

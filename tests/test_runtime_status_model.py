@@ -25,6 +25,7 @@ from supervisor import (  # noqa: E402
     direct_cto_async_job,
     direct_cto_progress_watcher,
     supervisor_cli,
+    task_recovery_engine,
     task_validation_engine,
     telegram_direct_cto,
     telegram_direct_cto_simulator,
@@ -2199,6 +2200,59 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(pending, 2)
         self.assertEqual(running, 1)
         self.assertEqual(active, 4)
+
+    def test_task_recovery_preserves_ready_phase_on_empty_queue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            logs = runtime / "logs"
+            state.mkdir()
+            reports.mkdir()
+            logs.mkdir()
+            (state / "task_queue.json").write_text(json.dumps({"tasks": []}), encoding="utf-8")
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-1", "status": "SLEEPING", "current_task": None}]}),
+                encoding="utf-8",
+            )
+            (state / "system_state.json").write_text(
+                json.dumps(
+                    {
+                        "phase": "READY_FOR_NEW_TASKS",
+                        "system_state": "READY_FOR_NEW_TASKS",
+                        "state": "READY_FOR_NEW_TASKS",
+                        "ready_for_new_tasks": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                task_recovery_engine.APP,
+                task_recovery_engine.STATE,
+                task_recovery_engine.REPORTS,
+                task_recovery_engine.LOGS,
+            )
+            task_recovery_engine.APP = runtime
+            task_recovery_engine.STATE = state
+            task_recovery_engine.REPORTS = reports
+            task_recovery_engine.LOGS = logs
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    task_recovery_engine.main()
+            finally:
+                (
+                    task_recovery_engine.APP,
+                    task_recovery_engine.STATE,
+                    task_recovery_engine.REPORTS,
+                    task_recovery_engine.LOGS,
+                ) = originals
+
+            system_state = json.loads((state / "system_state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(system_state["phase"], "READY_FOR_NEW_TASKS")
+        self.assertEqual(system_state["system_state"], "READY_FOR_NEW_TASKS")
+        self.assertEqual(system_state["state"], "READY_FOR_NEW_TASKS")
 
     def test_owner_cleanup_archives_and_empties_queue(self):
         spec = importlib.util.spec_from_file_location(

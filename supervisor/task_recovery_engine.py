@@ -295,9 +295,12 @@ def main():
         save_json(wpath, workers)
 
     state = load_json(spath, {})
+    queue_empty = not tasks
 
     state.update({
-        "phase": "step_23a_task_recovery_engine_active",
+        "phase": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else "step_23a_task_recovery_engine_active",
+        "system_state": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else state.get("system_state"),
+        "state": "READY_FOR_NEW_TASKS" if queue_empty and state.get("ready_for_new_tasks") else state.get("state"),
         "task_recovery_engine_active": True,
         "task_recovery_last_run": now(),
         "task_recovery_ready_for_validation_or_proposal_ready": recovered,
