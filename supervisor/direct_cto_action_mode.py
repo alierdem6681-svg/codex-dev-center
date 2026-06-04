@@ -67,6 +67,44 @@ def build_backlog(raw_text, run_id):
     text = (raw_text or "").lower()
     tasks = []
 
+    telegram_asset_requested = "telegram" in text and any(x in text for x in [
+        "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
+        "görsel", "gorsel", "media", "medya"
+    ])
+
+    if telegram_asset_requested:
+        tasks = [
+            make_task(
+                run_id, 1,
+                "telegram-asset-intake-backend",
+                "Telegram Asset Intake Backend",
+                "Telegram CTO hattinda fotoğraf, doküman ve caption gibi metin dışı mesajları güvenli şekilde algılayacak backend planını üret. Secret/token/env değeri okuma veya gösterme.",
+                "worker-1"
+            ),
+            make_task(
+                run_id, 2,
+                "telegram-asset-storage-manifest",
+                "Telegram Asset Storage And Manifest",
+                "Telegram getFile indirme akışı, boyut limiti, mime/hash kaydı, runtime asset inbox dizini ve manifest sözleşmesi için güvenli plan üret. Repo içine ham dosya koyma.",
+                "worker-3"
+            ),
+            make_task(
+                run_id, 3,
+                "dashboard-telegram-asset-inbox",
+                "Dashboard Telegram Asset Inbox",
+                "Dashboardda salt okunur Telegram Asset Inbox görünümü, asset metadata listesi, caption ve güvenli referans gösterimi için UI/API planı üret.",
+                "worker-2"
+            ),
+            make_task(
+                run_id, 4,
+                "telegram-asset-safety-tests",
+                "Telegram Asset Safety Tests",
+                "Asset kabul, limit, manifest, secret redaction, Telegram simulator, dashboard smoke ve hata durumları için test planı ve risk raporu üret.",
+                "worker-4"
+            ),
+        ]
+        return tasks
+
     stabilization_requested = any(x in text for x in [
         "queue/status", "normalizer", "stale running", "race fix",
         "deterministic proposal", "proposal artifact", "quality gate",

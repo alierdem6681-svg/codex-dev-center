@@ -19,6 +19,7 @@ from supervisor import (  # noqa: E402
     critical_operation_policy,
     cto_autonomous_delivery,
     cto_task_router,
+    direct_cto_action_mode,
     direct_cto_job_recovery,
     lifecycle_manager,
     production_deploy_controller,
@@ -909,6 +910,33 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(result["route"], "async_job")
         self.assertEqual(result["ack_deadline_seconds"], 3)
 
+    def test_development_followup_routes_to_action_async_job(self):
+        result = telegram_direct_cto_simulator.simulate_case(
+            "development_followup",
+            "geliştirmeye başlayalım",
+        )
+
+        self.assertTrue(result["action_command"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertEqual(result["ack_deadline_seconds"], 3)
+
+    def test_telegram_asset_action_mode_builds_specific_backlog(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "CTO ya telegram üzerinden dosya resim gibi assetler gönderebilmeliyim. geliştirme yapar mısın",
+            "20260604-TEST",
+        )
+
+        self.assertEqual(
+            [task["title"] for task in tasks],
+            [
+                "Telegram Asset Intake Backend",
+                "Telegram Asset Storage And Manifest",
+                "Dashboard Telegram Asset Inbox",
+                "Telegram Asset Safety Tests",
+            ],
+        )
+        self.assertEqual([task["assigned_worker"] for task in tasks], ["worker-1", "worker-3", "worker-2", "worker-4"])
+
     def test_long_task_routes_to_async_before_local_reply(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "long_multistep",
@@ -1043,6 +1071,74 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[0], ("start_async_job", "123", None, False))
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("yeni görev açmayacağım", calls[1][2])
+
+    def test_handle_message_uses_previous_actionable_context_for_development_followup(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False):
+            calls.append(("start_async_job", chat_id, text, router_task_id, action_command))
+            return "JOB-FOLLOWUP"
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fake_submit_task(root, source, title, message, **kwargs):
+            calls.append(("submit_task", source, title, message, kwargs))
+            return {"task": {"id": "TASK-FOLLOWUP"}}
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.submit_task,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            log_dir = Path(tmp)
+            telegram_direct_cto.LOGS = log_dir
+            (log_dir / "direct_cto_inbox.ndjson").write_text(
+                json.dumps(
+                    {
+                        "received_at": "2026-06-04T10:13:14+00:00",
+                        "chat_id": "123",
+                        "from_user": "tester",
+                        "text": "CTO ya telegram üzerinden dosya resim gibi assetler gönderebilmeliyim. geliştirme yapar mısın",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.submit_task = fake_submit_task
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "geliştirmeye başlayalım",
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.submit_task,
+                ) = originals
+
+        submit = next(call for call in calls if call[0] == "submit_task")
+        started = next(call for call in calls if call[0] == "start_async_job")
+        self.assertIn("telegram üzerinden dosya resim gibi assetler", submit[3])
+        self.assertIn("Önceki Telegram geliştirme talebi", started[2])
+        self.assertEqual(started[3], "TASK-FOLLOWUP")
+        self.assertTrue(started[4])
 
     def test_archive_review_continuation_is_idempotent(self):
         calls = []

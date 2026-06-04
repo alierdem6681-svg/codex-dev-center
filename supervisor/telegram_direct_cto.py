@@ -414,9 +414,82 @@ def is_action_command(text):
     action_words = [
         "başlat", "baslat", "uygula", "workerlara dağıt", "workerlara dagit",
         "pipeline kur", "pipeline'ı kur", "pipeline’i kur", "pipeline başlat",
-        "görevleri başlat", "gorevleri baslat", "tüm görevleri", "tum gorevleri"
+        "görevleri başlat", "gorevleri baslat", "tüm görevleri", "tum gorevleri",
+        "geliştirmeye başla", "gelistirmeye basla", "geliştirmeye başlayalım",
+        "gelistirmeye baslayalim"
     ]
     return any(w in lowered for w in action_words)
+
+
+def is_development_followup_command(text):
+    compact = " ".join((text or "").lower().split())
+    normalized = (
+        compact.replace("ı", "i")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ö", "o")
+        .replace("ç", "c")
+    )
+    return normalized in {
+        "baslayalim",
+        "hadi baslayalim",
+        "gelistirmeye baslayalim",
+        "gelistirmeye basla",
+        "gelistirmeye basliyoruz",
+        "uygulamaya baslayalim",
+    }
+
+
+def is_actionable_context_candidate(text):
+    lowered = (text or "").lower()
+    if len((text or "").strip()) < 40:
+        return False
+    if is_development_followup_command(text) or wants_summary_before_new_tasks(text):
+        return False
+    terms = [
+        "geliştir", "gelistir", "ekle", "kur", "düzelt", "duzelt", "kaldır", "kaldir",
+        "temizle", "canlıya al", "canliya al", "dashboard", "telegram", "worker",
+        "pipeline", "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman",
+        "dokuman", "görsel", "gorsel"
+    ]
+    return any(term in lowered for term in terms)
+
+
+def latest_actionable_context(chat_id, current_text, log_dir=None):
+    log_dir = Path(log_dir) if log_dir is not None else LOGS
+    inbox = log_dir / "direct_cto_inbox.ndjson"
+    try:
+        lines = inbox.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return ""
+    for line in reversed(lines[-120:]):
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        if str(payload.get("chat_id", "")) != str(chat_id):
+            continue
+        candidate = redact_sensitive_text(payload.get("text", ""))
+        if not candidate.strip() or candidate.strip() == (current_text or "").strip():
+            continue
+        if is_actionable_context_candidate(candidate):
+            return candidate
+    return ""
+
+
+def resolve_followup_action_text(chat_id, text, log_dir=None):
+    if not is_development_followup_command(text):
+        return ""
+    context = latest_actionable_context(chat_id, text, log_dir=log_dir)
+    if not context:
+        return text
+    return (
+        "Önceki Telegram geliştirme talebi:\n"
+        f"{context}\n\n"
+        "Kullanıcı takip komutu:\n"
+        f"{text}"
+    )
 
 
 def wants_summary_before_new_tasks(text):
@@ -783,23 +856,28 @@ def handle_message(token, expected_chat_id, msg):
             send_message(token, chat_id, "Devam komutunu aldım ama router şu an hazır değil; teknik hata olarak ele alıyorum.")
         return
 
+    followup_action_text = resolve_followup_action_text(chat_id, safe_text)
+
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
     # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
-    if is_action_command(text):
+    if followup_action_text or is_action_command(text):
+        action_text = followup_action_text or safe_text
         router_task_id = None
         if submit_task is not None:
             routed = submit_task(
                 APP,
                 source="telegram",
-                title="Telegram action command",
-                message=safe_text,
+                title=classify_job_metadata(action_text)["name"],
+                message=action_text,
                 priority="high",
                 requested_by=from_user,
                 split=False,
                 worker_eligible=False,
             )
             router_task_id = routed.get("task", {}).get("id")
-        job_id = start_async_job(chat_id, safe_text, router_task_id=router_task_id, action_command=True)
+        audit_route = "followup_action_context" if followup_action_text else "action_command"
+        audit_passthrough(chat_id, from_user, text, action_text, audit_route)
+        job_id = start_async_job(chat_id, action_text, router_task_id=router_task_id, action_command=True)
         send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")
         return
 
