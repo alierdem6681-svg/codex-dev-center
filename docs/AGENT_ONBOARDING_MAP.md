@@ -83,6 +83,7 @@ Ajan şu klasörleri inceler:
 - supervisor/codex_task_executor.py
 - supervisor/codex_quality_gate.py
 - supervisor/codex_quality_gate.py içindeki `standard-report` komutu readiness artefact'inden standart kalite raporu üretir
+- `standard-report` simülasyon gate'lerinde ayrıntılı contract kanıtı ister; staging/rollback `dry_run_non_mutating_contract`, restart/failure injection `static_non_mutating_contract` detayı eksikse rapor fail olur
 - supervisor/production_readiness_suite.py
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması

@@ -160,6 +160,8 @@ Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline st
 
 `supervisor/codex_quality_gate.py standard-report` komutu mevcut production readiness artefact'ini okuyarak `reports/quality-gate-report.json` ve `reports/quality-gate-summary.md` uretir. Eksik artefact veya basarisiz lint/test/simulasyon dry-run kapisi sonucu `fail` olur; komut production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+Standart rapor `simulation_dry_run` icin staging/rollback `dry_run_non_mutating_contract` detaylarini ve restart/failure injection `static_non_mutating_contract` detaylarini dogrulamalidir. Gate `ok=true` olsa bile bu sozlesme detaylari eksik veya mutating flag sapmaliysa rapor `fail` olur.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.

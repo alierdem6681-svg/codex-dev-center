@@ -48,6 +48,12 @@
       ]
     }
   },
+  "standard_quality_report_contract_details_required": {
+    "staging_smoke_test": "dry_run_non_mutating_contract",
+    "rollback_simulation": "dry_run_non_mutating_contract",
+    "restart_simulation": "static_non_mutating_contract",
+    "failure_injection_simulation": "static_non_mutating_contract"
+  },
   "real_deploy_sequence": [
     "git_clean_check",
     "github_remote_sync_check",

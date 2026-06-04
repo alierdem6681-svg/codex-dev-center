@@ -197,3 +197,15 @@ Guvenlik siniri:
 Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
 Local JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, `git diff --check` ve secret pattern scan PASS oldu. Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.
+
+## 2026-06-04 Quality Gate Contract Detail Apply Retry
+
+Codex quality gate standart raporu simülasyon kanıtını sıkılaştırdı. `simulation_dry_run` artik sadece gate `ok=true` ve ust seviye non-mutating flag'lere bakmaz; staging/rollback icin `dry_run_non_mutating_contract`, restart/failure injection icin `static_non_mutating_contract` detaylarini da arar.
+
+Eksik contract detayi, yanlis mod, dry-run sapmasi veya flag mismatch varsa `standard-report` sonucu `fail` olur. Davranis `tests/test_runtime_status_model.py` icindeki pass fixture ve eksik contract detayi negatif testiyle sabitlendi.
+
+JSON validation, compile, `tests.test_runtime_status_model`, gecici `/tmp` git repo kopyasinda production readiness suite, gecici standard-report, `git diff --check` ve secret pattern scan PASS oldu.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+Local commit/PR tamamlanamadi: git metadata dizini read-only oldugu icin `git add` basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi.

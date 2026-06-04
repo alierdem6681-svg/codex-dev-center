@@ -76,6 +76,40 @@ LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 import pipeline_flow  # noqa: E402
 
 
+def quality_gate_ready_artifact(gates):
+    tests = {gate: {"ok": True, "status": "PASS"} for gate in gates}
+    tests["staging_smoke_test"]["details"] = {
+        "contract": {
+            "ok": True,
+            "mode": "dry_run_non_mutating_contract",
+            "dry_run": True,
+            "required_false_flags": {"mutating_cloud_operations_performed": False},
+            "flag_mismatches": [],
+        }
+    }
+    tests["rollback_simulation"]["details"] = {
+        "contract": {
+            "ok": True,
+            "mode": "dry_run_non_mutating_contract",
+            "dry_run": True,
+            "required_false_flags": {
+                "git_reset_performed": False,
+                "data_mutation_performed": False,
+            },
+            "flag_mismatches": [],
+        }
+    }
+    tests["restart_simulation"]["details"] = {
+        "ok": True,
+        "mode": "static_non_mutating_contract",
+    }
+    tests["failure_injection_simulation"]["details"] = {
+        "ok": True,
+        "mode": "static_non_mutating_contract",
+    }
+    return tests
+
+
 class WorkerStatusModelTest(unittest.TestCase):
     def test_task_status_normalizer_accepts_case_space_hyphen_and_separator_variants(self):
         self.assertEqual(normalize_status("ready for validation"), TASK_STATUS_READY_FOR_VALIDATION)
@@ -224,7 +258,7 @@ class WorkerStatusModelTest(unittest.TestCase):
             (state / "production_readiness_status.json").write_text(
                 json.dumps(
                     {
-                        "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "tests": quality_gate_ready_artifact(gates),
                         "production_deploy_performed": False,
                         "staging_deploy_performed": False,
                         "mutating_cloud_operations_performed": False,
@@ -254,7 +288,7 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual({check["status"] for check in report["checks"]}, {"missing"})
         self.assertTrue(all(check["reason"].startswith("missing_artifact:") for check in report["checks"]))
 
-    def test_standard_quality_report_fails_on_mutating_simulation_flag(self):
+    def test_standard_quality_report_fails_without_simulation_contract_details(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             state = root / "state"
@@ -276,6 +310,44 @@ class WorkerStatusModelTest(unittest.TestCase):
                 json.dumps(
                     {
                         "tests": {gate: {"ok": True, "status": "PASS"} for gate in gates},
+                        "production_deploy_performed": False,
+                        "staging_deploy_performed": False,
+                        "mutating_cloud_operations_performed": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = codex_quality_gate.build_standard_quality_report(root)
+
+        simulation = next(check for check in report["checks"] if check["name"] == "simulation_dry_run")
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(simulation["status"], "fail")
+        self.assertIn("simulation_contract_detail_invalid:", simulation["reason"])
+        self.assertIn("staging_smoke_test:missing_contract_detail", simulation["reason"])
+
+    def test_standard_quality_report_fails_on_mutating_simulation_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir()
+            gates = [
+                "python_compile_check",
+                "json_validation",
+                "yaml_validation",
+                "secret_leakage_scan",
+                "forbidden_operation_scan",
+                "unit_test",
+                "integration_test",
+                "staging_smoke_test",
+                "rollback_simulation",
+                "restart_simulation",
+                "failure_injection_simulation",
+            ]
+            (state / "production_readiness_status.json").write_text(
+                json.dumps(
+                    {
+                        "tests": quality_gate_ready_artifact(gates),
                         "production_deploy_performed": False,
                         "staging_deploy_performed": True,
                         "mutating_cloud_operations_performed": False,

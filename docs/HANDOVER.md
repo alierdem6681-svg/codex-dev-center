@@ -449,6 +449,19 @@ Yeni davranis:
 
 Not:
 - Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+Test:
+- `python3 -m json.tool` ile guncellenen state template JSON dosyalari PASS.
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 92 test.
+- Gecici `/tmp` git repo kopyasinda `python3 supervisor/production_readiness_suite.py --json` PASS, 100.0.
+- Gecici readiness artefact'i uzerinden `python3 supervisor/codex_quality_gate.py standard-report` PASS.
+- `git diff --check` PASS.
+- Secret pattern scan bulgu vermedi.
+
+PR durumu:
+- Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
+- GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
 - UI stage tab gorunumu sonraki kucuk pakete birakildi.
 
 Test:
@@ -462,3 +475,23 @@ Test:
 PR durumu:
 - Local `git add` sandbox disindaki git worktree metadata dizininde `index.lock` olusturamadigi icin basarisiz oldu.
 - GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu iptal edildi; PR acilamadi.
+
+---
+
+## Quality Gate Contract Detail Apply Retry
+
+Tarih: 2026-06-04
+
+Görev: CTO-APPLY-20260604-065104 / CTO-DISPATCH-20260604-064823-CTO-ACTION-20260604-062153-02-QUALITY-GATE-TEST-SIMULATION
+
+Eklenenler:
+- `supervisor/codex_quality_gate.py` standart raporu, `simulation_dry_run` icin readiness gate `ok=true` alaninin yaninda contract detaylarini da dogrular.
+- `staging_smoke_test` ve `rollback_simulation` icin `dry_run_non_mutating_contract`; `restart_simulation` ve `failure_injection_simulation` icin `static_non_mutating_contract` detayi zorunlu hale geldi.
+- `tests/test_runtime_status_model.py` pass artefact'ini gercek contract detaylariyla guncelledi ve eksik detay negatif senaryosunu ekledi.
+- AGENTS, Anayasa, onboarding, roadmap, memory ve state template kayitlari bu sozlesmeye hizalandi.
+
+Yeni davranis:
+- Ust seviye non-mutating flag'ler false olsa ve gate `ok=true` gorunse bile simülasyon contract detayi eksik, hatali modda veya flag mismatch iceriyorsa `standard-report` sonucu `fail` olur.
+
+Not:
+- Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
