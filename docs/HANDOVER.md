@@ -920,3 +920,19 @@ Test:
 
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi bu apply adiminda yapilmadi.
+
+---
+
+## Direct CTO Repo Apply PR_READY Watcher Guard
+
+Tarih: 2026-06-04
+
+Eklenenler:
+- `action_result_watcher` repo apply akışında PR URL'si veya `PR_READY` delivery seviyesi bulunan CTO action kayıtlarını artık proposal workspace dosyası arayarak `FAILED_NO_PROPOSAL` durumuna düşürmez.
+- PR hazır kayıtları `DONE` / `PR_READY` / `repo_apply_pr_ready_pipeline_passed` olarak korunur; production deploy alanları false kalır ve sonraki merge/deploy kapısına bırakılır.
+- Deploy edilmiş kayıtları koruyan eski guard ile PR-ready repo apply guard ayrı regresyon testleriyle sabitlendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.ActionResultWatcherTest` PASS.
+- `python3 -m unittest discover -s tests` PASS, 203 test.
+- `python3 supervisor/production_readiness_suite.py --json` PASS, 100%.

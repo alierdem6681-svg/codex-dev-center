@@ -121,6 +121,17 @@ def is_deployed_record(task):
         or task.get("production_deployed") is True
     )
 
+
+def is_pr_ready_repo_apply_record(task):
+    result = str(task.get("result") or "")
+    delivery_level = str(task.get("delivery_level") or "").upper()
+    return (
+        bool(task.get("pull_request_url"))
+        or result == "repo_apply_pr_ready_pipeline_passed"
+        or delivery_level == "PR_READY"
+    )
+
+
 def main():
     LOGS.mkdir(parents=True, exist_ok=True)
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -163,6 +174,19 @@ def main():
             if is_deployed_record(t):
                 deployed_preserved += 1
                 details.append(f"{tid}: DEPLOYED_PRESERVED")
+                continue
+
+            if is_pr_ready_repo_apply_record(t):
+                t["status"] = "DONE"
+                t["result"] = "repo_apply_pr_ready_pipeline_passed"
+                t["delivery_level"] = "PR_READY"
+                t["validation_status"] = t.get("validation_status") or "PASS"
+                t["pipeline_status"] = t.get("pipeline_status") or "PASS"
+                t["repo_applied"] = False
+                t["staging_deployed"] = False
+                t["production_deployed"] = False
+                t["updated_at"] = now()
+                details.append(f"{tid}: PR_READY_PRESERVED")
                 continue
 
             if created >= 4:

@@ -300,3 +300,9 @@ Faz 19B-10A Model Policy
 - [x] Superseded duplicate parent task'larindan backlog continuation uretilmesi engellendi.
 - [x] Direct CTO action mode'da implementation sinyalli islerin plan-only kapanmasi engellendi.
 - [x] Module registry, settings, action catalog ve runtime status unit testleri guncellendi.
+
+## Faz 48 - Repo Apply PR_READY Watcher Guard
+
+- [x] `action_result_watcher` PR acmis repo apply action task'larini proposal dosyasi yok diye `FAILED_NO_PROPOSAL` durumuna dusurmez.
+- [x] PR URL'si, `PR_READY` delivery seviyesi veya `repo_apply_pr_ready_pipeline_passed` sonucu bulunan kayitlar `DONE` / `PR_READY` olarak korunur.
+- [x] Deploy edilmis kayit ve PR-ready kayit koruma davranisi runtime status regresyon testleriyle sabitlendi.
