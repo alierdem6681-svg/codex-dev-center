@@ -1159,3 +1159,23 @@ Not:
 - Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector mevcut, ancak yerel commit/tree üretilemediği ve büyük dosya değişiklikleri tam içerik/blob akışı gerektirdiği için güvenli PR açılamadı.
+
+---
+
+## Dashboard Direct Access Cleanup Apply
+
+Tarih: 2026-06-05
+Görev: CTO-TASK-20260605-075408-794462-DASHBOARD-ALAN-TEMIZLIĞI
+Worker: worker-2
+
+Eklenenler:
+- Ana panelde üyelik/giriş guard'ı kaldırıldı; `/` ve `/api/status` doğrudan erişilebilir oldu.
+- `/login` eski ekrana girmek yerine dashboard'a yönlenir; auth setup/login endpointleri `auth_disabled` sözleşmesiyle kapalıdır.
+- Dashboard hesap menüsü ve çıkış UI/JS izi kaldırıldı.
+- Dışa açık POST operasyonları direct access ile otomatik yetki kazanmayacak şekilde read-only/gate sınırında bırakıldı.
+- Deploy, VM smoke, bootstrap ve readiness kontrolleri login sayfası yerine doğrudan dashboard/API erişimini doğrular.
+- `state_templates` panel auth kayıtları disabled/direct dashboard access sözleşmesine hizalandı.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları güncellendi.

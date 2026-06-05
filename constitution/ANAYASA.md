@@ -150,3 +150,9 @@ Worker bootstrap tanısı repo checkout, local `.git/` metadata ve test yüzeyi 
 Pipeline analizi ve kalite tanısı gibi işlerde CI/pipeline kanıtı ayrıca istenirse preflight `pipeline_evidence_missing` reason code'u üretmelidir. Bu tanı sadece güvenli marker/dosya adlarını raporlar; log dump veya secret/env/token/private key değeri okumaz.
 
 Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz ve IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 16. Dashboard Direct Access Kuralı
+
+Dashboard üyelik/giriş akışı kapalıdır; panel adresi doğrudan yönetim ekranını açar ve read-only status API'leri login/cookie istemeden okunabilir.
+
+Bu doğrudan görünürlük production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez. Dışa açık POST operasyonları read-only blokaj veya ayrı gate olmadan çalıştırılamaz.

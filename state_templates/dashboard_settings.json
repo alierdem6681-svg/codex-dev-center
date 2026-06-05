@@ -1,14 +1,17 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-05T13:01:25+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
     "compact_mode": true,
     "theme": "soft_neutral",
-    "auth_mode": "username_password"
+    "auth_mode": "disabled"
   },
   "panel_auth": {
-    "mode": "username_password",
+    "mode": "disabled",
+    "enabled": false,
+    "membership_enabled": false,
+    "direct_dashboard_access": true,
     "token_login_enabled": false,
     "session_cookie_name": "codex_panel_session",
     "password_hash": "pbkdf2_sha256",

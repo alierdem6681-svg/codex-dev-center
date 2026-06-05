@@ -15,7 +15,6 @@ WEB_PANEL_DIR = Path(__file__).resolve().parent
 if str(WEB_PANEL_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_PANEL_DIR))
 
-import auth as panel_auth
 from memory_os_status import build_memory_os_status
 from pipeline_flow import build_pipeline_flow
 from quality_gate_view import build_quality_gate_view, normalize_readiness_report_text
@@ -129,12 +128,19 @@ def is_loopback(handler: BaseHTTPRequestHandler) -> bool:
     return host in {"127.0.0.1", "::1", "localhost"}
 
 
-def setup_allowed(handler: BaseHTTPRequestHandler) -> bool:
-    return is_loopback(handler) or os.environ.get("CODEX_PANEL_ALLOW_REMOTE_SETUP", "") == "1"
+def public_panel_auth_state() -> dict:
+    return {
+        "configured": False,
+        "setup_required": False,
+        "auth_mode": "disabled",
+        "token_login_enabled": False,
+        "membership_enabled": False,
+        "username": "Dashboard",
+    }
 
 
-def authorized(handler: BaseHTTPRequestHandler) -> bool:
-    return bool(panel_auth.user_from_cookie(handler.headers.get("Cookie", "")))
+def post_actions_allowed(handler: BaseHTTPRequestHandler) -> bool:
+    return is_loopback(handler) or os.environ.get("CODEX_PANEL_ALLOW_PUBLIC_POST_ACTIONS", "") == "1"
 
 
 def run_cmd(cmd: list[str], timeout: int = 180):
@@ -366,7 +372,7 @@ def status_payload():
         "module_settings": read_json(STATE / "module_settings.json", read_json(ROOT / "state_templates/module_settings.json", {})),
         "production_policy": read_json(ROOT / "state_templates/production_policy.json", {}),
         "cto_delivery": read_json(STATE / "cto_delivery_state.json", read_json(ROOT / "state_templates/cto_delivery_policy.json", {})),
-        "auth": panel_auth.public_auth_state(),
+        "auth": public_panel_auth_state(),
         "production_readiness": production_readiness,
         "production_deploy": production_deploy,
         "production_environment": read_json(STATE / "production_environment_status.json", {}),
@@ -440,26 +446,14 @@ class Handler(BaseHTTPRequestHandler):
         content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
         self.send_raw(target.read_bytes(), content_type)
 
-    def redirect_login(self):
-        self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/login"})
-
-    def send_login(self):
-        self.send_raw((STATIC_DIR / "login.html").read_bytes(), "text/html; charset=utf-8")
-
-    def send_with_session(self, data, username: str, code: int = 200):
-        self.send_raw(
-            json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"),
-            "application/json; charset=utf-8",
-            code,
-            {"Set-Cookie": panel_auth.session_cookie_header(username)},
-        )
+    def redirect_dashboard(self):
+        self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/"})
 
     def send_logout(self):
         self.send_raw(
-            json.dumps({"ok": True}, ensure_ascii=False).encode("utf-8"),
+            json.dumps({"ok": True, "auth": public_panel_auth_state()}, ensure_ascii=False).encode("utf-8"),
             "application/json; charset=utf-8",
             200,
-            {"Set-Cookie": panel_auth.clear_cookie_header()},
         )
 
     def body(self):
@@ -491,16 +485,10 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         if parsed.path in ("/login", "/login.html"):
-            self.send_login()
+            self.redirect_dashboard()
             return
         if parsed.path == "/api/auth/state":
-            self.send_json(panel_auth.public_auth_state())
-            return
-        if not authorized(self):
-            if parsed.path in ("/", "/index.html"):
-                self.redirect_login()
-            else:
-                self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
+            self.send_json(public_panel_auth_state())
             return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
@@ -527,35 +515,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         data = self.body()
         parsed = urlparse(self.path)
-        if parsed.path == "/api/auth/setup":
-            if panel_auth.auth_configured():
-                self.send_json({"ok": False, "error": "auth_already_configured", "message": "Kullanıcı zaten oluşturuldu."}, 409)
-                return
-            if not setup_allowed(self):
-                self.send_json({"ok": False, "error": "remote_setup_disabled", "message": "İlk kullanıcı yalnızca yerel erişimden oluşturulabilir."}, 403)
-                return
-            try:
-                panel_auth.setup_user(str(data.get("username", "")), str(data.get("password", "")))
-                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, str(data.get("username", "")).strip())
-            except ValueError as exc:
-                self.send_json({"ok": False, "error": str(exc), "message": "Kullanıcı adı veya şifre geçersiz."}, 400)
-            return
-        if parsed.path == "/api/auth/login":
-            username = str(data.get("username", "")).strip()
-            password = str(data.get("password", ""))
-            if panel_auth.verify_credentials(username, password):
-                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, username)
-            else:
-                self.send_json({"ok": False, "error": "invalid_credentials", "message": "Kullanıcı adı veya şifre hatalı."}, 401)
+        if parsed.path in ("/api/auth/setup", "/api/auth/login"):
+            self.send_json(
+                {
+                    "ok": False,
+                    "error": "auth_disabled",
+                    "message": "Panel doğrudan erişime açıktır.",
+                    "auth": public_panel_auth_state(),
+                },
+                410,
+            )
             return
         if parsed.path == "/api/auth/logout":
             self.send_logout()
             return
-        if not authorized(self):
-            self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
-            return
         if parsed.path.startswith("/api/dashboard/telegram-assets"):
             self.send_json({"ok": False, "error": "method_not_allowed", "read_only": True}, 405)
+            return
+        if not post_actions_allowed(self):
+            self.send_json({"ok": False, "error": "post_actions_disabled", "read_only": True}, 403)
             return
         action = data.get("action")
         if action == "production_readiness_suite":

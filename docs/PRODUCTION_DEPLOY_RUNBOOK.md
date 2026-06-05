@@ -15,7 +15,7 @@ Production hedefi GitHub Actions self-hosted runner ile yönetilen VM çalışma
 - Panel servisi: `web_panel/panel_server.py`
 - Deploy yöneticisi: `supervisor/production_environment_manager.py`
 - Deploy controller: `supervisor/production_deploy_controller.py`
-- Panel giriş modu: kullanıcı adı/şifre, imzalı oturum çerezi
+- Panel giriş modu: üyelik/giriş kapalı, doğrudan dashboard erişimi
 
 Production dosyalarına doğrudan SSH ile müdahale edilmez. Backup, validate, restart ve smoke check adımları GitHub Actions self-hosted runner üzerinde çalışır.
 
@@ -75,7 +75,7 @@ Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanıl
 9. Runtime içinde compile, JSON validation ve non-secret policy sync çalışır.
 10. Kurulu systemd servisleri varsa restart edilir.
 11. Production health check `127.0.0.1:8080/health` üzerinden geçer.
-12. Production smoke check `/login` ekranını doğrular.
+12. Production smoke check `/` dashboard ve `/api/status` public read-only erişimini doğrular.
 13. GitHub Actions step summary deploy, backup ve smoke sonucunu kaydeder.
 
 ## Rollback
@@ -91,11 +91,11 @@ Rollback mekanizması güvenli ve mantıksaldır. Otomatik `git reset`, veri sil
 - `reports/production_deploy_last_report.md`
 - `reports/production_readiness_last_report.md`
 
-## Panel Girişi
+## Panel Erişimi
 
-Tokenlı URL kullanılmaz. Panel `/login` üzerinden kullanıcı adı ve şifre ister. İlk kullanıcı runtime içinde oluşturulur; parola hash'i `state/panel_auth.json`, session secret ise `state/panel_session_secret.txt` altında tutulur. Bu dosyalar repo'ya yazılmaz.
+Tokenlı URL ve kullanıcı adı/şifre akışı kullanılmaz. Panel `/` üzerinden doğrudan dashboard'u açar; `/api/status` ve read-only dashboard API'ları cookie veya login gerektirmeden okunabilir.
 
-Uzak sunucuda ilk kullanıcı kurulumu güvenlik gereği varsayılan olarak kapalıdır. Uzak ilk kurulum gerekirse VM içinde `CODEX_PANEL_USERNAME` ve `CODEX_PANEL_PASSWORD` verilerek servis başlatılır veya `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` bilinçli olarak açılır.
+`/login` eski giriş ekranına gitmez, dashboard'a yönlenir. Auth setup/login endpointleri `auth_disabled` sözleşmesiyle kapalı kalır. Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez; dışa açık POST operasyonları read-only/gate sınırında kalmalıdır.
 
 ## Durdurulacak Riskler
 

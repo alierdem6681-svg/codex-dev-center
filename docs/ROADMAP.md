@@ -381,3 +381,12 @@ Faz 19B-10A Model Policy
 - [x] Pipeline evidence tanısı log içeriği okumadan sadece güvenli artefakt adı/marker yollarını raporlar.
 - [x] Davranış hedefli `tests.test_runtime_status_model.WorkerStatusModelTest` unit testleriyle sabitlendi.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 58 - Dashboard Direct Access Cleanup
+
+- [x] Panel üyelik/giriş yönlendirmesi kaldırıldı; `/` dashboard'u doğrudan açar.
+- [x] `/api/status` cookie veya login gerektirmeden okunabilir hale getirildi.
+- [x] Dashboard hesap menüsü ve çıkış UI izi kaldırıldı.
+- [x] Deploy, VM smoke ve readiness kontrolleri login sayfası yerine doğrudan dashboard/API erişimini doğrular.
+- [x] Public POST operasyonları doğrudan erişimle otomatik yetki kazanmayacak şekilde read-only/gate sınırında bırakıldı.
+- [x] Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

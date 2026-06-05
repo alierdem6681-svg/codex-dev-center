@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:30:29+00:00",
+  "updated_at": "2026-06-05T13:01:25+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -16,8 +16,10 @@
     "language": "tr",
     "compact_mode": true,
     "theme": "soft_neutral",
-    "auth_mode": "username_password",
+    "auth_mode": "disabled",
     "token_login_enabled": false,
+    "membership_enabled": false,
+    "direct_dashboard_access": true,
     "show_runner_status": true,
     "show_last_deploy_run": true,
     "show_last_smoke_run": true,
@@ -61,8 +63,10 @@
     "merge_policy_client_state_preserved": true
   },
   "panel_auth": {
-    "enabled": true,
-    "mode": "username_password",
+    "enabled": false,
+    "mode": "disabled",
+    "membership_enabled": false,
+    "direct_dashboard_access": true,
     "username_env": "CODEX_PANEL_USERNAME",
     "password_env": "CODEX_PANEL_PASSWORD",
     "session_ttl_seconds": 43200,
