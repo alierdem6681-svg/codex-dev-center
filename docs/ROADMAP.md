@@ -351,3 +351,10 @@ Faz 19B-10A Model Policy
 - [x] Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur.
 - [x] Statik wrapper kontrati `tests/test_staging_readiness_wrappers.py` ile sabitlendi.
 - [x] Deploy policy, module registry/settings/action catalog ve onboarding dokumanlari staging wrapper sozlesmesine hizalandi.
+
+## Faz 55 - Readiness Report Text Freshness
+
+- [x] Ana ve legacy `/api/status` payload'u `report_text_status.readiness` metadata alanini dondurur.
+- [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
+- [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
+- [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.

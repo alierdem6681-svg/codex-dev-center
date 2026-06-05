@@ -14,7 +14,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_PANEL_DIR))
 
 from pipeline_flow import build_pipeline_flow
-from quality_gate_view import build_quality_gate_view
+from quality_gate_view import build_quality_gate_view, normalize_readiness_report_text
 from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
 
 
@@ -120,6 +120,11 @@ def status_payload():
     production_readiness = read_json(STATE / "production_readiness_status.json", {})
     last_health_check = read_json(STATE / "last_health_check_status.json", {})
     legacy_quality_gate = read_json(STATE / "quality_gate_status.json", {})
+    production_readiness_policy = read_json(
+        STATE / "production_readiness_policy.json",
+        read_json(ROOT / "state_templates/production_readiness_policy.json", {}),
+    )
+    readiness_report_text = read_text(REPORTS / "production_readiness_last_report.md")
     return {
         "ok": True,
         "time": now(),
@@ -146,8 +151,11 @@ def status_payload():
         "last_smoke_test": read_json(STATE / "last_smoke_test_status.json", {}),
         "github_safe_flow": read_json(STATE / "github_safe_flow_status.json", {}),
         "reports": sorted([p.name for p in REPORTS.glob("*.md")]) if REPORTS.exists() else [],
+        "report_text_status": {
+            "readiness": normalize_readiness_report_text(readiness_report_text, production_readiness_policy),
+        },
         "report_text": {
-            "readiness": read_text(REPORTS / "production_readiness_last_report.md"),
+            "readiness": readiness_report_text,
             "deploy": read_text(REPORTS / "production_deploy_last_report.md"),
             "rollback": read_text(REPORTS / "rollback_simulation_last_report.md"),
             "github": read_text(REPORTS / "github_safe_flow_last_report.md"),

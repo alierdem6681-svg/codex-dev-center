@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:08:06+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -43,8 +43,11 @@
       "non_mutating": true,
       "endpoint": "/api/status",
       "payload_key": "qualityGateView",
+      "report_text_status_payload_key": "report_text_status",
       "contract_version": 1,
-      "legacy_decision_source_allowed": false
+      "legacy_decision_source_allowed": false,
+      "readiness_report_text_freshness_checked": true,
+      "readiness_report_required_gate_consistency_checked": true
     },
     {
       "id": "panel_first_user_setup",

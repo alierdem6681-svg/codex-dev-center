@@ -402,4 +402,12 @@ Production readiness analizi backlog devaminda staging health/smoke kontrollerin
 
 `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` mevcut wrapper kalibini korur, `CODEX_DEV_CENTER_HOME` ve `CODEX_PYTHON` destekler, ek argumanlari iletir ve manager komutlarini `--scope staging` ile cagirir. Wrapper sozlesmesi `tests/test_staging_readiness_wrappers.py` ile statik olarak sabitlendi; deploy policy ve module/action template kayitlari staging health/smoke komutlarini gorunur hale getirir.
 
+## 2026-06-05 Readiness Report Text Freshness Apply
+
+Production readiness analizi backlog devaminda dashboard ham readiness markdown raporunun guncel kanit gibi okunmasini engelleyen metadata sozlesmesi eklendi. Ana ve legacy `/api/status` payload'u artik `report_text_status.readiness` alanini dondurur.
+
+`web_panel/quality_gate_view.py` rapordaki `Generated at` tarihini production readiness policy `updated_at` tarihiyle karsilastirir ve policy `required_gates` listesini rapor gate satirlariyla eslestirir. Eski rapor `UNKNOWN` ve `freshness=stale` olur; eksik gate'ler `missing_required_gate` reason code'u ve `missing_required_gates` listesiyle gorunur.
+
+Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
+
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:08:06+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -33,11 +33,16 @@
     "contract_version": 1,
     "endpoint": "/api/status",
     "payload_key": "qualityGateView",
+    "report_text_status_payload_key": "report_text_status",
     "readiness_source": "state/production_readiness_status.json",
     "health_source": "state/last_health_check_status.json",
     "legacy_source": "state/quality_gate_status.json",
+    "readiness_report_text_source": "reports/production_readiness_last_report.md",
+    "readiness_report_policy_source": "state_templates/production_readiness_policy.json",
     "legacy_decision_source_allowed": false,
     "legacy_positive_ready_fallback_allowed": false,
+    "mark_report_stale_when_older_than_policy": true,
+    "required_gate_text_consistency_required": true,
     "stale_after_seconds": 86400
   },
   "pipeline_flow": {

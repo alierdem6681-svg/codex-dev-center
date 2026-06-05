@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:08:06+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -9,7 +9,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Canlı izleme, pipeline tracking, ayarlar ve kontrol paneli.",
+      "description": "Canlı izleme, pipeline tracking, report text freshness metadata, ayarlar ve kontrol paneli.",
       "actions": [
         "refresh_dashboard",
         "view_quality_gate_status",
