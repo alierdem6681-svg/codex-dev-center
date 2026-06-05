@@ -6,6 +6,7 @@ Telegram
 → Telegram Bridge
 → Telegram Asset Intake Classifier
 → CTO/Supervisor
+→ Task Envelope Router
 → Task Queue
 → 4 Worker
 → Git / Project Files
@@ -52,6 +53,7 @@ workers/
 
 supervisor/
 - CTO/Supervisor sistemi
+- Telegram, dashboard ve CTO kaynaklarını `request_id`, `correlation_id`, `idempotency_key`, reply policy ve worker eligibility policy alanlarıyla normalize eden task router
 - Telegram asset intake sınıflandırıcısı dosya indirmeden medya metadata event'i üretir
 
 projects/

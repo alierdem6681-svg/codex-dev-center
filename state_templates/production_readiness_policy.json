@@ -1,5 +1,5 @@
 {
-    "updated_at": "2026-06-05T14:05:40+00:00",
+    "updated_at": "2026-06-05T14:39:23+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -26,6 +26,7 @@
     "staging_smoke_test",
     "rollback_simulation",
     "telegram_result_report_flow",
+    "router_worker_dispatch_contract",
     "ack_watchdog_retry_contract",
     "restart_simulation",
     "failure_injection_simulation",
@@ -94,6 +95,24 @@
     "staging_deploy_performed": false,
     "mutating_cloud_operations_performed": false
   },
+  "router_worker_dispatch_contract": {
+    "mode": "router_worker_dispatch_fixture_contract",
+    "sources_checked": [
+      "telegram",
+      "dashboard",
+      "cto"
+    ],
+    "requires_task_envelope": true,
+    "requires_telegram_worker_override_block": true,
+    "requires_safe_reply_policy": true,
+    "requires_router_created_worker_subtasks": true,
+    "telegram_api_called": false,
+    "worker_service_started": false,
+    "runtime_state_mutated": false,
+    "production_deploy_performed": false,
+    "staging_deploy_performed": false,
+    "mutating_cloud_operations_performed": false
+  },
   "real_deploy_sequence": [
     "git_clean_check",
     "github_remote_sync_check",
@@ -109,6 +128,7 @@
     "staging_health_check",
     "staging_smoke_test",
     "rollback_simulation",
+    "router_worker_dispatch_contract",
     "telegram_result_report_flow",
     "github_actions_production_deploy",
     "production_health_check",

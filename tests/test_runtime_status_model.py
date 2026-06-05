@@ -67,6 +67,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     normalize_status,
     atomic_json_state_audit,
     atomic_write_json,
+    is_worker_eligible_task,
     worker_block_reason,
 )
 
@@ -368,6 +369,60 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertEqual(subtask["last_error_code"], "")
             self.assertIsNone(subtask["claimed_at"])
             self.assertIsNone(subtask["finished_at"])
+
+    def test_router_envelope_blocks_telegram_worker_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="telegram",
+                title="Router Dispatch Review",
+                message="worker queue pipeline",
+                risk="medium",
+                requested_by="telegram-user",
+                conversation_id="telegram:9001",
+                split=False,
+                worker_eligible=True,
+            )
+
+        task = result["task"]
+        self.assertTrue(task["router_normalized"])
+        self.assertFalse(task["worker_eligible"])
+        self.assertFalse(is_worker_eligible_task(task))
+        self.assertEqual(task["status"], "ROUTED")
+        self.assertEqual(task["actor_id"], "telegram-user")
+        self.assertTrue(task["request_id"].startswith("REQ-telegram-"))
+        self.assertEqual(task["correlation_id"], task["id"])
+        self.assertTrue(task["idempotency_key"].startswith("telegram:"))
+        self.assertEqual(task["reply_policy"]["mode"], "telegram_safe_summary")
+        self.assertFalse(task["reply_policy"]["technical_output_allowed"])
+        self.assertIn(
+            "telegram_reserved_for_cto",
+            task["worker_eligibility_policy"]["blocked_reasons"],
+        )
+
+    def test_router_subtasks_inherit_parent_envelope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Router Dispatch Review",
+                message="worker queue pipeline",
+                risk="medium",
+                requested_by="dashboard-user",
+                conversation_id="dashboard:review",
+                split=True,
+            )
+
+        parent = result["task"]
+        subtasks = result["subtasks"]
+        self.assertEqual(len(subtasks), 3)
+        self.assertTrue(parent["request_id"].startswith("REQ-dashboard-"))
+        for subtask in subtasks:
+            self.assertEqual(subtask["source"], "cto")
+            self.assertTrue(subtask["worker_eligible"])
+            self.assertEqual(subtask["parent_request_id"], parent["request_id"])
+            self.assertEqual(subtask["correlation_id"], parent["correlation_id"])
+            self.assertEqual(subtask["reply_policy"], parent["reply_policy"])
 
     def test_dashboard_cleanup_request_is_not_split_into_readiness_subtasks(self):
         message = (
@@ -813,6 +868,19 @@ class WorkerStatusModelTest(unittest.TestCase):
         )
         self.assertFalse(contract["production_deploy_performed"])
         self.assertFalse(contract["mutating_cloud_operations_performed"])
+
+    def test_router_worker_dispatch_contract_is_non_mutating(self):
+        contract = production_readiness_suite.router_worker_dispatch_contract()
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "router_worker_dispatch_fixture_contract")
+        self.assertIn("telegram", contract["sources_checked"])
+        self.assertFalse(contract["telegram_api_called"])
+        self.assertFalse(contract["worker_service_started"])
+        self.assertFalse(contract["runtime_state_mutated"])
+        self.assertFalse(contract["production_deploy_performed"])
+        self.assertFalse(contract["mutating_cloud_operations_performed"])
+        self.assertTrue(all(item["ok"] for item in contract["checks"]))
 
     def test_parallel_worker_regression_contract_has_no_duplicate_claim_or_terminal_event(self):
         contract = production_readiness_suite.parallel_worker_regression_contract()
@@ -2402,13 +2470,15 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             return True
 
         originals = (
+            telegram_direct_cto.APP,
             telegram_direct_cto.LOGS,
             telegram_direct_cto.audit_passthrough,
             telegram_direct_cto.start_async_job,
             telegram_direct_cto.send_message,
         )
         with tempfile.TemporaryDirectory() as tmp:
-            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.APP = Path(tmp)
+            telegram_direct_cto.LOGS = Path(tmp) / "logs"
             telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
             telegram_direct_cto.start_async_job = fake_start_async_job
             telegram_direct_cto.send_message = fake_send_message
@@ -2424,6 +2494,7 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
                 )
             finally:
                 (
+                    telegram_direct_cto.APP,
                     telegram_direct_cto.LOGS,
                     telegram_direct_cto.audit_passthrough,
                     telegram_direct_cto.start_async_job,

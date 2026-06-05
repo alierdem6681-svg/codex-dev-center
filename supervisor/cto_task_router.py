@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -26,6 +27,7 @@ try:
         TASK_STATUS_QUEUED,
         TASK_STATUS_ROUTED,
         TASK_STATUS_RUNNING,
+        WORKER_BLOCKED_SOURCES,
         append_audit,
         atomic_write_json,
         normalize_queue_payload,
@@ -53,6 +55,7 @@ except ImportError:
         TASK_STATUS_QUEUED,
         TASK_STATUS_ROUTED,
         TASK_STATUS_RUNNING,
+        WORKER_BLOCKED_SOURCES,
         append_audit,
         atomic_write_json,
         normalize_queue_payload,
@@ -253,6 +256,77 @@ DELIVERY_SIGNALS = [
 ]
 
 
+def envelope_hash(*parts: str) -> str:
+    joined = "\x1f".join(str(part or "") for part in parts)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:20]
+
+
+def reply_policy_for_source(source: str) -> dict[str, Any]:
+    normalized = str(source or "local").strip().lower()
+    if normalized == "telegram":
+        return {
+            "channel": "telegram",
+            "mode": "telegram_safe_summary",
+            "technical_output_allowed": False,
+            "max_chars": 900,
+            "max_lines": 12,
+        }
+    return {
+        "channel": normalized,
+        "mode": "safe_summary",
+        "technical_output_allowed": False,
+    }
+
+
+def worker_eligibility_policy(source: str, risk: str, requested: bool | None) -> dict[str, Any]:
+    normalized_source = str(source or "local").strip().lower()
+    normalized_risk = normalize_risk(risk)
+    effective = bool(requested)
+    blocked_reasons: list[str] = []
+    if normalized_source in WORKER_BLOCKED_SOURCES:
+        effective = False
+        blocked_reasons.append(f"{normalized_source}_reserved_for_cto")
+    if normalized_risk in {"high", "critical"}:
+        effective = False
+        blocked_reasons.append("risk_pipeline_gate")
+    return {
+        "requested": requested,
+        "effective": effective,
+        "blocked_reasons": blocked_reasons,
+    }
+
+
+def task_envelope_fields(
+    *,
+    task_id: str,
+    source: str,
+    title: str,
+    stored_message: str,
+    requested_by: str,
+    conversation_id: str,
+    route: dict[str, Any],
+    risk: str,
+) -> dict[str, Any]:
+    normalized_source = str(source or "local").strip().lower()
+    actor_id = str(requested_by or "").strip() or "unknown"
+    request_fingerprint = envelope_hash(normalized_source, actor_id, conversation_id, title, stored_message)
+    task_type = route.get("intent_domain") or route.get("control_type") or route.get("task_class") or "task"
+    return {
+        "actor_id": actor_id,
+        "request_id": f"REQ-{normalized_source}-{request_fingerprint}",
+        "correlation_id": task_id,
+        "idempotency_key": f"{normalized_source}:{request_fingerprint}",
+        "task_type": task_type,
+        "requested_permissions": critical_operation_findings(f"{title}\n{stored_message}"),
+        "reply_policy": reply_policy_for_source(normalized_source),
+        "payload": {
+            "title": title,
+            "message": stored_message,
+            "risk_level": normalize_risk(risk),
+        },
+    }
+
+
 def classify_task_route(text: str) -> dict[str, Any]:
     lowered = (text or "").lower()
     if is_memory_os_request(text):
@@ -354,6 +428,9 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
         return []
     parent_id = parent["id"]
     stored_message = redact_sensitive_text(message)
+    parent_request_id = str(parent.get("request_id") or "")
+    parent_correlation_id = str(parent.get("correlation_id") or parent_id)
+    parent_reply_policy = parent.get("reply_policy") or reply_policy_for_source(parent.get("source", "cto"))
     base = [
         (
             "Runtime Queue And Status Normalization",
@@ -370,15 +447,30 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
     ]
     tasks: list[dict[str, Any]] = []
     for idx, (title, description) in enumerate(base, 1):
+        subtask_id = f"{parent_id}-SUB{idx}"
         tasks.append(
             {
-                "id": f"{parent_id}-SUB{idx}",
+                "id": subtask_id,
                 "parent_task_id": parent_id,
                 "parent_source": parent.get("source"),
+                "parent_request_id": parent_request_id,
                 "title": title,
                 "description": description,
                 "raw_message": stored_message,
                 "source": "cto",
+                "actor_id": "cto-router",
+                "request_id": f"{parent_request_id}:sub{idx}" if parent_request_id else subtask_id,
+                "correlation_id": parent_correlation_id,
+                "idempotency_key": f"{parent.get('idempotency_key') or parent_id}:sub{idx}",
+                "task_type": "router_dispatch_review",
+                "requested_permissions": [],
+                "reply_policy": parent_reply_policy,
+                "payload": {
+                    "title": title,
+                    "message": description,
+                    "parent_task_id": parent_id,
+                    "parent_request_id": parent_request_id,
+                },
                 "priority": parent.get("priority", "normal"),
                 "status": TASK_STATUS_QUEUED,
                 "risk": "medium",
@@ -442,8 +534,8 @@ def submit_task(
     memory_followup = is_memory_os_followup_text(message) or is_memory_os_followup_text(title)
     if worker_eligible is None:
         worker_eligible = source != "telegram" and effective_risk not in {"high", "critical"}
-    if effective_risk in {"high", "critical"}:
-        worker_eligible = False
+    eligibility_policy = worker_eligibility_policy(source, effective_risk, worker_eligible)
+    worker_eligible = bool(eligibility_policy["effective"])
 
     bound_existing_memory_scope = False
     duplicate_suppressed = False
@@ -494,8 +586,19 @@ def submit_task(
                 atomic_write_json(qpath, normalized)
             else:
                 parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
+                parent_id = next_id("CTO-TASK", title)
+                envelope = task_envelope_fields(
+                    task_id=parent_id,
+                    source=source,
+                    title=title,
+                    stored_message=stored_message,
+                    requested_by=requested_by,
+                    conversation_id=conversation_id,
+                    route=route,
+                    risk=effective_risk,
+                )
                 parent = {
-                    "id": next_id("CTO-TASK", title),
+                    "id": parent_id,
                     "title": title,
                     "description": stored_message,
                     "raw_message": stored_message,
@@ -519,7 +622,10 @@ def submit_task(
                     "delivery_mode": route["delivery_mode"],
                     "pipeline_lane": route["pipeline_lane"],
                     "intent_domain": route.get("intent_domain", ""),
+                    "router_normalized": True,
+                    "worker_eligibility_policy": eligibility_policy,
                 }
+                parent.update(envelope)
                 if memory_intent:
                     memory_scope = {
                         "schema_version": 1,
@@ -579,6 +685,7 @@ def submit_task(
             "last_priority": priority,
             "last_risk": effective_risk,
             "last_worker_block_reason": worker_block_reason(parent),
+            "last_worker_eligibility_block_reasons": eligibility_policy.get("blocked_reasons", []),
             "last_subtask_count": len(created_subtasks),
             "last_task_class": route["task_class"],
             "last_control_type": route["control_type"],
@@ -599,6 +706,7 @@ def submit_task(
             "risk": effective_risk,
             "priority": priority,
             "worker_eligible": worker_eligible,
+            "worker_eligibility_block_reasons": eligibility_policy.get("blocked_reasons", []),
             "subtasks": len(created_subtasks),
             "memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "memory_os_bound_to_existing_scope": bound_existing_memory_scope,

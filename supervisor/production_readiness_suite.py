@@ -868,6 +868,109 @@ def ack_watchdog_retry_contract() -> dict[str, Any]:
     }
 
 
+def router_worker_dispatch_contract() -> dict[str, Any]:
+    try:
+        from . import cto_task_router
+        from .task_status_constants import is_worker_eligible_task, worker_block_reason
+    except ImportError:
+        import cto_task_router
+        from task_status_constants import is_worker_eligible_task, worker_block_reason
+
+    checks: list[dict[str, Any]] = []
+
+    def add_check(name: str, ok: bool, details: dict[str, Any] | None = None) -> None:
+        checks.append({"name": name, "ok": bool(ok), "details": details or {}})
+
+    with tempfile.TemporaryDirectory(prefix="router-worker-dispatch-contract-") as tmp:
+        root = Path(tmp)
+        telegram_result = cto_task_router.submit_task(
+            root=root,
+            source="telegram",
+            title="Router Telegram Override",
+            message="worker queue pipeline",
+            risk="medium",
+            requested_by="telegram-user",
+            conversation_id="telegram:9001",
+            split=False,
+            worker_eligible=True,
+        )
+        dashboard_result = cto_task_router.submit_task(
+            root=root,
+            source="dashboard",
+            title="Router Dispatch Review",
+            message="worker queue pipeline",
+            risk="medium",
+            requested_by="dashboard-user",
+            conversation_id="dashboard:review",
+            split=True,
+        )
+        queue = read_json(root / "state" / "task_queue.json", {"tasks": []})
+
+    telegram_task = telegram_result["task"]
+    dashboard_task = dashboard_result["task"]
+    subtasks = dashboard_result["subtasks"]
+
+    add_check(
+        "telegram_override_blocked",
+        telegram_task.get("worker_eligible") is False
+        and not is_worker_eligible_task(telegram_task)
+        and "telegram_reserved_for_cto" in telegram_task.get("worker_eligibility_policy", {}).get("blocked_reasons", []),
+        {
+            "status": telegram_task.get("status"),
+            "worker_block_reason": worker_block_reason(telegram_task),
+            "worker_eligibility_policy": telegram_task.get("worker_eligibility_policy"),
+        },
+    )
+    add_check(
+        "telegram_reply_policy_safe",
+        telegram_task.get("reply_policy", {}).get("mode") == "telegram_safe_summary"
+        and telegram_task.get("reply_policy", {}).get("technical_output_allowed") is False,
+        {"reply_policy": telegram_task.get("reply_policy")},
+    )
+    add_check(
+        "entry_envelope_fields_present",
+        all(
+            telegram_task.get(field)
+            for field in ("actor_id", "request_id", "correlation_id", "idempotency_key", "task_type", "reply_policy", "payload")
+        )
+        and telegram_task.get("router_normalized") is True,
+        {"request_id": telegram_task.get("request_id"), "correlation_id": telegram_task.get("correlation_id")},
+    )
+    add_check(
+        "dashboard_router_created_worker_subtasks",
+        len(subtasks) == 3
+        and all(task.get("source") == "cto" for task in subtasks)
+        and all(task.get("worker_eligible") is True for task in subtasks),
+        {"subtask_ids": [task.get("id") for task in subtasks]},
+    )
+    add_check(
+        "subtasks_inherit_correlation_and_reply_policy",
+        bool(dashboard_task.get("request_id"))
+        and all(task.get("parent_request_id") == dashboard_task.get("request_id") for task in subtasks)
+        and all(task.get("correlation_id") == dashboard_task.get("correlation_id") for task in subtasks)
+        and all(task.get("reply_policy") == dashboard_task.get("reply_policy") for task in subtasks),
+        {"parent_request_id": dashboard_task.get("request_id"), "subtask_count": len(subtasks)},
+    )
+    add_check(
+        "queue_contains_only_router_normalized_entries",
+        all(task.get("router_normalized") or task.get("parent_request_id") for task in queue.get("tasks", [])),
+        {"task_count": len(queue.get("tasks", []))},
+    )
+
+    return {
+        "ok": all(item["ok"] for item in checks),
+        "mode": "router_worker_dispatch_fixture_contract",
+        "checks": checks,
+        "sources_checked": ["telegram", "dashboard", "cto"],
+        "telegram_api_called": False,
+        "worker_service_started": False,
+        "runtime_state_mutated": False,
+        "production_deploy_performed": False,
+        "staging_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
 def _task_by_id(tasks: list[dict[str, Any]], task_id: str) -> dict[str, Any]:
     for task in tasks:
         if task.get("id") == task_id:
@@ -1069,6 +1172,11 @@ def ack_watchdog_retry_readiness(results: dict[str, Any]) -> None:
     record(results, "ack_watchdog_retry_contract", contract["ok"], contract)
 
 
+def router_worker_dispatch_readiness(results: dict[str, Any]) -> None:
+    contract = router_worker_dispatch_contract()
+    record(results, "router_worker_dispatch_contract", contract["ok"], contract)
+
+
 def unit_and_integration(results: dict[str, Any]) -> None:
     policy = read_json(ROOT / "state_templates/production_policy.json", {})
     ok = bool(policy.get("automatic_production_enabled") or policy.get("production_deploy_channel") == "github_actions_manual")
@@ -1093,6 +1201,7 @@ def run_suite() -> dict[str, Any]:
     deploy_script_checks(results)
     security_scans(results)
     staging_and_rollback(results)
+    router_worker_dispatch_readiness(results)
     ack_watchdog_retry_readiness(results)
     chaos_simulations(results)
     telegram_result_report(results)
