@@ -366,3 +366,11 @@ Faz 19B-10A Model Policy
 - [x] Eksik repo checkout `repo_checkout_missing`, eksik test yüzeyi `no_test_surface` reason code'u ile fail olur.
 - [x] Davranış `tests/test_runtime_status_model.py` içindeki hedefli worker bootstrap unit testleriyle sabitlendi.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 57 - Dashboard Görev Listesi Geçmiş Temizliği
+
+- [x] Görevler listesi varsayılan görünümde kapalı/geçmiş görevleri saklar.
+- [x] Geçmiş görev görünürlüğü `Geçmiş görevleri göster` checkbox'ı ile geri alınabilir.
+- [x] Canlı ve geçmiş filtre kapsamı status/risk filtre option'larına da uygulanır.
+- [x] Boş güncel görev listesi `Güncel görev yok.` durumuyla gösterilir.
+- [x] Davranış dashboard markup regresyon testiyle sabitlendi.

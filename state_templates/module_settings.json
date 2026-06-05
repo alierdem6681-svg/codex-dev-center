@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:28:11+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -27,7 +27,10 @@
     "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
     "show_pipeline_flow": true,
-    "show_memory_os_status": true
+    "show_memory_os_status": true,
+    "hide_live_tasks_by_default": true,
+    "hide_closed_tasks_by_default": true,
+    "show_closed_tasks_toggle": true
   },
   "quality_gate_view": {
     "enabled": true,
