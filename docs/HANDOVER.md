@@ -1028,6 +1028,7 @@ Test:
 Not:
 - Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.
+- Commit/PR tamamlanamadi: lokal `.git/index.lock` yazimi read-only filesystem nedeniyle basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` olarak dondu.
 
 ---
 
@@ -1095,3 +1096,30 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Dashboard Gorev Listesi Gecmis Kayit Temizligi Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-115547 / CTO-TASK-20260605-075400-123336-DASHBOARD-GÖREV-LISTESI-DÜZENI
+Worker: worker-2
+
+Eklenenler:
+- `web_panel/static/index.html` Gorevler ana listesinden kapali/gecmis task kayitlarini varsayilan olarak gizler.
+- `DONE`, `FINAL_REPORTED`, `CANCELLED`, `ARCHIVED` ve `CLOSED` statuleri history sayilir; production/live isaretli kayitlar mevcut `Canliya alinanlari goster` checkbox davranisinda kalir.
+- Guncel liste tamamen bosalirsa `Güncel görev yok.` bos durumu gosterilir.
+- Filtre option'lari gizlenen gecmis kayitlarla sisirilmez ve checkbox degisiminde yeniden senkronlanir.
+- Dashboard module registry/settings/action catalog kayitlari read-only gorev listesi sozlesmesine hizalandi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts` PASS.
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS, 4 test.
+- `python3 -m unittest tests.test_runtime_status_model tests.test_dashboard_account_menu_markup` PASS, 219 test.
+- `git diff --check` PASS.
+- Secret pattern scan PASS.
+- `CHECK_MODE=read_only TEST_SCRATCH_ROOT=/tmp/codex-test-scratch python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazimlari read-only modda `write-skipped`.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.

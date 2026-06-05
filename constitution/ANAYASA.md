@@ -71,6 +71,8 @@ Dashboard pipeline tracking görünürlüğü de salt okunurdur. Ana ve legacy p
 
 Dashboard pipeline flow görünürlüğü salt okunurdur. Ana ve legacy panel `/api/pipeline-flow` payload'larında task stage akışını göstermek raw kullanıcı mesajı, uzun açıklama, stdout/stderr, log, terminal dump, production deploy veya kritik altyapı işlemi yetkisi anlamına gelmez.
 
+Dashboard Görevler ana listesi kapalı/geçmiş kayıtları varsayılan olarak göstermemelidir. `DONE`, `FINAL_REPORTED`, `CANCELLED`, `ARCHIVED` ve `CLOSED` statüleri history sayılır; aktif/yeni görev akışları korunur. Bu görünürlük veri silme, production deploy veya kritik altyapı yetkisi vermez.
+
 Telegram asset intake backend fotoğraf ve doküman mesajlarını dosya indirmeden metadata event'ine sınıflandırabilir. Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi loglanamaz ya da Telegram/task mesajına yazılamaz. Dosya indirme, kalıcı saklama, checksum ve malware scan ayrı güvenlik aşamasına bağlıdır.
 
 Validated proposal apply akışı yalnızca izole git worktree ve ayrı worker branch üzerinde ilerler. PR öncesi exact path allowlist, runtime/secret path blokajı, secret scan ve local pipeline PASS olmadan değişiklik tamamlanmış sayılmaz.

@@ -72,15 +72,20 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
         self.assertIn('id="showLiveTasks"', html)
         self.assertIn("Canlıya alınanları göster", html)
         self.assertIn("function taskIsLive(t)", html)
+        self.assertIn("function taskIsHistorical(t){ return taskIsClosed(t) && !taskIsLive(t); }", html)
         self.assertIn("t.deployment_status || t.deploymentStatus || t.delivery_level", html)
         self.assertIn("function taskIsRunning(t){ return taskStatus(t) === 'RUNNING'; }", html)
         self.assertIn("if (taskIsRunning(a) !== taskIsRunning(b))", html)
+        self.assertIn("tasks().filter(t => !taskIsHistorical(t))", html)
         self.assertIn("list = list.filter(t => !taskIsLive(t));", html)
+        self.assertIn("list = list.filter(t => !taskIsHistorical(t));", html)
         self.assertIn("list.sort(compareTasks);", html)
+        self.assertIn("Güncel görev yok.", html)
         self.assertIn("function setFilterOptions(selectEl, defaultLabel, values)", html)
         self.assertIn("selectEl.dataset.optionsHtml !== html", html)
         self.assertIn("[statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks]", html)
         self.assertIn("el.addEventListener('change', event =>", html)
+        self.assertIn("fillFilters();", html)
 
 
 if __name__ == "__main__":

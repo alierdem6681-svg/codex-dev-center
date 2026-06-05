@@ -122,6 +122,7 @@ Dashboard status API notu:
 - `/api/status` ana ve legacy panelde `qualityGateView` alanini dondurur; dashboard kalite kapisi badge, renk, filtre ve ozet karari icin sadece bu kontrati kullanmalidir. `quality_gate_status` legacy diagnostik bilgi olarak `legacy_quality_gate_status` altinda tasinir ve pozitif READY karari uretmez.
 - `/api/status` ana ve legacy panelde `report_text_status.readiness` alanini da dondurur; ham `report_text.readiness` markdown'u policy `updated_at` tarihinden eskiyse veya `required_gates` listesini tam icermiyorsa guncel PASS kaniti sayilmamali ve `UNKNOWN`/stale metadata'si dikkate alinmalidir.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
+- Gorevler listesi `DONE`, `FINAL_REPORTED`, `CANCELLED`, `ARCHIVED` ve `CLOSED` gibi kapali/gecmis kayitlari varsayilan ana listeden gizler; liste tamamen bosalirsa `Güncel görev yok.` bos durumu gosterilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 
 Controlled apply notu:

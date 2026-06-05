@@ -411,3 +411,13 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Dashboard Gorev Listesi Gecmis Kayit Temizligi Apply
+
+Dashboard Gorevler ana listesi artik kapali/gecmis task kayitlarini varsayilan olarak gostermez. `DONE`, `FINAL_REPORTED`, `CANCELLED`, `ARCHIVED` ve `CLOSED` statuleri history sayilir; production/live isaretli kayitlar mevcut `Canliya alinanlari goster` checkbox davranisinda kalir.
+
+Guncel liste bosaldiginda `Güncel görev yok.` bos durumu gosterilir. Filtre option'lari gizlenen history kayitlariyla sisirilmez ve checkbox degisiminde yeniden senkronlanir.
+
+Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Compile, dashboard markup testi, runtime status model testi, diff check, secret pattern scan ve read-only production readiness suite PASS oldu. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+Commit/PR tamamlanamadi: lokal `.git/index.lock` yazimi read-only filesystem nedeniyle basarisiz oldu; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` olarak dondu. Degisiklikler izole apply clone calisma agacinda hazir kaldi.
