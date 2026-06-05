@@ -1,0 +1,11 @@
+{
+  "id": "memory_os_context",
+  "name": "Memory OS Context Binding",
+  "status": "active",
+  "risk": "medium",
+  "owner": "worker-2",
+  "description": "Binds same-conversation Memory OS continuation and approval messages to the last active scope without duplicate root task creation.",
+  "dashboard_visible": false,
+  "settings": "settings.json",
+  "actions": "actions.json"
+}

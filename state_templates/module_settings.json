@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:51:20+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -26,7 +26,8 @@
     "show_quality_gate_view": true,
     "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
-    "show_pipeline_flow": true
+    "show_pipeline_flow": true,
+    "show_memory_os_status": true
   },
   "quality_gate_view": {
     "enabled": true,
@@ -195,7 +196,20 @@
     "worker_subtasks_source": "cto",
     "audit_log": "logs/cto_audit.ndjson",
     "doctor_status_file": "state/cto_doctor_status.json",
-    "router_state_file": "state/cto_router_state.json"
+    "router_state_file": "state/cto_router_state.json",
+    "memory_os_domain_intent_enabled": true,
+    "memory_os_pipeline_lane": "Memory OS Delivery",
+    "memory_os_followup_context_preserved": true,
+    "memory_os_reference_pattern": "CTO-MEMORY-OS-*",
+    "memory_os_followup_commands": [
+      "devam",
+      "baslat",
+      "onay",
+      "canliya_al"
+    ],
+    "memory_os_routes_to_production_readiness": false,
+    "memory_os_routes_to_general_dispatch": false,
+    "memory_os_root_task_chain_required": true
   },
   "codex_execution": {
     "enabled": false,
@@ -401,5 +415,67 @@
   },
   "drift_control": {
     "registry_settings_candidate_classifier": true
+  },
+  "memory_os_context": {
+    "enabled": true,
+    "state_file": "state/memory_os_context.json",
+    "same_conversation_binding": true,
+    "bind_followup_and_approval_messages": true,
+    "duplicate_root_task_prevention": true,
+    "direct_cto_action_mode_enabled": true,
+    "direct_cto_async_job_prompt_context": true,
+    "telegram_followup_context_enabled": true,
+    "worker_dispatch_context_metadata": true,
+    "raw_payload_logged": false,
+    "secret_values_logged": false
+  },
+  "memory_os_runtime": {
+    "enabled": true,
+    "contract_ready": true,
+    "runtime_state_file": "state/memory_os_runtime.json",
+    "test_command": "{python} -m unittest tests.test_memory_os_runtime",
+    "state_schema_version": "memory_os_runtime_state_v1",
+    "record_schema_version": "memory_os_record_v1",
+    "summary_schema_version": "memory_os_summary_v1",
+    "raw_payload_storage_allowed": false,
+    "credential_value_storage_allowed": false,
+    "environment_value_storage_allowed": false,
+    "private_material_storage_allowed": false,
+    "recall_raw_content_included": false,
+    "audit_raw_content_logged": false,
+    "safe_metadata_allowlist": [
+      "actor",
+      "intent_domain",
+      "module",
+      "parent_task_id",
+      "pipeline_lane",
+      "risk",
+      "root_task_id",
+      "source",
+      "status",
+      "task_id",
+      "worker_id"
+    ]
+  },
+  "memory_os": {
+    "enabled": true,
+    "dashboard_payload_key": "memory_os",
+    "endpoint": "/api/status",
+    "read_only": true,
+    "health_sources": [
+      "state/memory_os_status.json",
+      "state/memory_os_health.json"
+    ],
+    "last_context_sources": [
+      "state/memory_os_last_context.json",
+      "state/memory_os_context.json"
+    ],
+    "return_raw_context": false,
+    "return_raw_payload": false,
+    "return_terminal_output": false,
+    "return_secret_values": false,
+    "production_deploy_allowed": false,
+    "mutating_actions_allowed": false,
+    "test_command": "{python} -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest"
   }
 }

@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {
+      "id": "validate_memory_os_context_binding",
+      "label": "Validate Memory OS Context Binding",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_memory_os_router_followup_binds_existing_scope_without_new_root tests.test_runtime_status_model.WorkerStatusModelTest.test_action_mode_memory_os_children_share_router_root_and_followup_is_idempotent tests.test_runtime_status_model.WorkerStatusModelTest.test_telegram_memory_os_approval_resolves_last_scope tests.test_runtime_status_model.WorkerStatusModelTest.test_async_prompt_includes_memory_os_context tests.test_runtime_status_model.BacklogDispatcherModelTest.test_dispatch_preserves_memory_os_scope_context_on_claim"
+    }
+  ]
+}

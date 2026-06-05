@@ -289,6 +289,75 @@ def dashboard_test(results: dict[str, Any]) -> None:
     record(results, "dashboard_route_api_test", not missing and not login_missing, {"missing_text": missing, "login_missing_text": login_missing})
 
 
+def memory_os_dashboard_contract(results: dict[str, Any]) -> None:
+    contracts = [
+        static_contract(
+            "web_panel/memory_os_status.py",
+            [
+                "build_memory_os_status",
+                "raw_context_included",
+                "secret_values_included",
+                "production_deploy_allowed",
+                "mutating_actions_allowed",
+            ],
+        ),
+        static_contract(
+            "web_panel/panel_server.py",
+            [
+                "build_memory_os_status",
+                "\"memory_os\"",
+            ],
+        ),
+        static_contract(
+            "web_panel/server.py",
+            [
+                "build_memory_os_status",
+                "\"memory_os\"",
+            ],
+        ),
+        static_contract(
+            "web_panel/static/index.html",
+            [
+                "Memory OS",
+                "memoryOsStatus",
+                "renderMemoryOs",
+            ],
+        ),
+        static_contract(
+            "supervisor/telegram_direct_cto_simulator.py",
+            [
+                "memory_os_dashboard",
+                "Memory OS health",
+            ],
+        ),
+        static_contract(
+            "state_templates/module_settings.json",
+            [
+                "\"memory_os\"",
+                "\"dashboard_payload_key\": \"memory_os\"",
+            ],
+        ),
+        static_contract(
+            "state_templates/action_catalog.json",
+            [
+                "\"view_memory_os_status\"",
+                "\"payload_key\": \"memory_os\"",
+            ],
+        ),
+    ]
+    record(
+        results,
+        "memory_os_dashboard_contract",
+        all(item["ok"] for item in contracts),
+        {
+            "mode": "static_read_only_dashboard_contract",
+            "contracts": contracts,
+            "production_deploy_performed": False,
+            "mutating_cloud_operations_performed": False,
+        },
+    )
+
+
 def telegram_test(results: dict[str, Any]) -> None:
     files = [
         ROOT / "supervisor/telegram_bridge.py",
@@ -858,6 +927,7 @@ def run_suite() -> dict[str, Any]:
     required_file_regression(results)
     worker_queue_recovery(results)
     dashboard_test(results)
+    memory_os_dashboard_contract(results)
     telegram_test(results)
     deploy_script_checks(results)
     security_scans(results)

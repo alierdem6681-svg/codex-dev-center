@@ -15,6 +15,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
 
 from pipeline_flow import build_pipeline_flow
 from quality_gate_view import build_quality_gate_view, normalize_readiness_report_text
+from memory_os_status import build_memory_os_status
 from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
 
 
@@ -131,6 +132,7 @@ def status_payload():
         "system_state": system_state,
         "controlled_execution": controlled_execution_summary(system_state),
         "qualityGateView": build_quality_gate_view(production_readiness, last_health_check, legacy_quality_gate),
+        "memory_os": build_memory_os_status(ROOT),
         "workers": read_json(STATE / "workers.json", {"workers": []}),
         "tasks": read_json(STATE / "task_queue.json", {"tasks": []}),
         "modules": read_json(STATE / "module_registry.json", read_json(ROOT / "state_templates/module_registry.json", {"modules": []})),

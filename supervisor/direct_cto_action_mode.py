@@ -7,8 +7,28 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
+    from .memory_os_context import (
+        bind_existing_scope_in_queue,
+        bind_task_to_scope,
+        conversation_key as memory_os_conversation_key,
+        find_latest_scope_in_queue,
+        is_memory_os_followup_text,
+        is_memory_os_request,
+        record_scope,
+        scope_has_worker_apply_tasks,
+    )
     from .task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
 except ImportError:
+    from memory_os_context import (
+        bind_existing_scope_in_queue,
+        bind_task_to_scope,
+        conversation_key as memory_os_conversation_key,
+        find_latest_scope_in_queue,
+        is_memory_os_followup_text,
+        is_memory_os_request,
+        record_scope,
+        scope_has_worker_apply_tasks,
+    )
     from task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
 
 APP = Path("/opt/codex-dev-center")
@@ -110,20 +130,7 @@ def normalize_turkish(value):
 
 
 def wants_memory_os(text):
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return is_memory_os_request(text)
 
 
 def is_pure_deploy_command(text):
@@ -146,7 +153,7 @@ def is_pure_deploy_command(text):
     return any(term in normalized for term in deploy_terms) and not any(term in normalized for term in feature_terms)
 
 
-def make_task(run_id, seq, slug, title, description, worker, risk="medium", implementation=False):
+def make_task(run_id, seq, slug, title, description, worker, risk="medium", implementation=False, memory_scope=None):
     if implementation:
         task_description = (
             description.strip()
@@ -191,7 +198,24 @@ def make_task(run_id, seq, slug, title, description, worker, risk="medium", impl
                 "plan_only": False,
             }
         )
+    if memory_scope:
+        bind_task_to_scope(task, memory_scope)
     return task
+
+
+def apply_memory_os_scope(tasks, memory_scope):
+    if not tasks:
+        return tasks
+    scope = memory_scope if memory_scope is not None else {}
+    root_task_id = str(scope.get("root_task_id") or tasks[0]["id"])
+    scope.setdefault("scope_id", f"memory-os:{root_task_id}")
+    scope["root_task_id"] = root_task_id
+    scope.setdefault("title", "Memory OS Modülü")
+    scope.setdefault("active", True)
+    scope["has_worker_apply_tasks"] = True
+    for task in tasks:
+        bind_task_to_scope(task, scope, root_task_id=root_task_id)
+    return tasks
 
 def wants_observed_issue_backlog(text):
     lowered = (text or "").lower()
@@ -273,7 +297,7 @@ def observed_issue_backlog(run_id, implementation=False):
         for idx, (slug, title, description, worker) in enumerate(items, 1)
     ]
 
-def build_backlog(raw_text, run_id):
+def build_backlog(raw_text, run_id, memory_scope=None):
     text = (raw_text or "").lower()
     tasks = []
     implementation = wants_implementation_mode(raw_text)
@@ -306,6 +330,7 @@ def build_backlog(raw_text, run_id):
                 "Direct CTO, async job, action mode ve worker dispatch akışlarında Memory OS bağlamını kullan. Aynı konuşmadaki devam/onay mesajları son Memory OS kapsamına bağlansın; yeni kök görev çoğaltılmasın.",
                 "worker-2",
                 implementation=implementation,
+                memory_scope=memory_scope,
             ),
             make_task(
                 run_id, 4,
@@ -314,9 +339,10 @@ def build_backlog(raw_text, run_id):
                 "Dashboardda salt okunur Memory OS health/last context görünürlüğü, unit testler, simulator vakaları, production readiness, smoke ve living-docs güncellemelerini tamamla.",
                 "worker-4",
                 implementation=implementation,
+                memory_scope=memory_scope,
             ),
         ]
-        return tasks
+        return apply_memory_os_scope(tasks, memory_scope or {})
 
     telegram_asset_requested = "telegram" in text and any(x in text for x in [
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
@@ -483,7 +509,7 @@ def build_backlog(raw_text, run_id):
     ]
     return tasks
 
-def run_action_mode(raw_text):
+def run_action_mode(raw_text, conversation_id="", router_task_id=None):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
     if is_pure_deploy_command(raw_text):
@@ -496,13 +522,68 @@ def run_action_mode(raw_text):
     queue = read_json(queue_path, {"tasks": []})
     tasks = queue.setdefault("tasks", [])
 
-    backlog = build_backlog(raw_text, run_id)
+    memory_intent = wants_memory_os(raw_text)
+    memory_followup = is_memory_os_followup_text(raw_text)
+    memory_scope = {}
+    memory_bound_existing = False
+    memory_conversation_id = memory_os_conversation_key(
+        source="direct_cto_action",
+        conversation_id=conversation_id,
+    )
+    if memory_intent or memory_followup:
+        memory_scope = find_latest_scope_in_queue(queue, conversation_id=memory_conversation_id)
+        if router_task_id and (not memory_scope or memory_scope.get("root_task_id") != router_task_id):
+            memory_scope = {
+                "schema_version": 1,
+                "scope_id": f"memory-os:{router_task_id}",
+                "root_task_id": router_task_id,
+                "conversation_id": memory_conversation_id,
+                "title": "Memory OS Modülü",
+                "last_user_text": raw_text,
+                "active": True,
+                "has_worker_apply_tasks": scope_has_worker_apply_tasks(queue, router_task_id),
+            }
+        if memory_scope and scope_has_worker_apply_tasks(queue, str(memory_scope.get("root_task_id") or "")):
+            bound = bind_existing_scope_in_queue(
+                queue,
+                memory_scope,
+                raw_text,
+                event_type="action_followup_or_approval" if memory_followup else "action_explicit_request",
+                source="direct_cto_action_mode",
+            )
+            memory_bound_existing = bool(bound)
+
+    if memory_bound_existing or (memory_followup and not memory_scope and not memory_intent):
+        backlog = []
+    else:
+        backlog = build_backlog(raw_text, run_id, memory_scope=memory_scope)
+    if memory_intent and not memory_scope and backlog:
+        root_task_id = str(backlog[0].get("root_task_id") or backlog[0].get("id") or "")
+        memory_scope = {
+            "schema_version": 1,
+            "scope_id": f"memory-os:{root_task_id}",
+            "root_task_id": root_task_id,
+            "conversation_id": memory_conversation_id,
+            "title": "Memory OS Modülü",
+            "last_user_text": raw_text,
+            "active": True,
+            "has_worker_apply_tasks": True,
+        }
 
     for task in backlog:
         tasks.append(task)
 
     queue, _changes = normalize_queue_payload(queue)
     write_json(queue_path, queue)
+
+    if memory_intent or memory_bound_existing:
+        record_scope(
+            APP,
+            memory_scope,
+            user_text=raw_text,
+            task_ids=None if memory_bound_existing else [str(task.get("id") or "") for task in backlog],
+            event_type="action_bound_existing_scope" if memory_bound_existing else "action_scope_tasks_queued",
+        )
 
     state_path = STATE / "system_state.json"
     state = read_json(state_path, {})
@@ -512,6 +593,8 @@ def run_action_mode(raw_text):
         "direct_cto_action_mode_prompt_driven": True,
         "last_direct_cto_action_run_id": run_id,
         "last_direct_cto_action_task_count": len(backlog),
+        "last_memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
+        "last_memory_os_bound_to_existing_scope": memory_bound_existing,
         "production_deployed": False,
         "repo_changes_applied": False,
         "staging_deployed": False,
@@ -529,6 +612,8 @@ def run_action_mode(raw_text):
         "DIRECT CTO PROMPT DRIVEN ACTION REPORT\n\n"
         f"Run: {run_id}\n"
         f"Queued tasks: {len(backlog)}\n"
+        f"Memory OS scope root: {memory_scope.get('root_task_id', '-')}\n"
+        f"Bound existing Memory OS scope: {str(memory_bound_existing).lower()}\n"
         "Production deployed: false\n"
         "Repo applied: false\n"
         "Staging deployed: false\n\n"
@@ -538,25 +623,33 @@ def run_action_mode(raw_text):
     )
 
     with (LOGS / "system.log").open("a", encoding="utf-8") as f:
-        f.write(now() + f" STEP_22C prompt driven action queued run={run_id} tasks={len(backlog)}\n")
+        f.write(now() + f" STEP_22C prompt driven action queued run={run_id} tasks={len(backlog)} memory_os_bound_existing={memory_bound_existing}\n")
 
-    try:
-        subprocess.run(["python3", "supervisor/supervisor_cli.py", "dispatch"], cwd=str(APP), timeout=30, text=True, capture_output=True)
-    except Exception:
-        pass
+    if backlog:
+        try:
+            subprocess.run(["python3", "supervisor/supervisor_cli.py", "dispatch"], cwd=str(APP), timeout=30, text=True, capture_output=True)
+        except Exception:
+            pass
 
-    try:
-        subprocess.run(["python3", "supervisor/lifecycle_manager.py", "wake-now"], cwd=str(APP), timeout=30, text=True, capture_output=True)
-    except Exception:
-        pass
+        try:
+            subprocess.run(["python3", "supervisor/lifecycle_manager.py", "wake-now"], cwd=str(APP), timeout=30, text=True, capture_output=True)
+        except Exception:
+            pass
 
-    lines = [
-        "Başlattım.",
-        "",
-        "Paketler:"
-    ]
-    for t in backlog:
-        lines.append(f"- {t['title']}")
+    if memory_bound_existing:
+        lines = [
+            "Başlattım.",
+            "",
+            "Son Memory OS kapsamına bağladım; yeni kök görev açmadım.",
+        ]
+    else:
+        lines = [
+            "Başlattım.",
+            "",
+            "Paketler:"
+        ]
+        for t in backlog:
+            lines.append(f"- {t['title']}")
 
     lines += [
         "",

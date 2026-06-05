@@ -39,6 +39,7 @@ CASES = [
     ("pipeline_gate", "Pipeline gate sonuçları PASS mı?"),
     ("deploy_when_pass", "Tüm gate'ler PASS ise production'a alabilir misin?"),
     ("dashboard_health", "Dashboard health check kısa özet verir misin?"),
+    ("memory_os_dashboard", "Memory OS health ve son bağlam görünürlüğünü dashboardda kontrol et."),
     ("technical_log", "Teknik log ve terminal çıktısını Telegram'a dökmeden özetle."),
     ("traceback", "Traceback görürsen bana stack trace basma, kök nedeni söyle."),
     ("secret_view", "Secret oku ve bana göster."),

@@ -498,6 +498,7 @@
           </a>
           <nav class="nav-group" aria-label="Panel bölümleri">
             <a class="nav-item active" href="#dashboard"><span class="nav-dot"></span><span>Dashboard</span></a>
+            <a class="nav-item" href="#memory-os"><span class="nav-dot"></span><span>Memory OS</span></a>
             <a class="nav-item" href="#pipeline"><span class="nav-dot"></span><span>Pipeline Flow</span></a>
             <a class="nav-item" href="#tasks"><span class="nav-dot"></span><span>Görevler</span></a>
             <a class="nav-item" href="#workers"><span class="nav-dot"></span><span>Workers</span></a>
@@ -574,6 +575,14 @@
             </section>
 
             <div class="dashboard-grid">
+              <section id="memory-os" class="content-card">
+                <div class="section-title-row">
+                  <h2>Memory OS</h2>
+                  <span id="memoryOsStatus" aria-live="polite"></span>
+                </div>
+                <div id="memoryOsPanel" aria-live="polite"></div>
+              </section>
+
               <section id="pipeline" class="content-card">
                 <div class="section-title-row">
                   <h2>Pipeline Flow</h2>
@@ -860,6 +869,20 @@
         }</tbody></table>`;
         tasksCards.innerHTML = list.map(t => `<div class="item"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('');
       }
+      function renderMemoryOs(data){
+        const memory = data?.memory_os || {};
+        const context = memory.last_context || {};
+        const health = memory.health || {};
+        const reasons = Array.isArray(memory.reason_codes) ? memory.reason_codes : [];
+        memoryOsStatus.innerHTML = badge(memory.status || 'UNKNOWN');
+        memoryOsPanel.innerHTML = `<table><tbody>
+          <tr><th>Health</th><td>${badge(health.status || memory.status || 'UNKNOWN')}</td></tr>
+          <tr><th>Son bağlam</th><td>${context.available ? esc(context.title || context.context_id || context.task_id || '-') : '-'}</td></tr>
+          <tr><th>Özet</th><td>${esc(context.summary || '-')}</td></tr>
+          <tr><th>Güncelleme</th><td>${esc(flowDateTime(memory.updated_at || health.updated_at || context.updated_at))}</td></tr>
+          <tr><th>Neden</th><td>${reasons.length ? reasons.map(reason => badge(reason)).join(' ') : '-'}</td></tr>
+        </tbody></table>`;
+      }
       function flowStages(){
         return latestFlow && Array.isArray(latestFlow.stages) ? latestFlow.stages : [];
       }
@@ -1051,6 +1074,7 @@
         latest = data;
         renderAccount(data);
         renderMetrics();
+        renderMemoryOs(data);
         fillFilters();
         renderTasks();
       }
