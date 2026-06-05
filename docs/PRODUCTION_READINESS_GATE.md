@@ -13,6 +13,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Worker lifecycle test PASS
 - Queue / recovery test PASS
 - Dashboard route/API test PASS
+- Memory OS dashboard contract PASS
 - Telegram bridge/direct CTO test PASS
 - Secret leakage scan PASS
 - Forbidden operation scan PASS
@@ -35,6 +36,7 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - `parallel_worker_regression` dört dummy/simülasyon task için dispatch, wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular.
+- `memory_os_dashboard_contract` ana/legacy `/api/status` payload'undaki `memory_os` görünürlüğünü, dashboard markerlarını, simulator vakasını ve template kayıtlarını statik olarak doğrular.
 - Restart/failure injection kapıları `static_non_mutating_contract`, paralel worker kapısı `parallel_worker_lifecycle_simulation` modunda çalışır; hepsi `production_deploy_performed=false` beyanını korur.
 
 ## Telegram Sonuç Raporu

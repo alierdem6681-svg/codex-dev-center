@@ -91,6 +91,7 @@ LEGACY_PANEL_SERVER_SPEC.loader.exec_module(legacy_panel_server)
 
 import pipeline_flow  # noqa: E402
 import quality_gate_view  # noqa: E402
+import memory_os_status  # noqa: E402
 
 
 class WorkerStatusModelTest(unittest.TestCase):
@@ -555,6 +556,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "forbidden_operation_scan",
                 "unit_test",
                 "integration_test",
+                "memory_os_dashboard_contract",
                 "staging_smoke_test",
                 "rollback_simulation",
                 "restart_simulation",
@@ -668,6 +670,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "forbidden_operation_scan",
                 "unit_test",
                 "integration_test",
+                "memory_os_dashboard_contract",
                 "staging_smoke_test",
                 "rollback_simulation",
                 "restart_simulation",
@@ -733,6 +736,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "forbidden_operation_scan",
                 "unit_test",
                 "integration_test",
+                "memory_os_dashboard_contract",
                 "staging_smoke_test",
                 "rollback_simulation",
                 "restart_simulation",
@@ -801,6 +805,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "forbidden_operation_scan",
                 "unit_test",
                 "integration_test",
+                "memory_os_dashboard_contract",
                 "staging_smoke_test",
                 "rollback_simulation",
                 "restart_simulation",
@@ -1617,6 +1622,18 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(result["route"], "async_job")
         self.assertEqual(result["ack_deadline_seconds"], 3)
 
+    def test_memory_os_dashboard_simulator_case_is_registered(self):
+        labels = [label for label, _message in telegram_direct_cto_simulator.CASES]
+        self.assertIn("memory_os_dashboard", labels)
+
+        result = telegram_direct_cto_simulator.simulate_case(
+            "memory_os_dashboard",
+            "Memory OS health ve son bağlam görünürlüğünü dashboardda kontrol et.",
+        )
+
+        self.assertEqual(result["metadata"]["name"], "Memory OS Modülü")
+        self.assertFalse(result["critical_operation_findings"])
+
     def test_observed_issue_action_mode_builds_ten_backlog_tasks(self):
         tasks = direct_cto_action_mode.build_backlog(
             "Terminal ile testler yap, logları incele ve sık karşılaşılan 10 hata eksik veya sorunu kendine görev olarak aç.",
@@ -2108,7 +2125,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 """
                 <title>Codex Dev Center Yönetim Paneli</title>
                 <div>Görevler, pipeline flow ve güvenli panel yönetimi</div>
-                <nav>Pipeline Flow Görevler Workers Çıkış</nav>
+                <nav>Memory OS Pipeline Flow Görevler Workers Çıkış</nav>
                 <main>
                   <span>Aktif Kuyruk</span>
                   <span>Canlı İşler</span>
@@ -2126,6 +2143,9 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                       closed: 'Kapalı',
                       deployed: 'Canlı'
                     };
+                    const memoryOsStatus = {};
+                    const memoryOsPanel = {};
+                    function renderMemoryOs(){}
                   </script>
                 </main>
                 """,
@@ -2145,6 +2165,17 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 production_readiness_suite.ROOT = original_root
 
         self.assertTrue(results["dashboard_route_api_test"]["ok"])
+
+    def test_memory_os_dashboard_contract_gate_passes(self):
+        results = {}
+
+        production_readiness_suite.memory_os_dashboard_contract(results)
+
+        gate = results["memory_os_dashboard_contract"]
+        self.assertTrue(gate["ok"])
+        self.assertEqual(gate["details"]["mode"], "static_read_only_dashboard_contract")
+        self.assertFalse(gate["details"]["production_deploy_performed"])
+        self.assertFalse(gate["details"]["mutating_cloud_operations_performed"])
 
     def test_iter_repo_text_files_tolerates_deleted_directory_during_walk(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2641,6 +2672,135 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
                 for module, original_state in originals.items():
                     module.STATE = original_state
 
+
+class DashboardMemoryOsStatusTest(unittest.TestCase):
+    def test_memory_os_status_missing_runtime_markers_is_unknown_read_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "state").mkdir()
+            templates = root / "state_templates"
+            templates.mkdir()
+            (templates / "module_settings.json").write_text(
+                json.dumps({"memory_os": {"enabled": True}}),
+                encoding="utf-8",
+            )
+
+            payload = memory_os_status.build_memory_os_status(root)
+
+        self.assertEqual(payload["contract_version"], 1)
+        self.assertTrue(payload["enabled"])
+        self.assertTrue(payload["read_only"])
+        self.assertEqual(payload["status"], "UNKNOWN")
+        self.assertIn("no_runtime_marker", payload["reason_codes"])
+        self.assertFalse(payload["last_context"]["available"])
+        self.assertFalse(payload["raw_context_included"])
+        self.assertFalse(payload["secret_values_included"])
+        self.assertFalse(payload["production_deploy_allowed"])
+        self.assertFalse(payload["mutating_actions_allowed"])
+
+    def test_memory_os_status_exposes_only_safe_last_context_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir()
+            templates = root / "state_templates"
+            templates.mkdir()
+            (templates / "module_settings.json").write_text(
+                json.dumps({"memory_os": {"enabled": True}}),
+                encoding="utf-8",
+            )
+            (state / "memory_os_status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "PASS",
+                        "checked_at": "2026-06-05T05:20:00+00:00",
+                        "raw_payload": {"ignored": "RAW SHOULD NOT LEAK"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state / "memory_os_last_context.json").write_text(
+                json.dumps(
+                    {
+                        "context_id": "CTX-1",
+                        "task_id": "TASK-1",
+                        "title": "Memory OS runtime handoff",
+                        "summary": "Last safe context summary for the CTO workflow.",
+                        "intent_domain": "memory_os",
+                        "updated_at": "2026-06-05T05:21:00+00:00",
+                        "raw_message": "RAW SHOULD NOT LEAK",
+                        "stdout": "terminal output should not leak",
+                        "storage_path": "/opt/should/not/leak",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            payload = memory_os_status.build_memory_os_status(root)
+
+        text = json.dumps(payload, ensure_ascii=False)
+        self.assertEqual(payload["status"], "HEALTHY")
+        self.assertEqual(payload["health"]["status"], "HEALTHY")
+        self.assertEqual(payload["last_context"]["context_id"], "CTX-1")
+        self.assertEqual(payload["last_context"]["task_id"], "TASK-1")
+        self.assertEqual(payload["last_context"]["summary"], "Last safe context summary for the CTO workflow.")
+        self.assertIn("unsafe_fields_ignored", payload["reason_codes"])
+        self.assertNotIn("RAW SHOULD NOT LEAK", text)
+        self.assertNotIn("terminal output should not leak", text)
+        self.assertNotIn("/opt/should/not/leak", text)
+
+    def test_status_payload_exposes_memory_os_for_all_panel_servers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = root / "state"
+            state.mkdir(parents=True)
+            templates = root / "state_templates"
+            templates.mkdir()
+            (templates / "module_settings.json").write_text(
+                json.dumps({"memory_os": {"enabled": True}}),
+                encoding="utf-8",
+            )
+            (state / "memory_os_status.json").write_text(
+                json.dumps({"status": "healthy", "checked_at": "2099-01-01T00:00:00+00:00"}),
+                encoding="utf-8",
+            )
+            (state / "memory_os_last_context.json").write_text(
+                json.dumps({"context_id": "CTX-STATUS", "summary": "Dashboard safe last context."}),
+                encoding="utf-8",
+            )
+
+            originals = {}
+            try:
+                for module in (panel_server, legacy_panel_server):
+                    originals[module] = {
+                        "ROOT": module.ROOT,
+                        "STATE": module.STATE,
+                        "REPORTS": module.REPORTS,
+                        "services": getattr(module, "services", None),
+                    }
+                    module.ROOT = root
+                    module.STATE = state
+                    module.REPORTS = root / "reports"
+                    if hasattr(module, "services"):
+                        module.services = lambda: []
+
+                    payload = module.status_payload()
+                    self.assertIn("memory_os", payload)
+                    self.assertEqual(payload["memory_os"]["contract_version"], 1)
+                    self.assertEqual(payload["memory_os"]["status"], "HEALTHY")
+                    self.assertEqual(payload["memory_os"]["last_context"]["context_id"], "CTX-STATUS")
+                    self.assertTrue(payload["memory_os"]["read_only"])
+                    self.assertFalse(payload["memory_os"]["production_deploy_allowed"])
+            finally:
+                for module, original in originals.items():
+                    module.ROOT = original["ROOT"]
+                    module.STATE = original["STATE"]
+                    module.REPORTS = original["REPORTS"]
+                    if original["services"] is not None:
+                        module.services = original["services"]
+
+
+class DashboardQualityGateViewStatusTest(unittest.TestCase):
     def test_quality_gate_view_contract_maps_readiness_and_health(self):
         computed_at = "2026-06-04T12:00:00+00:00"
         cases = [

@@ -411,3 +411,11 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Memory OS Dashboard And Tests Apply
+
+Memory OS dashboard/test paketi eklendi. Ana ve legacy panel `/api/status` payload'u artik `memory_os` alanini dondurur. `web_panel/memory_os_status.py` opsiyonel runtime marker dosyalarini salt okunur okur; marker yoksa `UNKNOWN` ve reason code dondurur.
+
+Dashboard Memory OS bolumu health ve son baglam ozetini allowlist DTO ile gosterir. Raw context, raw payload, stdout/stderr, log, diff, storage path ve secret-like degerler payload disinda kalir. `memory_os_dashboard_contract` production readiness gate'i ve Telegram Direct CTO simulator Memory OS dashboard case'i eklendi.
+
+Testler PASS: compile, Memory OS unit testleri, `tests.test_runtime_status_model`, tum unittest discover, read-only production readiness suite ve `git diff --check`. Production deploy, staging deploy, gercek servis smoke, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yapilmadi.

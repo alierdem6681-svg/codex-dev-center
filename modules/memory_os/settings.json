@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "dashboard_payload_key": "memory_os",
+  "endpoint": "/api/status",
+  "read_only": true,
+  "health_sources": [
+    "state/memory_os_status.json",
+    "state/memory_os_health.json"
+  ],
+  "last_context_sources": [
+    "state/memory_os_last_context.json",
+    "state/memory_os_context.json"
+  ],
+  "return_raw_context": false,
+  "return_raw_payload": false,
+  "return_terminal_output": false,
+  "return_secret_values": false,
+  "production_deploy_allowed": false,
+  "mutating_actions_allowed": false,
+  "test_command": "{python} -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest",
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

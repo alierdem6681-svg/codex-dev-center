@@ -1,0 +1,26 @@
+{
+  "actions": [
+    {
+      "id": "view_memory_os_status",
+      "label": "View Memory OS Status",
+      "module": "memory_os",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/api/status",
+      "payload_key": "memory_os"
+    },
+    {
+      "id": "validate_memory_os_dashboard_contract",
+      "label": "Validate Memory OS Dashboard Contract",
+      "module": "memory_os",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest"
+    }
+  ],
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

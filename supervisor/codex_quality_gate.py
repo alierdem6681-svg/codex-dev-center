@@ -46,7 +46,7 @@ STANDARD_REPORT_GATES = {
         "forbidden_operation_scan",
     ],
     "unit_test": ["unit_test"],
-    "integration_test": ["integration_test"],
+    "integration_test": ["integration_test", "memory_os_dashboard_contract"],
     "simulation_dry_run": [
         "staging_smoke_test",
         "rollback_simulation",

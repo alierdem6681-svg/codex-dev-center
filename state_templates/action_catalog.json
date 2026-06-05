@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -48,6 +48,34 @@
       "legacy_decision_source_allowed": false,
       "readiness_report_text_freshness_checked": true,
       "readiness_report_required_gate_consistency_checked": true
+    },
+    {
+      "id": "view_memory_os_status",
+      "label": "Memory OS Durum Görünümü",
+      "module": "memory_os",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/api/status",
+      "payload_key": "memory_os",
+      "read_only": true,
+      "raw_context_included": false,
+      "terminal_output_included": false,
+      "secret_values_included": false,
+      "production_deploy_allowed": false,
+      "mutating_actions_allowed": false
+    },
+    {
+      "id": "validate_memory_os_dashboard_contract",
+      "label": "Memory OS Dashboard Sözleşmesini Doğrula",
+      "module": "memory_os",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest",
+      "production_deploy_allowed": false
     },
     {
       "id": "panel_first_user_setup",

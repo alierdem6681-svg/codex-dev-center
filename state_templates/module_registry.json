@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -28,6 +28,20 @@
       "description": "Read-only pipeline stage backend payload with live polling revision/reset contract for dashboard flow tabs without raw task messages or terminal output.",
       "actions": [
         "view_pipeline_flow"
+      ]
+    },
+    {
+      "id": "memory_os",
+      "name": "Memory OS Dashboard",
+      "status": "contract_ready",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Read-only Memory OS health and last context visibility for dashboard status payloads without raw context, terminal output or secret-like values.",
+      "actions": [
+        "view_memory_os_status",
+        "validate_memory_os_dashboard_contract"
       ]
     },
     {

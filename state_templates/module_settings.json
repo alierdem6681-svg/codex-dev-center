@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -26,7 +26,29 @@
     "show_quality_gate_view": true,
     "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
-    "show_pipeline_flow": true
+    "show_pipeline_flow": true,
+    "show_memory_os_status": true
+  },
+  "memory_os": {
+    "enabled": true,
+    "dashboard_payload_key": "memory_os",
+    "endpoint": "/api/status",
+    "read_only": true,
+    "health_sources": [
+      "state/memory_os_status.json",
+      "state/memory_os_health.json"
+    ],
+    "last_context_sources": [
+      "state/memory_os_last_context.json",
+      "state/memory_os_context.json"
+    ],
+    "return_raw_context": false,
+    "return_raw_payload": false,
+    "return_terminal_output": false,
+    "return_secret_values": false,
+    "production_deploy_allowed": false,
+    "mutating_actions_allowed": false,
+    "test_command": "{python} -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest"
   },
   "quality_gate_view": {
     "enabled": true,

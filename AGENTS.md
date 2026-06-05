@@ -198,6 +198,12 @@ Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk pro
 
 `report_text.readiness` ham markdown metni tek basina guncel PASS kaniti sayilamaz. Ana ve legacy `/api/status` payload'lari `report_text_status.readiness` metadata alanini dondurur; readiness raporu policy `updated_at` tarihinden eskiyse veya policy `required_gates` listesini tam icermiyorsa status `UNKNOWN`, freshness `stale` veya ilgili reason code ile isaretlenir.
 
+## DASHBOARD MEMORY OS VISIBILITY V1
+
+Ana ve legacy panel `/api/status` payload'lari `memory_os` alanini salt okunur olarak dondurur. Bu alan Memory OS health ve son baglam ozetini allowlist DTO ile gosterir; raw context, raw payload, stdout/stderr, log, diff, storage path, secret/env/token/private key degeri veya Authorization/header bilgisi dondurmemelidir.
+
+Runtime marker dosyalari eksikse sonuc `UNKNOWN` ve `no_runtime_marker`/`no_last_context_marker` reason code'lariyla kalir. Bu gorunurluk production deploy, runtime state mutate, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## TELEGRAM READINESS RESULT REPORT CONTRACT V1
 
 `supervisor/production_readiness_suite.py` `telegram_result_report_flow` kapisiyla staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini Telegram-safe kisa ozet sozlesmesiyle dogrular.

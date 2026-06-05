@@ -1,0 +1,15 @@
+{
+  "id": "memory_os",
+  "name": "Memory OS Dashboard",
+  "status": "contract_ready",
+  "risk": "medium",
+  "settings_enabled": true,
+  "actions_enabled": true,
+  "dashboard_visible": true,
+  "description": "Read-only Memory OS health and last context dashboard visibility.",
+  "actions": [
+    "view_memory_os_status",
+    "validate_memory_os_dashboard_contract"
+  ],
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

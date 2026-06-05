@@ -1095,3 +1095,32 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Memory OS Dashboard And Tests Apply
+
+Tarih: 2026-06-05
+Görev: CTO-ACTION-20260605-052521-04-MEMORY-OS-DASHBOARD-TESTS
+Worker: worker-4
+
+Eklenenler:
+- `web_panel/memory_os_status.py` Memory OS health ve son baglam icin read-only, allowlist DTO helper'i olarak eklendi.
+- Ana ve legacy `/api/status` payload'lari `memory_os` alanini dondurur.
+- Dashboard HTML'inde Memory OS bolumu health, son baglam, ozet, guncelleme ve reason code bilgilerini gosterir.
+- `supervisor/production_readiness_suite.py` `memory_os_dashboard_contract` gate'ini ekledi.
+- Telegram Direct CTO simulator Memory OS dashboard case'i ve unit testler eklendi.
+- `modules/memory_os/`, module registry, module settings, action catalog, AGENTS, anayasa, onboarding, roadmap ve readiness gate dokumanlari guncellendi.
+
+Test:
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.DashboardMemoryOsStatusTest -v` PASS, 3 test.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 210 test.
+- `python3 -m unittest discover -s tests` PASS, 239 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `memory_os_dashboard_contract` PASS; write status `completed_with_write_skipped`.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, gercek staging/prod servis smoke cagrisi, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Smoke kapsami readiness suite icindeki `staging_smoke_test` dry-run non-mutating sozlesmesiyle dogrulandi; production smoke calistirilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari guncellendi.

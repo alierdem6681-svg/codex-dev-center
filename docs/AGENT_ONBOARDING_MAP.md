@@ -89,6 +89,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py `CHECK_MODE=read_only` veya `CHECK_MODE=dry_run` altında state/report yazmadan JSON sonucunda `write_evidence` ve `write_status=completed_with_write_skipped` döndürür
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki `parallel_worker_regression` kapısı dört dummy/simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular
+- supervisor/production_readiness_suite.py içindeki `memory_os_dashboard_contract` kapısı Memory OS health/last context dashboard görünürlüğünü statik, read-only ve non-mutating olarak doğrular
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
@@ -121,6 +122,7 @@ Dashboard status API notu:
 - `/api/pipeline-flow` live polling kontrati `serverRevision`, `resetToken`, `requiresUiReset`, `mergePolicy` ve `initialUiDefaults` alanlarini dondurur. Frontend eski veya ayni revision refresh'lerini uygulamaz; reset token degismedikce client-owned stage/expand/filter/scroll state korunmalidir.
 - `/api/status` ana ve legacy panelde `qualityGateView` alanini dondurur; dashboard kalite kapisi badge, renk, filtre ve ozet karari icin sadece bu kontrati kullanmalidir. `quality_gate_status` legacy diagnostik bilgi olarak `legacy_quality_gate_status` altinda tasinir ve pozitif READY karari uretmez.
 - `/api/status` ana ve legacy panelde `report_text_status.readiness` alanini da dondurur; ham `report_text.readiness` markdown'u policy `updated_at` tarihinden eskiyse veya `required_gates` listesini tam icermiyorsa guncel PASS kaniti sayilmamali ve `UNKNOWN`/stale metadata'si dikkate alinmalidir.
+- `/api/status` ana ve legacy panelde `memory_os` alanini dondurur; Memory OS health ve son baglam ozeti raw context, raw payload, stdout/stderr, log, diff, storage path veya secret-like degerler olmadan allowlist DTO ile gosterilmelidir.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 

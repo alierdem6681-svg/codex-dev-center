@@ -16,6 +16,7 @@ if str(WEB_PANEL_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_PANEL_DIR))
 
 import auth as panel_auth
+from memory_os_status import build_memory_os_status
 from pipeline_flow import build_pipeline_flow
 from quality_gate_view import build_quality_gate_view, normalize_readiness_report_text
 from telegram_asset_inbox import build_telegram_asset_detail, build_telegram_asset_list
@@ -354,6 +355,7 @@ def status_payload():
         "system_state": system_state,
         "controlled_execution": controlled_execution_summary(system_state),
         "qualityGateView": build_quality_gate_view(production_readiness, last_health_check, legacy_quality_gate),
+        "memory_os": build_memory_os_status(ROOT),
         "workers": workers_payload,
         "tasks": tasks_payload,
         "operations": queue_diagnostics(tasks_payload, workers_payload, system_state, production_deploy, github_actions),
