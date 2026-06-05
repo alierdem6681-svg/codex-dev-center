@@ -19,7 +19,7 @@ Her agent, worker veya Codex oturumu işe başlamadan önce aşağıdaki dosyala
 
 Hiçbir agent doğrudan kontrolsüz canlı değişiklik yapamaz.
 
-Önce görevi anlar, plan çıkarır, dosya değişikliklerini yapar, test eder, log yazar, rapor üretir ve risk seviyesine göre onay ister veya otomatik kapılardan geçer.
+Önce görevi anlar, plan çıkarır, dosya değişikliklerini yapar, test eder, log yazar, rapor üretir ve risk seviyesine göre kullanıcı onayı istemeden zorunlu gate/pipeline kapılarından geçer.
 
 ## 4. Telegram Kuralı
 
