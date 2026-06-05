@@ -5,6 +5,7 @@ from typing import Any
 
 
 CONTRACT_VERSION = 1
+REPORT_TEXT_CONTRACT_VERSION = 1
 STALE_AFTER_SECONDS = 24 * 60 * 60
 
 VIEW_STATUS_SEVERITY = {
@@ -60,6 +61,43 @@ def normalized_status_text(payload: Any) -> str:
     return str(payload.get("status") or payload.get("result") or "").strip().upper()
 
 
+def readiness_report_generated_at(report_text: Any) -> str | None:
+    for line in str(report_text or "").splitlines():
+        key, separator, value = line.partition(":")
+        if separator and key.strip().lower() == "generated at":
+            return value.strip() or None
+    return None
+
+
+def readiness_report_gate_names(report_text: Any) -> set[str]:
+    gates: set[str] = set()
+    for line in str(report_text or "").splitlines():
+        text = line.strip()
+        if not text.startswith("- "):
+            continue
+        name, separator, _status = text[2:].partition(":")
+        if separator:
+            gate = name.strip()
+            if gate:
+                gates.add(gate)
+    return gates
+
+
+def policy_required_gates(policy_payload: Any) -> list[str]:
+    if not isinstance(policy_payload, dict):
+        return []
+    gates = policy_payload.get("required_gates")
+    if not isinstance(gates, list):
+        return []
+    return [str(gate).strip() for gate in gates if str(gate or "").strip()]
+
+
+def policy_updated_at(policy_payload: Any) -> str | None:
+    if not isinstance(policy_payload, dict):
+        return None
+    return first_text(policy_payload.get("updated_at"), policy_payload.get("generated_at"))
+
+
 def updated_at(payload: Any) -> str | None:
     if not isinstance(payload, dict):
         return None
@@ -70,6 +108,69 @@ def updated_at(payload: Any) -> str | None:
         payload.get("finished_at"),
         payload.get("created_at"),
     )
+
+
+def normalize_readiness_report_text(
+    report_text: Any,
+    policy_payload: Any,
+    computed_at: str | None = None,
+) -> dict[str, Any]:
+    computed = computed_at or utc_now_iso()
+    text = str(report_text or "")
+    report_missing = not text.strip()
+    generated_at = readiness_report_generated_at(text)
+    policy_updated = policy_updated_at(policy_payload)
+    report_time = parse_time(generated_at)
+    policy_time = parse_time(policy_updated)
+    required_gates = policy_required_gates(policy_payload)
+    observed_gates = readiness_report_gate_names(text)
+    missing_required_gates = [gate for gate in required_gates if gate not in observed_gates]
+
+    reason_codes: list[str] = []
+    if report_missing:
+        reason_codes.append("readiness_report_missing")
+    if not report_missing and not generated_at:
+        reason_codes.append("readiness_report_generated_at_missing")
+    if generated_at and report_time is None:
+        reason_codes.append("readiness_report_generated_at_invalid")
+    if not isinstance(policy_payload, dict) or not policy_payload:
+        reason_codes.append("readiness_policy_missing")
+    elif not required_gates:
+        reason_codes.append("readiness_policy_required_gates_missing")
+    if isinstance(policy_payload, dict) and policy_payload and not policy_updated:
+        reason_codes.append("readiness_policy_updated_at_missing")
+    if policy_updated and policy_time is None:
+        reason_codes.append("readiness_policy_updated_at_invalid")
+    report_stale = bool(report_time and policy_time and report_time < policy_time)
+    if report_stale:
+        reason_codes.append("readiness_report_stale")
+    if missing_required_gates:
+        reason_codes.append("missing_required_gate")
+
+    trustworthy = not reason_codes
+    freshness = "current"
+    if report_missing:
+        freshness = "missing"
+    elif generated_at and report_time is None:
+        freshness = "invalid"
+    elif report_stale:
+        freshness = "stale"
+    elif not generated_at:
+        freshness = "unknown"
+
+    return {
+        "contract_version": REPORT_TEXT_CONTRACT_VERSION,
+        "status": "CURRENT" if trustworthy else "UNKNOWN",
+        "trustworthy": trustworthy,
+        "freshness": freshness,
+        "reason_codes": reason_codes,
+        "computed_at": computed,
+        "generated_at": generated_at,
+        "policy_updated_at": policy_updated,
+        "required_gate_count": len(required_gates),
+        "observed_gate_count": len(observed_gates),
+        "missing_required_gates": missing_required_gates,
+    }
 
 
 def is_stale(timestamp: str | None, computed_at: str) -> bool:

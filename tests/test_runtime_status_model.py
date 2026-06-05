@@ -2606,6 +2606,60 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
         self.assertIn("readiness_stale", view["reason_codes"])
         self.assertIn("legacy_fallback_non_authoritative", view["reason_codes"])
 
+    def test_readiness_report_text_status_marks_stale_policy_mismatch(self):
+        report_text = "\n".join(
+            [
+                "# Production Readiness Last Report",
+                "",
+                "Generated at: 2026-06-02T08:46:04+00:00",
+                "Status: PASS",
+                "",
+                "## Gates",
+                "- unit_test: PASS",
+            ]
+        )
+        policy = {
+            "updated_at": "2026-06-04T18:05:05+00:00",
+            "required_gates": ["unit_test", "telegram_result_report_flow", "parallel_worker_regression"],
+        }
+
+        status = quality_gate_view.normalize_readiness_report_text(
+            report_text,
+            policy,
+            computed_at="2026-06-05T00:00:00+00:00",
+        )
+
+        self.assertEqual(status["contract_version"], 1)
+        self.assertEqual(status["status"], "UNKNOWN")
+        self.assertFalse(status["trustworthy"])
+        self.assertEqual(status["freshness"], "stale")
+        self.assertEqual(status["generated_at"], "2026-06-02T08:46:04+00:00")
+        self.assertEqual(status["policy_updated_at"], "2026-06-04T18:05:05+00:00")
+        self.assertIn("readiness_report_stale", status["reason_codes"])
+        self.assertIn("missing_required_gate", status["reason_codes"])
+        self.assertEqual(
+            status["missing_required_gates"],
+            ["telegram_result_report_flow", "parallel_worker_regression"],
+        )
+
+        current_status = quality_gate_view.normalize_readiness_report_text(
+            "\n".join(
+                [
+                    "Generated at: 2026-06-05T00:00:00+00:00",
+                    "- unit_test: PASS",
+                    "- telegram_result_report_flow: PASS",
+                    "- parallel_worker_regression: PASS",
+                ]
+            ),
+            policy,
+            computed_at="2026-06-05T00:00:01+00:00",
+        )
+
+        self.assertEqual(current_status["status"], "CURRENT")
+        self.assertTrue(current_status["trustworthy"])
+        self.assertEqual(current_status["freshness"], "current")
+        self.assertEqual(current_status["missing_required_gates"], [])
+
     def test_status_payload_exposes_quality_gate_view_for_all_panel_servers(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "state"
@@ -2642,6 +2696,49 @@ class DashboardPipelineTrackingStatusTest(unittest.TestCase):
             finally:
                 for module, original_state in originals.items():
                     module.STATE = original_state
+
+    def test_status_payload_exposes_readiness_report_text_status_for_all_panel_servers(self):
+        report_text = "\n".join(
+            [
+                "# Production Readiness Last Report",
+                "",
+                "Generated at: 2026-06-02T08:46:04+00:00",
+                "Status: PASS",
+                "",
+                "## Gates",
+                "- unit_test: PASS",
+                "- integration_test: PASS",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            reports = Path(tmp) / "reports"
+            state.mkdir(parents=True)
+            reports.mkdir(parents=True)
+            (reports / "production_readiness_last_report.md").write_text(report_text, encoding="utf-8")
+
+            originals = {
+                panel_server: (panel_server.STATE, panel_server.REPORTS),
+                legacy_panel_server: (legacy_panel_server.STATE, legacy_panel_server.REPORTS),
+            }
+            try:
+                for module in originals:
+                    module.STATE = state
+                    module.REPORTS = reports
+                    payload = module.status_payload()
+                    readiness_status = payload["report_text_status"]["readiness"]
+                    self.assertEqual(payload["report_text"]["readiness"], report_text)
+                    self.assertEqual(readiness_status["status"], "UNKNOWN")
+                    self.assertEqual(readiness_status["freshness"], "stale")
+                    self.assertFalse(readiness_status["trustworthy"])
+                    self.assertIn("readiness_report_stale", readiness_status["reason_codes"])
+                    self.assertIn("missing_required_gate", readiness_status["reason_codes"])
+                    self.assertIn("telegram_result_report_flow", readiness_status["missing_required_gates"])
+                    self.assertIn("parallel_worker_regression", readiness_status["missing_required_gates"])
+            finally:
+                for module, (original_state, original_reports) in originals.items():
+                    module.STATE = original_state
+                    module.REPORTS = original_reports
 
 
 class DashboardPipelineFlowTest(unittest.TestCase):

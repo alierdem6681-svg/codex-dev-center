@@ -1076,3 +1076,22 @@ Not:
 - Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `.git/index.lock` yazımı read-only filesystem nedeniyle başarısız oldu; GitHub MCP branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## Readiness Report Text Freshness Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-050301 / CTO-BACKLOG-20260605-045701-343711-PRODUCTION-READINESS-ANALIZI
+Worker: worker-3
+
+Eklenenler:
+- `web_panel/quality_gate_view.py` readiness report text metadata helper'i ekledi.
+- Ana ve legacy `/api/status` payload'lari `report_text_status.readiness` alanini dondurur.
+- Ham `report_text.readiness` markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
+- Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, roadmap, AGENTS, anayasa ve memory kayitlari guncellendi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.

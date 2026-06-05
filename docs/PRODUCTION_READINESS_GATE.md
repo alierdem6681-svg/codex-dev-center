@@ -46,6 +46,14 @@ Readiness suite `telegram_result_report_flow` kapısıyla kullanıcıya gidebile
 - Diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, token/private key/env değeri veya runtime path bilgisi içeremez.
 - Bu kapı gerçek Telegram API çağırmaz; sadece güvenli özet sözleşmesini test eder.
 
+## Dashboard Kanıt Görünürlüğü
+
+Dashboard ham `reports/production_readiness_last_report.md` metnini gösterirse `/api/status` içinde `report_text_status.readiness` metadata'sını da döndürmelidir.
+
+- Rapor `Generated at` tarihi policy `updated_at` tarihinden eskiyse status `UNKNOWN`, freshness `stale` olur.
+- Rapor policy `required_gates` listesini tam içermiyorsa `missing_required_gate` reason code'u ve eksik gate listesi döner.
+- Ham PASS metni bu metadata olmadan güncel readiness kanıtı sayılmaz.
+
 ## Otomatik Yayına Alma Kuralı
 
 `production_requires_explicit_approval=false` normal Codex Dev Center app deploy'u için hedef kuraldır. Bu, kontrolsüz yayına alma anlamına gelmez.
