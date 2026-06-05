@@ -198,6 +198,10 @@ Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk pro
 
 `report_text.readiness` ham markdown metni tek basina guncel PASS kaniti sayilamaz. Ana ve legacy `/api/status` payload'lari `report_text_status.readiness` metadata alanini dondurur; readiness raporu policy `updated_at` tarihinden eskiyse veya policy `required_gates` listesini tam icermiyorsa status `UNKNOWN`, freshness `stale` veya ilgili reason code ile isaretlenir.
 
+## DASHBOARD NEUTRAL BACKGROUND CONTRACT V1
+
+Ana dashboard doğa/manzara bitmap arka planı kullanmaz. `web_panel/static/index.html` nötr uygulama arka planı ile çalışır ve `/assets/dashboard-landscape.png` referansı bulunmamalıdır. Bu görsel düzenleme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## TELEGRAM READINESS RESULT REPORT CONTRACT V1
 
 `supervisor/production_readiness_suite.py` `telegram_result_report_flow` kapisiyla staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini Telegram-safe kisa ozet sozlesmesiyle dogrular.

@@ -1,6 +1,17 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:27:05+00:00",
   "actions": [
+    {
+      "id": "view_dashboard",
+      "label": "Dashboard Görünümü",
+      "module": "dashboard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/",
+      "background_image_enabled": false
+    },
     {
       "id": "panel_login",
       "label": "Panel Girişi",
