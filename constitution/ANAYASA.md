@@ -88,6 +88,8 @@ Dashboard ham readiness rapor metnini gösterirken `report_text_status.readiness
 
 Production readiness sonucu Telegram'a bildirilecekse önce `telegram_result_report_flow` sözleşmesiyle kısa ve güvenli özet doğrulanmalıdır. Bu özet staging health/smoke, rollback planı, readiness sonucu ve production deploy yapılmadı bilgisini taşıyabilir; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key değeri veya runtime path bilgisi taşıyamaz ve gerçek Telegram API çağrısı yapmadan test edilir.
 
+Arka plan CTO ACK, progress-aware watchdog ve retryable hata sınıflandırması production readiness içinde ayrı sözleşmeyle doğrulanmalıdır. Aynı Telegram `update_id` için `ack_correlation_id` tek job/tek ACK davranışını korumalı; yalnız stdout gürültüsü anlamlı progress sayılmamalı; timeout/usage-limit/geçici worker hataları retryable, proposal üretmeden biten veya kritik destructive istekler non-retryable/approval kapsamında kalmalıdır.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

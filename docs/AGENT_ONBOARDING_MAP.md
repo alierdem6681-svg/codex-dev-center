@@ -194,6 +194,12 @@ Observed issue completion notu:
 - `codex_quality_gate` retry simulation raporu `safety_status`, `safety_reasons` ve `required_false_flags` dry-run safety alanlarini uretir.
 - `supervisor_cli.reconcile_stale_dispatch_claims()` aktif worker sahipligi olmayan stale claim'leri yeni kok gorev acmadan ayni task uzerinde retry/timeout statüsüne taşır.
 
+ACK / watchdog / retry readiness notu:
+- `supervisor/telegram_direct_cto.py` async ACK akisi Telegram `update_id` varsa `ack_correlation_id` ile ayni update icin mevcut job id'sini tekrar kullanir.
+- `async_job_created(job_id)` false ise handler duplicate ACK gondermez; bu davranis Telegram polling offsetine ek idempotency emniyetidir.
+- `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'i async ACK deadline, duplicate ACK suppression, progress-aware watchdog signal ayrimi ve retryable/non-retryable hata matrisini non-mutating olarak dogrular.
+- Bu gate gercek Telegram API cagrisi, production/staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:

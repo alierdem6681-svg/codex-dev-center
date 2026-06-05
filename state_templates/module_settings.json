@@ -286,6 +286,12 @@
   "production_readiness": {
     "enabled": true,
     "simulation_contracts_required": true,
+    "ack_watchdog_retry_contract_required": true,
+    "ack_watchdog_retry_mode": "static_and_fixture_non_mutating_contract",
+    "ack_deadline_seconds": 3,
+    "duplicate_ack_suppression_required": true,
+    "progress_signal_separation_required": true,
+    "retryable_matrix_required": true,
     "restart_simulation_mode": "static_non_mutating_contract",
     "failure_injection_mode": "static_non_mutating_contract",
     "parallel_worker_regression_mode": "parallel_worker_lifecycle_simulation",

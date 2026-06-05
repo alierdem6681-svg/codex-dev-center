@@ -888,10 +888,65 @@ def is_long_task_message(text):
 
     return False
 
-def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False):
+class AsyncJobId(str):
+    def __new__(cls, value, *, created=True, ack_correlation_id=None):
+        obj = str.__new__(cls, value)
+        obj.created = bool(created)
+        obj.ack_correlation_id = ack_correlation_id
+        return obj
+
+
+def async_ack_correlation_id(chat_id, update_id=None):
+    if update_id is None:
+        return None
+    value = str(update_id).strip()
+    if not value:
+        return None
+    return f"telegram:{chat_id}:update:{value}"
+
+
+def existing_async_job_id(ack_correlation_id):
+    if not ack_correlation_id:
+        return None
+    jobs_dir = STATE / "direct_cto_jobs"
+    try:
+        for job_file in sorted(jobs_dir.glob("*.json"), key=lambda path: path.name, reverse=True):
+            try:
+                payload = json.loads(job_file.read_text(encoding="utf-8-sig"))
+            except Exception:
+                continue
+            if payload.get("ack_correlation_id") == ack_correlation_id and payload.get("id"):
+                return str(payload.get("id"))
+    except Exception:
+        return None
+    return None
+
+
+def async_job_created(job_id):
+    return bool(getattr(job_id, "created", True))
+
+
+def start_async_job_for_update(chat_id, raw_text, router_task_id=None, action_command=False, update_id=None):
+    if update_id is None:
+        return start_async_job(chat_id, raw_text, router_task_id=router_task_id, action_command=action_command)
+    return start_async_job(
+        chat_id,
+        raw_text,
+        router_task_id=router_task_id,
+        action_command=action_command,
+        update_id=update_id,
+    )
+
+
+def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False, update_id=None):
     import subprocess
     JOBS = STATE / "direct_cto_jobs"
     JOBS.mkdir(parents=True, exist_ok=True)
+    ack_correlation_id = async_ack_correlation_id(chat_id, update_id)
+    existing_job_id = existing_async_job_id(ack_correlation_id)
+    if existing_job_id:
+        return AsyncJobId(existing_job_id, created=False, ack_correlation_id=ack_correlation_id)
+
     job_id = datetime.now(timezone.utc).strftime("JOB-%Y%m%d-%H%M%S-%f")
     job_file = JOBS / (job_id + ".json")
     safe_text = redact_sensitive_text(raw_text)
@@ -919,6 +974,8 @@ def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False
         "created_at": now(),
         "updated_at": now()
     }
+    if ack_correlation_id:
+        job["ack_correlation_id"] = ack_correlation_id
     if memory_scope:
         job["memory_os_context"] = memory_scope
     job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
@@ -939,7 +996,7 @@ def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False
         start_new_session=True
     )
 
-    return job_id
+    return AsyncJobId(job_id, created=True, ack_correlation_id=ack_correlation_id)
 
 def build_prompt(raw_user_message):
     policy = "\n".join([
@@ -1112,12 +1169,13 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
 
     if wants_summary_before_new_tasks(safe_text):
         audit_passthrough(chat_id, from_user, text, safe_text, "summary_before_task_creation")
-        job_id = start_async_job(chat_id, safe_text)
-        send_message(
-            token,
-            chat_id,
-            f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
-        )
+        job_id = start_async_job_for_update(chat_id, safe_text, update_id=update_id)
+        if async_job_created(job_id):
+            send_message(
+                token,
+                chat_id,
+                f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
+            )
         return
 
     if is_non_task_information_or_preference(safe_text):
@@ -1161,8 +1219,15 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
             router_task_id = routed.get("task", {}).get("id")
         audit_route = "followup_action_context" if followup_action_text else "action_command"
         audit_passthrough(chat_id, from_user, text, action_text, audit_route)
-        job_id = start_async_job(chat_id, action_text, router_task_id=router_task_id, action_command=True)
-        send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")
+        job_id = start_async_job_for_update(
+            chat_id,
+            action_text,
+            router_task_id=router_task_id,
+            action_command=True,
+            update_id=update_id,
+        )
+        if async_job_created(job_id):
+            send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")
         return
 
     # Uzun görevlerde Telegram yanıtını bloklama; CTO işi arka planda sürdürür.
@@ -1183,8 +1248,9 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
             router_task_id = routed.get("task", {}).get("id")
             if trigger_lifecycle is not None and routed.get("subtasks"):
                 trigger_lifecycle(APP)
-        job_id = start_async_job(chat_id, safe_text, router_task_id=router_task_id)
-        send_message(token, chat_id, f"Başladım. Kısa bir ilk kontrol yapıp arkada sürdürüyorum. Job: {job_id}.")
+        job_id = start_async_job_for_update(chat_id, safe_text, router_task_id=router_task_id, update_id=update_id)
+        if async_job_created(job_id):
+            send_message(token, chat_id, f"Başladım. Kısa bir ilk kontrol yapıp arkada sürdürüyorum. Job: {job_id}.")
         return
 
     local_reply = local_natural_reply(safe_text)
@@ -1194,8 +1260,9 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
         return
 
     # Lokal/deterministik cevap gerektirmeyen her CTO/Codex işi async yürür.
-    job_id = start_async_job(chat_id, safe_text)
-    send_message(token, chat_id, f"Aldım. CTO işi arkada çalışıyor; hazır olunca güvenli özet göndereceğim. Job: {job_id}.")
+    job_id = start_async_job_for_update(chat_id, safe_text, update_id=update_id)
+    if async_job_created(job_id):
+        send_message(token, chat_id, f"Aldım. CTO işi arkada çalışıyor; hazır olunca güvenli özet göndereceğim. Job: {job_id}.")
 
 def main():
     STATE.mkdir(parents=True, exist_ok=True)
