@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T14:05:40+00:00",
+  "updated_at": "2026-06-05T14:39:23+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -295,6 +295,15 @@
   "production_readiness": {
     "enabled": true,
     "simulation_contracts_required": true,
+    "router_worker_dispatch_contract_required": true,
+    "router_worker_dispatch_mode": "router_worker_dispatch_fixture_contract",
+    "router_worker_dispatch_sources_checked": [
+      "telegram",
+      "dashboard",
+      "cto"
+    ],
+    "router_worker_dispatch_telegram_override_block_required": true,
+    "router_worker_dispatch_safe_reply_policy_required": true,
     "ack_watchdog_retry_contract_required": true,
     "ack_watchdog_retry_mode": "static_and_fixture_non_mutating_contract",
     "ack_deadline_seconds": 3,

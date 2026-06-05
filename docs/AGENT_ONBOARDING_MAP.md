@@ -203,6 +203,12 @@ ACK / watchdog / retry readiness notu:
 - `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'i async ACK deadline, duplicate ACK suppression, progress-aware watchdog signal ayrimi ve retryable/non-retryable hata matrisini non-mutating olarak dogrular.
 - Bu gate gercek Telegram API cagrisi, production/staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+Router / worker dispatch readiness notu:
+- `supervisor/cto_task_router.py` Telegram, dashboard ve CTO kaynakli isleri `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload` alanlariyla task envelope olarak normalize eder.
+- Telegram ana gorevleri worker eligibility override gelse bile worker dispatch'e acilmaz; Telegram reply policy teknik ciktiya izin vermeyen safe-summary sozlesmesidir.
+- Router'in urettiği `source=cto` alt gorevler parent `request_id`, `correlation_id` ve `reply_policy` bilgisini devralir.
+- `supervisor/production_readiness_suite.py` `router_worker_dispatch_contract` gate'i gecici fixture ile Telegram/dashboard/CTO akisini non-mutating dogrular; gercek Telegram API, worker servisi, production/staging deploy, runtime state/log/report mutasyonu veya kritik altyapi live-write islemi yapmaz.
+
 ## Servis Keşfi
 
 Ajan şu servisleri kontrol eder:

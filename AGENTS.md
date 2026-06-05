@@ -182,6 +182,14 @@ Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi 
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
 
+## ROUTER WORKER DISPATCH CONTRACT V1
+
+`supervisor/cto_task_router.py` Telegram, dashboard ve CTO kaynakli isleri router-normalized task envelope alanlariyla kaydeder: `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload`.
+
+Telegram ana gorevleri `--worker-eligible` override gelse bile worker dispatch'e acilmaz; reply policy Telegram-safe kisa ozet olarak kalir ve teknik ciktiya izin vermez. Router tarafindan uretilen `source=cto` alt gorevler parent `request_id` ve `correlation_id` bilgisini devralir.
+
+`supervisor/production_readiness_suite.py` `router_worker_dispatch_contract` kapisiyla bu davranisi gecici fixture uzerinde dogrular. Bu kapi gercek Telegram API cagirmaz, worker servisi baslatmaz, runtime state/log/report mutasyonu yapmaz, production/staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## PARALLEL WORKER REGRESSION GATE V1
 
 `supervisor/production_readiness_suite.py` `parallel_worker_regression` kapisiyla dort dummy/simulasyon task icin dispatch, lifecycle wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmamasi sozlesmesini gecici queue fixture'i uzerinden dogrular.

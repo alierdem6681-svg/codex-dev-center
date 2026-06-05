@@ -90,6 +90,8 @@ Production readiness sonucu Telegram'a bildirilecekse önce `telegram_result_rep
 
 Arka plan CTO ACK, progress-aware watchdog ve retryable hata sınıflandırması production readiness içinde ayrı sözleşmeyle doğrulanmalıdır. Aynı Telegram `update_id` için `ack_correlation_id` tek job/tek ACK davranışını korumalı; yalnız stdout gürültüsü anlamlı progress sayılmamalı; timeout/usage-limit/geçici worker hataları retryable, proposal üretmeden biten veya kritik destructive istekler non-retryable/approval kapsamında kalmalıdır.
 
+Router ve worker dispatch akışı production readiness içinde ayrı sözleşmeyle doğrulanmalıdır. Telegram, dashboard ve CTO kaynaklı işler `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload` alanlarını taşıyan router-normalized task envelope ile kaydedilmelidir. Telegram ana görevleri worker eligibility override gelse bile worker dispatch'e açılmamalı; Telegram reply policy teknik çıktı içermeyen güvenli kısa özet olarak kalmalıdır. Bu sözleşme gerçek Telegram API, worker servisi, production/staging deploy, runtime state/log/report mutasyonu veya kritik altyapı canlı yazma yetkisi vermez.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

@@ -1257,3 +1257,31 @@ Test:
 Not:
 - Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+
+---
+
+## CTO Router Worker Dispatch Contract Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-143254 / CTO-TASK-20260605-132117-915759-PRODUCTION-READINESS-ANALIZI-SUB2
+Worker: worker-1
+
+Eklenenler:
+- `supervisor/cto_task_router.py` router-normalized task envelope alanlarini yazar: `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload`.
+- Telegram ana gorevleri `worker_eligible=True` override gelse bile worker dispatch'e acilmaz; Telegram reply policy teknik ciktiya izin vermeyen safe-summary modunda kalir.
+- Router tarafindan uretilen `source=cto` alt gorevler parent `request_id`, `correlation_id` ve `reply_policy` bilgisini devralir.
+- `supervisor/production_readiness_suite.py` `router_worker_dispatch_contract` gate'ini ekledi; gate gecici fixture ile Telegram/dashboard/CTO router-dispatch sozlesmesini non-mutating dogrular.
+- `state_templates/production_readiness_policy.json`, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_router_envelope_blocks_telegram_worker_override tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_inherit_parent_envelope tests.test_runtime_status_model.WorkerStatusModelTest.test_router_worker_dispatch_contract_is_non_mutating` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.TelegramAsyncRoutingTest.test_handle_message_starts_async_for_critical_operation_without_approval` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 236 test.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `router_worker_dispatch_contract=PASS`; state/report yazımları read-only modda `write-skipped`.
+- `python3 -m json.tool` ile production readiness ve module/action template JSON dosyaları PASS.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, gercek Telegram API cagrisi, worker servisi restart, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.

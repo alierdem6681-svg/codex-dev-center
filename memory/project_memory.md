@@ -461,3 +461,13 @@ Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` b
 Production readiness analizi devamında staging health/smoke default command kaynakları wrapper scriptlere hizalandı. `production_environment_manager` ve `production_deploy_controller` default map'leri, deploy policy template, module settings ve action catalog artık `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` komutlarını gösterir.
 
 Doğrudan `production_environment_manager.py health-check/smoke-test --scope staging` çağrıları wrapper iç uygulaması olarak kalır; policy/action/default görünürlüğü wrapper scriptleri tek kaynak yapar. Davranış `tests/test_staging_readiness_wrappers.py` içine eklenen regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## 2026-06-05 CTO Router Worker Dispatch Contract Apply
+
+Router/dispatch review apply paketinde `supervisor/cto_task_router.py` task envelope alanlarini merkezi olarak yazmaya basladi: `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload`.
+
+Telegram ana gorevleri `worker_eligible=True` override gelse bile worker dispatch'e acilmaz; `reply_policy` Telegram-safe kisa ozet olarak kalir ve teknik ciktiya izin vermez. Router'in urettiği `source=cto` alt gorevler parent request/correlation bilgisini devralir.
+
+`supervisor/production_readiness_suite.py` yeni `router_worker_dispatch_contract` gate'i ile Telegram/dashboard/CTO fixture akisini gecici queue uzerinde non-mutating dogrular. Davranis `tests/test_runtime_status_model.py` unit testleri ve production readiness policy/template kayitlariyla sabitlendi.
+
+Bu paket production deploy, staging deploy, gercek Telegram API cagrisi, worker servisi restart, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.

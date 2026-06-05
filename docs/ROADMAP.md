@@ -401,3 +401,12 @@ Faz 19B-10A Model Policy
 - [x] Markup regresyon testi scenic background referansının geri eklenmemesini doğrular.
 - [x] Dashboard settings/module/action template kayıtları nötr arka plan sözleşmesine hizalandı.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 59 - CTO Router Worker Dispatch Contract
+
+- [x] Router task envelope alanlari `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `requested_permissions`, `reply_policy` ve sanitized `payload` olarak kaydedilir.
+- [x] Telegram ana gorevlerinde worker eligibility override gelse bile worker dispatch kapali kalir.
+- [x] Router tarafindan uretilen `source=cto` alt gorevler parent `request_id` ve `correlation_id` bilgisini devralir.
+- [x] Production readiness suite `router_worker_dispatch_contract` kapisiyla Telegram/dashboard/CTO fixture akisini non-mutating olarak dogrular.
+- [x] Policy, module registry/settings/action catalog ve living docs yeni gate'e hizalandi.
+- [x] Production deploy, staging deploy, gercek Telegram API, worker servisi restart, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
