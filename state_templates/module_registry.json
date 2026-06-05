@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:30:29+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -405,7 +405,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Worker workspace bootstrap preflight and local diagnostics before Codex execution starts.",
+      "description": "Worker workspace bootstrap preflight and local diagnostics before Codex execution starts, including optional repo, test surface and pipeline evidence checks.",
       "actions": [
         "run_worker_bootstrap_preflight"
       ]

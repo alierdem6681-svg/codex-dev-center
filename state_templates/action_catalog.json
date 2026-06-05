@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:30:29+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -316,9 +316,10 @@
       "enabled": true,
       "requires_approval": false,
       "non_mutating": true,
-      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_repo_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_test_surface_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface",
+      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_repo_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_test_surface_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_pipeline_evidence_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_pipeline_metadata_surface tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface",
       "requires_repo_checkout_check": true,
       "requires_test_surface_check": true,
+      "requires_pipeline_evidence_check": true,
       "secret_values_logged": false,
       "production_deploy": false
     },

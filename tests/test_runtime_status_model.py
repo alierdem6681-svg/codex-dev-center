@@ -197,6 +197,30 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(payload["checks"]["test_surface"]["status"], "missing")
         self.assertFalse(payload["secret_values_logged"])
 
+    def test_worker_bootstrap_preflight_blocks_missing_pipeline_evidence_when_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_pipeline_evidence=True)
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "blocked_no_pipeline_evidence")
+        self.assertIn("pipeline_evidence_missing", payload["issues"])
+        self.assertEqual(payload["checks"]["pipeline_evidence"]["status"], "missing")
+        self.assertFalse(payload["secret_values_logged"])
+
+    def test_worker_bootstrap_preflight_accepts_pipeline_metadata_surface(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            state_dir.mkdir()
+            (state_dir / "pipeline_status.json").write_text("{}\n", encoding="utf-8")
+
+            payload = worker_bootstrap.bootstrap_preflight(root, require_pipeline_evidence=True)
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(payload["checks"]["pipeline_evidence"]["status"], "ready")
+        self.assertIn("state/pipeline_status.json", payload["checks"]["pipeline_evidence"]["markers"])
+
     def test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface(self):
         if not shutil.which("git"):
             self.skipTest("git not available")

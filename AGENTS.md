@@ -218,6 +218,8 @@ Readiness, audit, risk review, test plan ve proposal-only isler `Controls / Read
 
 Repo apply akisi izole clone olusturduktan sonra `require_git_repo=True`, `require_local_git_metadata=True` ve `require_test_surface=True` preflight kapisindan gecmelidir. Eksik veya gecersiz repo checkout `repo_checkout_missing` / `repo_checkout_invalid`; test yuzeyi yoklugu `no_test_surface` olarak fail olur. Bu sozlesme secret/env/token/private key degeri okumaz, production deploy yapmaz ve runtime state mutate etmez.
 
+Pipeline analiz ve kalite tanisi isleri `require_pipeline_evidence=True` kullanarak CI/pipeline kaniti yoklugunu `pipeline_evidence_missing` ve `blocked_no_pipeline_evidence` reason code'lariyla ayirabilir. Bu kontrol sadece artefakt adlarini ve guvenli marker yollarini raporlar; log icerigi, stdout/stderr dump, secret/env/token/private key degeri okumaz veya yazmaz.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.
