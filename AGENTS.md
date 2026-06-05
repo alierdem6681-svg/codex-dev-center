@@ -156,6 +156,10 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## DASHBOARD NEUTRAL BACKGROUND V1
+
+Ana dashboard shell doğa/manzara bitmap arka planı kullanmaz. `web_panel/static/index.html` nötr solid arka plan kullanmalı; `/assets/dashboard-landscape.png` veya benzeri scenic background referansı geri eklenirse markup regresyon testi fail olmalıdır.
+
 ## TELEGRAM ASSET SAFETY CONTRACT V1
 
 `supervisor/telegram_asset_safety.py` Telegram asset kabulu icin manifest, limit, checksum, MIME/uzanti, secret redaction, simulator ve dashboard-safe snapshot sozlesmesini test eder. Bu kontrat gercek Telegram API'ye fallback yapmaz, asset indirmez, runtime state/log/report mutate etmez ve production deploy yetkisi vermez.
