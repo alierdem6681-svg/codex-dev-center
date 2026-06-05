@@ -75,7 +75,8 @@ QUEUE = STATE / "task_queue.json"
 DELIVERY_STATE = STATE / "cto_delivery_state.json"
 DEPLOY_WORKFLOW = "Deploy to VM"
 SMOKE_WORKFLOW = "VM Smoke Check"
-CONFIRM_PHRASE = "DEPLOY-CODEX-VM"
+CONFIRM_PHRASE = ""
+LEGACY_DEPLOY_CONFIRM_PHRASE = "DEPLOY-CODEX-VM"
 ACTIVE_WORKFLOW_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
 SUCCESSFUL_WORKFLOW_STATUS = "completed"
 SUCCESSFUL_WORKFLOW_CONCLUSION = "success"
@@ -109,6 +110,20 @@ def run(args: list[str], cwd: Path | None = None, timeout: int = 300) -> dict[st
             "returncode": proc.returncode,
             "stdout": proc.stdout[-5000:],
             "stderr": proc.stderr[-5000:],
+            "cmd": " ".join(args),
+        }
+    except Exception as exc:
+        return {"ok": False, "returncode": 1, "stdout": "", "stderr": str(exc), "cmd": " ".join(args)}
+
+
+def run_full(args: list[str], cwd: Path | None = None, timeout: int = 300) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(args, cwd=str(cwd or ROOT), text=True, capture_output=True, timeout=timeout)
+        return {
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
             "cmd": " ".join(args),
         }
     except Exception as exc:
@@ -738,7 +753,7 @@ def workflow_runs(workflow: str) -> dict[str, Any]:
         "--json",
         "databaseId,status,conclusion,createdAt,updatedAt,headBranch,headSha,name,url,event",
     ]
-    result = run(args, cwd=command_root(), timeout=60)
+    result = run_full(args, cwd=command_root(), timeout=60)
     if not result["ok"]:
         return {"ok": False, "run_result": result}
     try:
@@ -814,6 +829,24 @@ def wait_run(run_id: str, timeout_seconds: int = 900) -> dict[str, Any]:
     return {"ok": False, "error": "timeout", "last": last}
 
 
+def workflow_yaml_requires_confirm(workflow: str) -> bool:
+    result = run_full(["gh", "workflow", "view", workflow, "--yaml"], cwd=command_root(), timeout=60)
+    if not result["ok"]:
+        return False
+    text = str(result.get("stdout") or "")
+    return "inputs:" in text and re.search(r"(?m)^\s+confirm:\s*$", text) is not None
+
+
+def workflow_dispatch_args(workflow: str) -> list[str]:
+    if workflow != DEPLOY_WORKFLOW:
+        return ["gh", "workflow", "run", workflow, "--ref", "main"]
+    args = ["gh", "workflow", "run", workflow, "--ref", "main"]
+    if workflow_yaml_requires_confirm(workflow):
+        args += ["-f", f"confirm={LEGACY_DEPLOY_CONFIRM_PHRASE}"]
+    args += ["-f", "ref=main"]
+    return args
+
+
 def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
     head = main_head()
     success = successful_run(workflow, head)
@@ -836,10 +869,7 @@ def dispatch_workflow(workflow: str, wait: bool = False) -> dict[str, Any]:
                 payload["run"] = payload["wait"]["run"]
             payload["status"] = "WORKFLOW_ALREADY_RUNNING_COMPLETED" if payload["ok"] else "WORKFLOW_ALREADY_RUNNING_FAILED"
         return payload
-    if workflow == DEPLOY_WORKFLOW:
-        args = ["gh", "workflow", "run", workflow, "--ref", "main", "-f", f"confirm={CONFIRM_PHRASE}", "-f", "ref=main"]
-    else:
-        args = ["gh", "workflow", "run", workflow, "--ref", "main"]
+    args = workflow_dispatch_args(workflow)
     dispatched = run(args, cwd=command_root(), timeout=60)
     if not dispatched["ok"]:
         return {"ok": False, "dispatch": dispatched}
