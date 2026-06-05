@@ -254,6 +254,19 @@ def local_natural_reply(text):
             "Kısa özet: secret, token/private key/env, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
         )
 
+    if is_non_task_information_or_preference(text):
+        if is_information_only_request(text):
+            total, counts = queue_counts()
+            return (
+                "Kısa bilgi: bunu yeni görev olarak açmadım.\n"
+                f"Kuyrukta toplam {total} kayıt var; aktif worker işi sayısı güvenli lifecycle tarafından yönetiliyor.\n"
+                f"Tamamlanan: {counts.get('DEPLOYED', 0) + counts.get('DONE', 0)}, kapalı/iptal: {counts.get('CANCELLED', 0) + counts.get('ARCHIVED', 0)}."
+            )
+        return (
+            "Tamam, bunu görev açmadan iletişim/tercih notu olarak aldım.\n"
+            "Bundan sonraki yanıtlarda bu tercihe göre daha net ve kısa ifade kullanacağım."
+        )
+
     if compact in {"cto", "hey cto", "ctom"} or any(x in lowered for x in ["merhaba", "selam", "sistem durumu", "status", "çalışıyor", "calisiyor"]):
         total, counts = queue_counts()
         core = {
@@ -403,7 +416,13 @@ def classify_job_metadata(text):
         or ("filtre" in lowered and "checkbox" in lowered)
     )
 
-    if memory_os:
+    if is_non_task_information_or_preference(text):
+        name = "Kısa Bilgi"
+        eta = "hemen"
+        first_update = "hemen"
+        interval = 60
+        risk = "düşük"
+    elif memory_os:
         name = "Memory OS Modülü"
         eta = "20-45 dakika"
         first_update = "yaklaşık 2 dakika içinde"
@@ -485,6 +504,60 @@ def normalize_turkish(value):
     )
 
 
+def is_information_only_request(text):
+    normalized = normalize_turkish(text)
+    info_terms = [
+        "var mi",
+        "nedir",
+        "ne durumda",
+        "durum nedir",
+        "bilgi istiyorum",
+        "sadece bilgi",
+        "sadece bilgi ver",
+        "tamamlanmis",
+        "devam eden",
+        "planlama asamasinda",
+    ]
+    action_terms = [
+        "baslat",
+        "uygula",
+        "tamamla",
+        "canliya al",
+        "deploy et",
+        "gorev ac",
+        "gorevleri ac",
+        "workerlara dagit",
+        "duzelt",
+        "gelistir",
+    ]
+    has_action = any(term in normalized for term in action_terms if term != "tamamla")
+    has_action = has_action or " tamamla " in f" {normalized} " or normalized.strip().endswith(" tamamla")
+    return any(term in normalized for term in info_terms) and not has_action
+
+
+def is_reply_style_preference_request(text):
+    normalized = normalize_turkish(text)
+    preference_terms = [
+        "bana verdigin yanitlarda",
+        "cevaplarinda",
+        "yanitlarinda",
+        "ifadeleri kullanma",
+        "ifadeyi kullanma",
+        "bunu soyleme",
+        "bunu deme",
+        "bundan sonra",
+        "olmasini istiyorum",
+        "formatinda",
+        "gorev kod",
+        "proje kod",
+    ]
+    return any(term in normalized for term in preference_terms)
+
+
+def is_non_task_information_or_preference(text):
+    return is_information_only_request(text) or is_reply_style_preference_request(text)
+
+
 def is_memory_os_request(text):
     return memory_os_request(text)
 
@@ -532,6 +605,8 @@ def is_deploy_approval_policy_request(text):
     return any(term in normalized for term in approval_terms) and any(term in normalized for term in deploy_terms)
 
 def is_action_command(text):
+    if is_non_task_information_or_preference(text):
+        return False
     lowered = (text or "").lower()
     action_words = [
         "başlat", "baslat", "uygula", "workerlara dağıt", "workerlara dagit",
@@ -623,6 +698,8 @@ def resolve_followup_action_text(chat_id, text, log_dir=None):
 
 
 def resolve_memory_os_followup_action_text(chat_id, text):
+    if is_non_task_information_or_preference(text):
+        return ""
     if not is_memory_os_followup_text(text):
         return ""
     latest_context = latest_actionable_context(chat_id, text)
@@ -752,6 +829,8 @@ def run_direct_action(text):
 
 
 def is_long_task_message(text):
+    if is_non_task_information_or_preference(text):
+        return False
     lowered = (text or "").lower()
 
     # Açıkça arka plan istenirse async.
@@ -1039,6 +1118,11 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
             chat_id,
             f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
         )
+        return
+
+    if is_non_task_information_or_preference(safe_text):
+        audit_passthrough(chat_id, from_user, text, safe_text, "non_task_information_or_preference")
+        send_message(token, chat_id, local_natural_reply(safe_text))
         return
 
     if is_continue_command(safe_text) and latest_archive_review_summary_available():

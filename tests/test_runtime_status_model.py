@@ -381,6 +381,28 @@ class WorkerStatusModelTest(unittest.TestCase):
             "telegram_parent_requires_explicit_action_tasks",
         )
 
+    def test_information_question_does_not_become_action_task(self):
+        message = "hafıza konusu ile ilgili tamamlanmış devam eden veya henüz planlama aşamasında olan görevler var mı sadece bilgi istiyorum"
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Kısa Bilgi")
+        self.assertFalse(telegram_direct_cto.is_action_command(message))
+        self.assertFalse(telegram_direct_cto.is_long_task_message(message))
+        self.assertEqual(telegram_direct_cto.resolve_memory_os_followup_action_text("1", message), "")
+
+    def test_reply_style_preference_does_not_become_action_task(self):
+        message = (
+            "Bana verdiğin yanıtlarda şu ifadeleri kullanma: Production yapılmadı, "
+            "Ana repo değişikliği yapılmadı."
+        )
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Kısa Bilgi")
+        self.assertFalse(telegram_direct_cto.is_action_command(message))
+        self.assertFalse(telegram_direct_cto.is_long_task_message(message))
+
     def test_short_proposal_prepare_is_not_action_command(self):
         self.assertFalse(
             telegram_direct_cto.is_action_command("Bana sistem mimarisi için kısa bir öneri hazırla.")
