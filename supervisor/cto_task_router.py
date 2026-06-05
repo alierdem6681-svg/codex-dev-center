@@ -65,6 +65,16 @@ except ImportError:
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
+ACTIVE_DUPLICATE_STATUSES = {
+    "PENDING",
+    "ASSIGNED",
+    "READY_FOR_VALIDATION",
+    "PR_READY",
+    "READY_FOR_DEPLOY",
+    TASK_STATUS_QUEUED,
+    TASK_STATUS_ROUTED,
+    TASK_STATUS_RUNNING,
+}
 
 
 def runtime_root(value: str | None = None) -> Path:
@@ -118,6 +128,47 @@ def normalize_turkish(value: str) -> str:
         .replace("ö", "o")
         .replace("ç", "c")
     )
+
+
+def duplicate_text_key(value: str) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def find_active_duplicate_task(
+    tasks: list[dict[str, Any]],
+    *,
+    source: str,
+    title: str,
+    message: str,
+    requested_by: str = "",
+    conversation_id: str = "",
+) -> dict[str, Any] | None:
+    target_source = str(source or "").strip().lower()
+    target_title = duplicate_text_key(title)
+    target_message = duplicate_text_key(message)
+    target_requested_by = str(requested_by or "").strip()
+    target_conversation_id = str(conversation_id or "").strip()
+
+    for task in reversed(tasks):
+        if task.get("parent_task") or task.get("parent_task_id"):
+            continue
+        if str(task.get("source") or "").strip().lower() != target_source:
+            continue
+        if str(task.get("status") or "").upper() not in ACTIVE_DUPLICATE_STATUSES:
+            continue
+        if duplicate_text_key(task.get("title", "")) != target_title:
+            continue
+        task_message = duplicate_text_key(task.get("description") or task.get("raw_message") or "")
+        if task_message != target_message:
+            continue
+        task_requested_by = str(task.get("requested_by") or "").strip()
+        task_conversation_id = str(task.get("conversation_id") or "").strip()
+        if target_requested_by and task_requested_by and task_requested_by != target_requested_by:
+            continue
+        if target_conversation_id and task_conversation_id and task_conversation_id != target_conversation_id:
+            continue
+        return task
+    return None
 
 
 def is_memory_os_request(text: str) -> bool:
@@ -395,7 +446,10 @@ def submit_task(
         worker_eligible = False
 
     bound_existing_memory_scope = False
+    duplicate_suppressed = False
     memory_scope: dict[str, Any] = {}
+    created_subtasks: list[dict[str, Any]] = []
+    changes: list[dict[str, Any]] = []
     with state_file_lock(qpath):
         queue = read_json(qpath, {"tasks": []})
         tasks = queue.setdefault("tasks", [])
@@ -414,7 +468,6 @@ def submit_task(
             )
             if bound:
                 parent = bound
-                created_subtasks: list[dict[str, Any]] = []
                 bound_existing_memory_scope = True
                 memory_scope = dict(existing_memory_scope)
                 normalized, changes = normalize_queue_payload(queue)
@@ -423,61 +476,79 @@ def submit_task(
                 existing_memory_scope = {}
 
         if not bound_existing_memory_scope:
-            parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
-            parent = {
-                "id": next_id("CTO-TASK", title),
-                "title": title,
-                "description": stored_message,
-                "raw_message": stored_message,
-                "source": source,
-                "priority": priority,
-                "status": parent_status,
-                "risk": effective_risk,
-                "risk_level": effective_risk,
-                "assigned_worker": None,
-                "worker_eligible": worker_eligible,
-                "requested_by": requested_by,
-                "created_at": utc_now(),
-                "updated_at": utc_now(),
-                "repo_applied": False,
-                "staging_deployed": False,
-                "production_deployed": False,
-                "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
-                "task_class": route["task_class"],
-                "control_type": route["control_type"],
-                "delivery_mode": route["delivery_mode"],
-                "pipeline_lane": route["pipeline_lane"],
-                "intent_domain": route.get("intent_domain", ""),
-            }
-            if memory_intent:
-                memory_scope = {
-                    "schema_version": 1,
-                    "scope_id": f"memory-os:{parent['id']}",
-                    "root_task_id": parent["id"],
-                    "conversation_id": memory_conversation_id,
+            duplicate_parent = find_active_duplicate_task(
+                tasks,
+                source=source,
+                title=title,
+                message=stored_message,
+                requested_by=requested_by,
+                conversation_id=conversation_id,
+            )
+            if duplicate_parent:
+                parent = duplicate_parent
+                duplicate_suppressed = True
+                parent["duplicate_suppressed_count"] = int(parent.get("duplicate_suppressed_count") or 0) + 1
+                parent["last_duplicate_seen_at"] = utc_now()
+                parent.setdefault("conversation_id", conversation_id)
+                normalized, changes = normalize_queue_payload(queue)
+                atomic_write_json(qpath, normalized)
+            else:
+                parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
+                parent = {
+                    "id": next_id("CTO-TASK", title),
                     "title": title,
-                    "last_user_text": stored_message,
-                    "active": True,
-                    "has_worker_apply_tasks": False,
+                    "description": stored_message,
+                    "raw_message": stored_message,
+                    "source": source,
+                    "priority": priority,
+                    "status": parent_status,
+                    "risk": effective_risk,
+                    "risk_level": effective_risk,
+                    "assigned_worker": None,
+                    "worker_eligible": worker_eligible,
+                    "requested_by": requested_by,
+                    "conversation_id": conversation_id,
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                    "repo_applied": False,
+                    "staging_deployed": False,
+                    "production_deployed": False,
+                    "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
+                    "task_class": route["task_class"],
+                    "control_type": route["control_type"],
+                    "delivery_mode": route["delivery_mode"],
+                    "pipeline_lane": route["pipeline_lane"],
+                    "intent_domain": route.get("intent_domain", ""),
                 }
-                bind_task_to_scope(parent, memory_scope, root_task_id=parent["id"])
-            if route["task_class"] == "control_task":
-                parent["repo_apply_allowed"] = False
-                parent["production_deployed"] = False
-                parent["proposal_only"] = True
-            if worker_eligible:
-                parent["assigned_worker"] = choose_worker(len(tasks))
-            tasks.append(parent)
+                if memory_intent:
+                    memory_scope = {
+                        "schema_version": 1,
+                        "scope_id": f"memory-os:{parent['id']}",
+                        "root_task_id": parent["id"],
+                        "conversation_id": memory_conversation_id,
+                        "title": title,
+                        "last_user_text": stored_message,
+                        "active": True,
+                        "has_worker_apply_tasks": False,
+                    }
+                    bind_task_to_scope(parent, memory_scope, root_task_id=parent["id"])
+                if route["task_class"] == "control_task":
+                    parent["repo_apply_allowed"] = False
+                    parent["production_deployed"] = False
+                    parent["proposal_only"] = True
+                if worker_eligible:
+                    parent["assigned_worker"] = choose_worker(len(tasks))
+                tasks.append(parent)
 
-            should_create_subtasks = should_split(message) if split is None else split
-            created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
-            if memory_scope and created_subtasks:
-                for subtask in created_subtasks:
-                    bind_task_to_scope(subtask, memory_scope, root_task_id=parent["id"])
-            tasks.extend(created_subtasks)
+                should_create_subtasks = should_split(message) if split is None else split
+                created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+                if memory_scope and created_subtasks:
+                    for subtask in created_subtasks:
+                        bind_task_to_scope(subtask, memory_scope, root_task_id=parent["id"])
+                tasks.extend(created_subtasks)
 
-            normalized, changes = normalize_queue_payload(queue)
-            atomic_write_json(qpath, normalized)
+                normalized, changes = normalize_queue_payload(queue)
+                atomic_write_json(qpath, normalized)
 
     if memory_intent or bound_existing_memory_scope:
         task_ids = None if bound_existing_memory_scope else [
@@ -513,6 +584,7 @@ def submit_task(
             "last_control_type": route["control_type"],
             "last_memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "last_memory_os_bound_to_existing_scope": bound_existing_memory_scope,
+            "last_duplicate_suppressed": duplicate_suppressed,
             "queue_normalization_changes": len(changes),
             "updated_at": utc_now(),
         }
@@ -530,6 +602,7 @@ def submit_task(
             "subtasks": len(created_subtasks),
             "memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "memory_os_bound_to_existing_scope": bound_existing_memory_scope,
+            "duplicate_suppressed": duplicate_suppressed,
         },
     )
     return {
@@ -539,6 +612,7 @@ def submit_task(
         "normalization_changes": changes,
         "memory_os_scope": memory_scope,
         "memory_os_bound_to_existing_scope": bound_existing_memory_scope,
+        "duplicate_suppressed": duplicate_suppressed,
     }
 
 

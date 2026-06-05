@@ -171,6 +171,44 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(task["repo_apply_allowed"])
         self.assertEqual(result["subtasks"], [])
 
+    def test_router_suppresses_active_duplicate_telegram_task(self):
+        message = "Production database " + "delete" + " from users çalıştır."
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = cto_task_router.submit_task(
+                root=root,
+                source="telegram",
+                title="Production Readiness Analizi",
+                message=message,
+                priority="high",
+                requested_by="tester",
+                conversation_id="telegram:123",
+                split=True,
+                worker_eligible=False,
+            )
+            second = cto_task_router.submit_task(
+                root=root,
+                source="telegram",
+                title="Production Readiness Analizi",
+                message=message,
+                priority="high",
+                requested_by="tester",
+                conversation_id="telegram:123",
+                split=True,
+                worker_eligible=False,
+            )
+
+            queue = json.loads((root / "state" / "task_queue.json").read_text(encoding="utf-8"))
+
+        self.assertFalse(first["duplicate_suppressed"])
+        self.assertTrue(second["duplicate_suppressed"])
+        self.assertEqual(first["task"]["id"], second["task"]["id"])
+        self.assertEqual(len(first["subtasks"]), 3)
+        self.assertEqual(second["subtasks"], [])
+        self.assertEqual(len(queue["tasks"]), 4)
+        self.assertEqual(queue["tasks"][0]["duplicate_suppressed_count"], 1)
+        self.assertEqual(queue["tasks"][0]["conversation_id"], "telegram:123")
+
     def test_worker_bootstrap_preflight_blocks_required_missing_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_codex_config=True)
@@ -2109,12 +2147,14 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             return True
 
         originals = (
+            telegram_direct_cto.APP,
             telegram_direct_cto.LOGS,
             telegram_direct_cto.audit_passthrough,
             telegram_direct_cto.start_async_job,
             telegram_direct_cto.send_message,
         )
         with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.APP = Path(tmp)
             telegram_direct_cto.LOGS = Path(tmp)
             telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
             telegram_direct_cto.start_async_job = fake_start_async_job
@@ -2132,6 +2172,7 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
                 )
             finally:
                 (
+                    telegram_direct_cto.APP,
                     telegram_direct_cto.LOGS,
                     telegram_direct_cto.audit_passthrough,
                     telegram_direct_cto.start_async_job,
