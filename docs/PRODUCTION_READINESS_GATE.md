@@ -16,6 +16,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Telegram bridge/direct CTO test PASS
 - Secret leakage scan PASS
 - Forbidden operation scan PASS
+- GitHub Actions manuel confirm ve policy sıkılık sözleşmesi PASS
 - Ön canlı health/smoke wrapper sözleşmesi PASS
 - Ön canlı smoke test PASS
 - Geri alma simulation PASS
@@ -59,6 +60,8 @@ Dashboard ham `reports/production_readiness_last_report.md` metnini gösterirse 
 ## Otomatik Yayına Alma Kuralı
 
 `production_requires_explicit_approval=false` normal Codex Dev Center app deploy'u için hedef kuraldır. Bu, kontrolsüz yayına alma anlamına gelmez.
+
+`Deploy to VM` workflow'u `confirm=DEPLOY-CODEX-VM` input doğrulamasını içermelidir. `deploy_script_command_check` aynı zamanda deploy policy kaynaklarında `production_deploy_channel=github_actions_manual`, direct VM SSH/file mutation yasakları ve local VM fallback'in kapalı olduğunu doğrular. `CODEX_LOCAL_DEPLOY_FALLBACK` veya `CODEX_DEPLOY_ACTOR=cto_finalizer` production manual gate bypass yolu değildir.
 
 Controller şu şartlar olmadan canlıya geçmez:
 

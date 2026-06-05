@@ -167,6 +167,8 @@ def truthy(value: Any) -> bool:
 
 
 def local_deploy_fallback_enabled() -> bool:
+    if deploy_channel() == "github_actions_manual":
+        return False
     if truthy(os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")):
         return True
     policies = deploy_policy()
@@ -184,6 +186,8 @@ def local_deploy_fallback_context() -> bool:
 
 
 def github_actions_local_fallback_allowed() -> bool:
+    if deploy_channel() == "github_actions_manual":
+        return False
     return bool(local_deploy_fallback_enabled() and local_deploy_fallback_context())
 
 

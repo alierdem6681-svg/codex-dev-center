@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-02T00:00:00+00:00",
+  "updated_at": "2026-06-05T13:32:56+00:00",
   "enabled": true,
   "mode": "four_worker_autonomous_backlog",
   "cto_role": "orchestrate_plan_assign_review_gate_deploy_health_rollback",
@@ -13,7 +13,10 @@
   "production_deploy_allowed_when_all_gates_pass": true,
   "production_deploy_channel": "github_actions_manual",
   "github_actions_workflow_name": "Deploy to VM",
-  "github_actions_confirm_phrase": "",
+  "github_actions_confirm_phrase": "DEPLOY-CODEX-VM",
+  "direct_vm_ssh_forbidden": true,
+  "direct_production_file_mutation_forbidden": true,
+  "local_vm_deploy_fallback_enabled": false,
   "required_before_production": [
     "worker_assignment",
     "worker_result_review",

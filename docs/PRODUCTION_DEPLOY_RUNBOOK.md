@@ -60,7 +60,7 @@ Shell script karşılıkları:
 - `scripts/health_check.sh`
 - `scripts/smoke_test.sh`
 
-Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanılmaz. `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur. CTO'nun otomatik deploy kararı `supervisor/cto_autonomous_delivery.py` üzerinden gate PASS, branch/PR/merge marker'ı ve kritik işlem taraması ile verilir.
+Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanılmaz. `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur. `CODEX_LOCAL_DEPLOY_FALLBACK` ve `CODEX_DEPLOY_ACTOR=cto_finalizer` bu blocker'ı bypass edemez. CTO'nun otomatik deploy kararı `supervisor/cto_autonomous_delivery.py` üzerinden gate PASS, branch/PR/merge marker'ı ve kritik işlem taraması ile verilir.
 
 ## Sıra
 

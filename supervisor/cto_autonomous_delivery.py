@@ -143,6 +143,29 @@ def policy() -> dict[str, Any]:
         or production.get("stable_successful_low_risk_deploy_threshold")
         or 3
     )
+    deploy_channel = str(
+        template.get("production_deploy_channel")
+        or deploy.get("production_deploy_channel")
+        or production.get("production_deploy_channel")
+        or "github_actions_manual"
+    )
+    confirm_phrase = str(
+        template.get("github_actions_confirm_phrase")
+        or deploy.get("github_actions_confirm_phrase")
+        or production.get("github_actions_confirm_phrase")
+        or LEGACY_DEPLOY_CONFIRM_PHRASE
+    )
+    local_fallback_enabled = bool(
+        task_flag(deploy, "local_vm_deploy_fallback_enabled")
+        or task_flag(production, "local_vm_deploy_fallback_enabled")
+    )
+    if deploy_channel != "github_actions_manual":
+        local_fallback_enabled = bool(
+            local_fallback_enabled
+            or task_flag({"env": os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")}, "env")
+        )
+    else:
+        local_fallback_enabled = False
     return {
         "enabled": bool(template.get("enabled", True)),
         "max_parallel_tasks": max_parallel,
@@ -153,12 +176,9 @@ def policy() -> dict[str, Any]:
         ),
         "production_deploy_requires_user_approval_for_normal_app_changes": False,
         "workflow": str(template.get("github_actions_workflow_name") or DEPLOY_WORKFLOW),
-        "confirm_phrase": "",
-        "local_vm_deploy_fallback_enabled": bool(
-            task_flag(deploy, "local_vm_deploy_fallback_enabled")
-            or task_flag(production, "local_vm_deploy_fallback_enabled")
-            or task_flag({"env": os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK")}, "env")
-        ),
+        "production_deploy_channel": deploy_channel,
+        "confirm_phrase": confirm_phrase,
+        "local_vm_deploy_fallback_enabled": local_fallback_enabled,
         "local_vm_deploy_fallback_allowed_actor": str(
             deploy.get("local_vm_deploy_fallback_allowed_actor")
             or production.get("local_vm_deploy_fallback_allowed_actor")
@@ -230,6 +250,8 @@ def task_flag(task: dict[str, Any], key: str) -> bool:
 
 def local_deploy_fallback_enabled() -> bool:
     cfg = policy()
+    if str(cfg.get("production_deploy_channel") or "") == "github_actions_manual":
+        return False
     actor = os.environ.get("CODEX_DEPLOY_ACTOR", "").strip()
     allowed_actor = str(cfg.get("local_vm_deploy_fallback_allowed_actor") or "cto_finalizer")
     return bool(

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:33:37+00:00",
+  "updated_at": "2026-06-05T13:32:56+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -40,6 +40,13 @@
     "requires_staging_health_smoke_status": true,
     "requires_rollback_plan_status": true,
     "requires_production_deploy_not_performed": true
+  },
+  "github_actions_manual_gate_contract": {
+    "workflow_confirm_input_required": true,
+    "confirm_phrase": "DEPLOY-CODEX-VM",
+    "controller_local_fallback_bypass_allowed": false,
+    "direct_vm_ssh_forbidden": true,
+    "direct_production_file_mutation_forbidden": true
   },
   "staging_readiness_wrappers": {
     "health_wrapper": "scripts/staging_health_check.sh",

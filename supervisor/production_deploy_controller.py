@@ -106,6 +106,14 @@ def settings() -> dict[str, Any]:
     production_policy = read_json(ROOT / "state_templates/production_policy.json", {})
     deploy_policy_data = read_json(ROOT / "state_templates/deploy_policy.json", {})
     deploy = module_settings.get("deploy_pipeline", {}) if isinstance(module_settings, dict) else {}
+    deploy_channel = str(deploy_policy_data.get("production_deploy_channel", "local_controller"))
+    local_fallback_enabled = bool(
+        truthy(os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK"))
+        or truthy(deploy_policy_data.get("local_vm_deploy_fallback_enabled"))
+        or truthy(production_policy.get("local_vm_deploy_fallback_enabled"))
+    )
+    if deploy_channel == "github_actions_manual":
+        local_fallback_enabled = False
     return {
         "automatic_production_enabled": bool(
             production_policy.get(
@@ -124,12 +132,8 @@ def settings() -> dict[str, Any]:
         "staging_required": bool(deploy.get("production_requires_staging_pass", True)),
         "rollback_required": bool(deploy.get("production_requires_rollback_pass", True)),
         "auto_rollback_on_failure": bool(production_policy.get("auto_rollback_on_failure", True)),
-        "production_deploy_channel": str(deploy_policy_data.get("production_deploy_channel", "local_controller")),
-        "local_vm_deploy_fallback_enabled": bool(
-            truthy(os.environ.get("CODEX_LOCAL_DEPLOY_FALLBACK"))
-            or truthy(deploy_policy_data.get("local_vm_deploy_fallback_enabled"))
-            or truthy(production_policy.get("local_vm_deploy_fallback_enabled"))
-        ),
+        "production_deploy_channel": deploy_channel,
+        "local_vm_deploy_fallback_enabled": local_fallback_enabled,
         "local_vm_deploy_fallback_allowed_actor": str(
             deploy_policy_data.get("local_vm_deploy_fallback_allowed_actor")
             or production_policy.get("local_vm_deploy_fallback_allowed_actor")
@@ -194,6 +198,8 @@ def local_deploy_fallback_context(cfg: dict[str, Any] | None = None) -> bool:
 
 def github_actions_local_fallback_allowed(cfg: dict[str, Any] | None = None) -> bool:
     cfg = cfg or settings()
+    if str(cfg.get("production_deploy_channel") or "") == "github_actions_manual":
+        return False
     return bool(cfg.get("local_vm_deploy_fallback_enabled") and local_deploy_fallback_context(cfg))
 
 
