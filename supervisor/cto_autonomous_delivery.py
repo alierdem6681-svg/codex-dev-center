@@ -289,6 +289,8 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         return "backlog_dispatcher_child_not_backlog_candidate"
     if task.get("parent_task_id") and str(task.get("source", "")).lower() == "cto":
         return "already_child_task"
+    if str(task.get("source", "")).lower() == "telegram" and not task_flag(task, "allow_backlog_continuation"):
+        return "telegram_parent_requires_explicit_action_tasks"
     if str(task.get("source", "")).lower() == "telegram" and status in ACTIVE_TASK_STATUSES:
         return "active_telegram_parent_reserved_for_cto"
     if status == TASK_STATUS_DONE:

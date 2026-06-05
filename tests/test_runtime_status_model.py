@@ -340,6 +340,47 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(meta["name"], "Infrastructure Access Readiness")
         self.assertNotEqual(meta["name"], "Dashboard Alan Temizliği")
 
+    def test_deploy_approval_policy_is_not_production_readiness(self):
+        message = (
+            "Production Readiness Analizi: tüm onay isteme durumlarını kaldıralım. "
+            "Pipeline PASS olduğunda GitHub üzerinden deploy ederek canlıya alabilirsin."
+        )
+
+        route = cto_task_router.classify_task_route(message)
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(route["intent_domain"], "deploy_approval_policy")
+        self.assertEqual(route["delivery_mode"], "policy_update")
+        self.assertEqual(meta["name"], "Production Deploy Policy")
+        self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
+    def test_direct_cto_policy_action_does_not_queue_backlog(self):
+        status, reason = direct_cto_async_job.successful_router_terminal_status(action_command=True)
+
+        self.assertEqual(status, TASK_STATUS_DONE)
+        self.assertEqual(reason, "async_cto_action_tasks_queued")
+
+    def test_async_cto_answer_does_not_become_backlog_proposal(self):
+        status, reason = direct_cto_async_job.successful_router_terminal_status(action_command=False)
+
+        self.assertEqual(status, TASK_STATUS_DONE)
+        self.assertEqual(reason, "async_cto_answer_reported_no_backlog")
+
+    def test_telegram_parent_is_not_autonomous_backlog_candidate(self):
+        task = {
+            "id": "ROOT",
+            "source": "telegram",
+            "status": TASK_STATUS_PROPOSAL_READY,
+            "risk": "low",
+            "title": "Görev Dağıtım Planı",
+            "description": "hafıza konusu ile ilgili görevler var mı",
+        }
+
+        self.assertEqual(
+            cto_autonomous_delivery.backlog_candidate_reason(task),
+            "telegram_parent_requires_explicit_action_tasks",
+        )
+
     def test_short_proposal_prepare_is_not_action_command(self):
         self.assertFalse(
             telegram_direct_cto.is_action_command("Bana sistem mimarisi için kısa bir öneri hazırla.")

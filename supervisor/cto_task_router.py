@@ -146,6 +146,29 @@ def is_infrastructure_access_change(text: str) -> bool:
     )
 
 
+def is_deploy_approval_policy_request(text: str) -> bool:
+    normalized = normalize_turkish(text)
+    approval_terms = [
+        "onay isteme",
+        "onay istemeden",
+        "onay almadan",
+        "onaysiz",
+        "onaylari kaldir",
+        "onay durumlarini kaldir",
+        "approval",
+    ]
+    deploy_terms = [
+        "production",
+        "canli",
+        "canliya al",
+        "deploy",
+        "github",
+        "pipeline pass",
+        "gate pass",
+    ]
+    return any(term in normalized for term in approval_terms) and any(term in normalized for term in deploy_terms)
+
+
 def is_dashboard_cleanup_request(text: str) -> bool:
     lowered = (text or "").lower()
     dashboard_terms = ["dashboard", "navbar", "panel", "menü", "menu", "ui"]
@@ -189,6 +212,15 @@ def classify_task_route(text: str) -> dict[str, Any]:
             "pipeline_lane": "Memory OS Delivery",
             "explicit_delivery_signal": True,
             "intent_domain": "memory_os",
+        }
+    if is_deploy_approval_policy_request(text):
+        return {
+            "task_class": "policy_task",
+            "control_type": "",
+            "delivery_mode": "policy_update",
+            "pipeline_lane": "Policy / Production Deploy",
+            "explicit_delivery_signal": True,
+            "intent_domain": "deploy_approval_policy",
         }
     if is_infrastructure_access_change(text):
         return {

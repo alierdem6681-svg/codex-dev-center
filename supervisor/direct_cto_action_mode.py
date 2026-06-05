@@ -153,6 +153,47 @@ def is_pure_deploy_command(text):
     return any(term in normalized for term in deploy_terms) and not any(term in normalized for term in feature_terms)
 
 
+def is_deploy_approval_policy_request(text):
+    normalized = normalize_turkish(text)
+    approval_terms = [
+        "onay isteme",
+        "onay istemeden",
+        "onay almadan",
+        "onaysiz",
+        "onaylari kaldir",
+        "onay durumlarini kaldir",
+        "approval",
+    ]
+    deploy_terms = [
+        "production",
+        "canli",
+        "canliya al",
+        "deploy",
+        "github",
+        "pipeline pass",
+        "gate pass",
+    ]
+    return any(term in normalized for term in approval_terms) and any(term in normalized for term in deploy_terms)
+
+
+def record_deploy_approval_policy():
+    state_path = STATE / "system_state.json"
+    state = read_json(state_path, {})
+    state.update(
+        {
+            "production_deploy_requires_explicit_approval": False,
+            "production_deploy_allowed_when_all_gates_pass": True,
+            "production_deploy_requires_quality_gate": True,
+            "production_deploy_requires_staging": True,
+            "production_deploy_requires_rollback_plan": True,
+            "critical_infrastructure_requires_approval": True,
+            "deploy_approval_policy_last_confirmed_at": now(),
+            "updated_at": now(),
+        }
+    )
+    write_json(state_path, state)
+
+
 def make_task(run_id, seq, slug, title, description, worker, risk="medium", implementation=False, memory_scope=None):
     if implementation:
         task_description = (
@@ -511,6 +552,14 @@ def build_backlog(raw_text, run_id, memory_scope=None):
 
 def run_action_mode(raw_text, conversation_id="", router_task_id=None):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+    if is_deploy_approval_policy_request(raw_text):
+        record_deploy_approval_policy()
+        return (
+            "Production deploy policy kaydedildi.\n"
+            "Normal app değişiklikleri tüm gate'ler PASS ise ayrıca onay istemeden GitHub/deploy akışına girebilir.\n"
+            "Secret, IAM, billing, DNS, firewall, token/private key/env ve destructive database işlemleri APPROVAL_REQUIRED kalır."
+        )
 
     if is_pure_deploy_command(raw_text):
         return (

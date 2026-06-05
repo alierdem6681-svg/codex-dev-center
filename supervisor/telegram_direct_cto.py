@@ -391,6 +391,7 @@ def classify_job_metadata(text):
     length = len(text or "")
 
     memory_os = is_memory_os_request(text)
+    deploy_approval_policy = is_deploy_approval_policy_request(text)
     infrastructure_access = is_infrastructure_access_request(text)
     dashboard_cleanup = (
         any(x in lowered for x in ["dashboard", "navbar", "panel", "menü", "menu", "ui"])
@@ -408,6 +409,12 @@ def classify_job_metadata(text):
         first_update = "yaklaşık 2 dakika içinde"
         interval = 300
         risk = "orta; normal app kodu gate PASS ise otomatik deploy, kritik altyapı işlemi varsa onay gerekli"
+    elif deploy_approval_policy:
+        name = "Production Deploy Policy"
+        eta = "2-5 dakika"
+        first_update = "yaklaşık 1 dakika içinde"
+        interval = 180
+        risk = "orta; normal app deploy gate PASS ise otomatik, kritik altyapı işlemi APPROVAL_REQUIRED kalır"
     elif dashboard_cleanup:
         name = "Dashboard Alan Temizliği"
         eta = "5-10 dakika"
@@ -500,6 +507,29 @@ def is_infrastructure_access_request(text):
         "proxy",
     ]
     return any(term in normalized for term in infra_terms)
+
+
+def is_deploy_approval_policy_request(text):
+    normalized = normalize_turkish(text)
+    approval_terms = [
+        "onay isteme",
+        "onay istemeden",
+        "onay almadan",
+        "onaysiz",
+        "onaylari kaldir",
+        "onay durumlarini kaldir",
+        "approval",
+    ]
+    deploy_terms = [
+        "production",
+        "canli",
+        "canliya al",
+        "deploy",
+        "github",
+        "pipeline pass",
+        "gate pass",
+    ]
+    return any(term in normalized for term in approval_terms) and any(term in normalized for term in deploy_terms)
 
 def is_action_command(text):
     lowered = (text or "").lower()

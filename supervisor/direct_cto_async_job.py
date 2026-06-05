@@ -15,6 +15,7 @@ try:
     from progress_aware_runner import run_progress_aware
     from cto_task_router import mark_task_status
     from task_status_constants import (
+        TASK_STATUS_DONE,
         TASK_STATUS_ERROR,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_PROPOSAL_READY,
@@ -28,6 +29,7 @@ except ImportError:
     from .progress_aware_runner import run_progress_aware
     from .cto_task_router import mark_task_status
     from .task_status_constants import (
+        TASK_STATUS_DONE,
         TASK_STATUS_ERROR,
         TASK_STATUS_FAILED_RETRYABLE,
         TASK_STATUS_PROPOSAL_READY,
@@ -41,6 +43,7 @@ except Exception:
     mark_task_status = None
     def memory_os_prompt_context(_scope):
         return ""
+    TASK_STATUS_DONE = "DONE"
     TASK_STATUS_ERROR = "ERROR"
     TASK_STATUS_FAILED_RETRYABLE = "FAILED_RETRYABLE"
     TASK_STATUS_PROPOSAL_READY = "PROPOSAL_READY"
@@ -59,6 +62,12 @@ JOBS = STATE / "direct_cto_jobs"
 ASYNC_STALL_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_STALL_SECONDS", "900"))
 ASYNC_GRACE_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_GRACE_SECONDS", "180"))
 ASYNC_MAX_WALL_SECONDS = int(os.environ.get("CODEX_DIRECT_CTO_MAX_WALL_SECONDS", "14400"))
+
+
+def successful_router_terminal_status(action_command=False):
+    if action_command:
+        return TASK_STATUS_DONE, "async_cto_action_tasks_queued"
+    return TASK_STATUS_DONE, "async_cto_answer_reported_no_backlog"
 
 def compact_text(value, limit=1600):
     text = redact_sensitive_text(value or "")
@@ -262,7 +271,8 @@ def run_job(job_id):
             job["status"] = "FINAL_REPORTED"
             job["result"] = "action_queued_and_reported"
             if router_task_id and mark_task_status is not None:
-                mark_task_status(APP, router_task_id, TASK_STATUS_PROPOSAL_READY, "async_cto_action_queued")
+                status, reason = successful_router_terminal_status(action_command=True)
+                mark_task_status(APP, router_task_id, status, reason)
         except Exception as exc:
             send_message(chat_id, "CTO action job hata aldı. Teknik çıktı Telegram'a gönderilmedi; işi retry kuyruğunda ele alacağım.")
             job["status"] = TASK_STATUS_ERROR
@@ -344,7 +354,8 @@ def run_job(job_id):
             job["result"] = "telegram_notified"
             job["progress_watchdog"] = progress
             if router_task_id and mark_task_status is not None:
-                mark_task_status(APP, router_task_id, TASK_STATUS_PROPOSAL_READY, "async_cto_job_final_reported")
+                status, reason = successful_router_terminal_status(action_command=False)
+                mark_task_status(APP, router_task_id, status, reason)
         else:
             failure = classify_codex_failure(raw_out, raw_err, progress)
             with (LOGS / "async_cto_failures.log").open("a", encoding="utf-8") as f:
