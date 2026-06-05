@@ -597,6 +597,33 @@ def repo_apply_git_metadata_is_local(repo_dir: Path) -> bool:
     return (repo_dir / ".git").is_dir()
 
 
+def repo_apply_push_retryable(push_result: dict[str, Any]) -> bool:
+    if push_result.get("ok"):
+        return False
+    text = f"{push_result.get('stdout') or ''}\n{push_result.get('stderr') or ''}".lower()
+    markers = [
+        "fetch first",
+        "non-fast-forward",
+        "stale info",
+        "remote contains work",
+        "failed to push some refs",
+    ]
+    return any(marker in text for marker in markers)
+
+
+def push_repo_apply_branch(worktree: Path, branch: str) -> dict[str, Any]:
+    push = run_cmd(["git", "push", "-u", "origin", branch], cwd=worktree, timeout=300)
+    if push.get("ok") or not repo_apply_push_retryable(push):
+        return push
+
+    fetch = run_cmd(["git", "fetch", "origin", f"{branch}:refs/remotes/origin/{branch}"], cwd=worktree, timeout=180)
+    retry = run_cmd(["git", "push", "--force-with-lease", "-u", "origin", branch], cwd=worktree, timeout=300)
+    retry["initial_push"] = push
+    retry["remote_branch_conflict_fetch"] = fetch
+    retry["repo_apply_remote_branch_conflict_recovered"] = bool(retry.get("ok"))
+    return retry
+
+
 def create_isolated_repo_clone(source_root: Path, repo_dir: Path, branch: str, base_ref: str) -> dict[str, Any]:
     result: dict[str, Any] = {
         "ok": False,
@@ -925,6 +952,8 @@ Kurallar:
 - Değişikliği küçük, test edilebilir ve geri alınabilir tut.
 - İlgili testleri çalıştır; çalıştıramadığın testleri final çıktıda belirt.
 - Teknik çıktıyı Telegram'a gönderme.
+- Git add, commit, push veya PR açma; değişiklikleri çalışma ağacında bırak.
+- Pipeline PASS olursa dış worker runner commit, push ve PR adımlarını otomatik yapacak.
 
 Önceki proposal/kanıt özeti:
 {evidence or "-"}
@@ -1001,7 +1030,7 @@ Beklenen çıktı:
         else:
             add_result = run_cmd(["git", "add", "-A", "--", *commit_files], cwd=worktree, timeout=120)
             commit_result = run_cmd(["git", "commit", "-m", f"Worker apply {task_id}"], cwd=worktree, timeout=180)
-            push_result = run_cmd(["git", "push", "-u", "origin", branch], cwd=worktree, timeout=300)
+            push_result = push_repo_apply_branch(worktree, branch)
             if not (add_result["ok"] and commit_result["ok"] and push_result["ok"]):
                 status = TASK_STATUS_FAILED_RETRYABLE
                 result = "repo_apply_commit_or_push_failed"

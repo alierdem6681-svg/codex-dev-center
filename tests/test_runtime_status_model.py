@@ -608,6 +608,32 @@ class WorkerStatusModelTest(unittest.TestCase):
             (linked / ".git").write_text("gitdir: ../source/.git/worktrees/linked\n", encoding="utf-8")
             self.assertFalse(worker_runner.repo_apply_git_metadata_is_local(linked))
 
+    def test_repo_apply_push_retries_remote_branch_conflict_with_lease(self):
+        calls = []
+
+        def fake_run_cmd(args, *, cwd, timeout=300, env=None):
+            calls.append(args)
+            if args == ["git", "push", "-u", "origin", "worker/test"]:
+                return {
+                    "ok": False,
+                    "stdout": "",
+                    "stderr": "Updates were rejected because the remote contains work that you do not have locally. fetch first",
+                }
+            if args == ["git", "fetch", "origin", "worker/test:refs/remotes/origin/worker/test"]:
+                return {"ok": True, "stdout": "", "stderr": ""}
+            if args == ["git", "push", "--force-with-lease", "-u", "origin", "worker/test"]:
+                return {"ok": True, "stdout": "pushed", "stderr": ""}
+            return {"ok": False, "stdout": "", "stderr": "unexpected"}
+
+        with mock.patch.object(worker_runner, "run_cmd", side_effect=fake_run_cmd):
+            result = worker_runner.push_repo_apply_branch(Path("/tmp/repo"), "worker/test")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["repo_apply_remote_branch_conflict_recovered"])
+        self.assertEqual(calls[0], ["git", "push", "-u", "origin", "worker/test"])
+        self.assertEqual(calls[1], ["git", "fetch", "origin", "worker/test:refs/remotes/origin/worker/test"])
+        self.assertEqual(calls[2], ["git", "push", "--force-with-lease", "-u", "origin", "worker/test"])
+
     def test_repo_apply_report_sections_include_controlled_apply_notes(self):
         sections = worker_runner.repo_apply_control_report_sections(
             risk="medium",
