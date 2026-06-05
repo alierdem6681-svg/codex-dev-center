@@ -6,17 +6,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DashboardAccountMenuMarkupTest(unittest.TestCase):
-    def test_dashboard_account_menu_uses_auth_state_and_logout_endpoint(self):
+    def test_dashboard_shell_has_no_membership_menu(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
 
-        self.assertIn('id="accountMenuButton"', html)
-        self.assertIn('aria-haspopup="true"', html)
-        self.assertIn('aria-controls="accountMenuPanel"', html)
-        self.assertIn('role="menu"', html)
-        self.assertGreaterEqual(html.count('role="menuitem"'), 1)
-        self.assertIn("data?.auth?.username", html)
-        self.assertIn("'/api/auth/logout'", html)
-        self.assertIn("event.key === 'Escape'", html)
+        self.assertNotIn('id="accountMenuButton"', html)
+        self.assertNotIn('id="accountMenuPanel"', html)
+        self.assertNotIn("data?.auth?.username", html)
+        self.assertNotIn("'/api/auth/logout'", html)
+        self.assertNotIn("location.href = '/login'", html)
+
+    def test_panel_server_uses_direct_access_contract(self):
+        source = (ROOT / "web_panel" / "panel_server.py").read_text(encoding="utf-8")
+
+        self.assertIn("def public_panel_auth_state", source)
+        self.assertIn('"auth_mode": "disabled"', source)
+        self.assertIn('"membership_enabled": False', source)
+        self.assertIn("self.redirect_dashboard()", source)
+        self.assertIn('"error": "auth_disabled"', source)
+        self.assertIn('"error": "post_actions_disabled"', source)
+        self.assertNotIn("redirect_login", source)
 
     def test_dashboard_cleanup_removes_operational_sections(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")

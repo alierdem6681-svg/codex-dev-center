@@ -87,77 +87,6 @@
       }
       .control-check input { width: 16px; height: 16px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .header-actions { align-items: center; position: relative; }
-      .account-menu { position: relative; }
-      .account-trigger {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 38px;
-        max-width: min(280px, 48vw);
-        padding: 5px 9px 5px 6px;
-      }
-      .account-avatar {
-        display: inline-grid;
-        place-items: center;
-        flex: 0 0 28px;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: #2f5f73;
-        color: #fff;
-        font-size: 12px;
-        font-weight: 700;
-      }
-      .account-copy { min-width: 0; text-align: left; }
-      .account-name {
-        display: block;
-        max-width: 190px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: var(--ink);
-        font-weight: 650;
-      }
-      .account-role { display: block; color: var(--muted); font-size: 11px; }
-      .account-panel {
-        position: absolute;
-        z-index: 10;
-        top: calc(100% + 8px);
-        right: 0;
-        width: min(280px, calc(100vw - 28px));
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        box-shadow: 0 14px 30px rgba(32, 36, 44, .16);
-        padding: 10px;
-      }
-      .account-panel[hidden] { display: none; }
-      .account-summary {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        padding: 3px 2px 10px;
-        border-bottom: 1px solid var(--line);
-        margin-bottom: 8px;
-        min-width: 0;
-      }
-      .account-summary strong {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .menu-item {
-        width: 100%;
-        display: flex;
-        justify-content: flex-start;
-        margin-top: 4px;
-        background: #fff;
-        color: var(--ink);
-      }
-      .menu-item:hover, .menu-item:focus { background: var(--soft); }
-      .menu-item.danger { color: var(--bad); }
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
@@ -237,9 +166,6 @@
         .desktop-table { display: none; }
         .mobile-list { display: grid; gap: 8px; }
         header { align-items: flex-start; flex-direction: column; }
-        .header-actions { width: 100%; justify-content: space-between; }
-        .account-trigger { max-width: calc(100vw - 160px); }
-        .account-panel { left: auto; right: 0; }
       }
       body {
         min-height: 100vh;
@@ -484,7 +410,6 @@
           flex-direction: column;
         }
         .top-search { width: 100%; }
-        .account-trigger { max-width: 100%; }
       }
     </style>
   </head>
@@ -514,27 +439,6 @@
             </div>
             <div class="top-tools">
               <input id="pageSearch" class="top-search" type="search" placeholder="Type here..." aria-label="Sayfa arama">
-              <div class="actions header-actions">
-                <div id="accountMenu" class="account-menu">
-                  <button id="accountMenuButton" class="account-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenuPanel" onclick="toggleAccountMenu()">
-                    <span id="accountAvatar" class="account-avatar">P</span>
-                    <span class="account-copy">
-                      <span id="accountName" class="account-name">Panel</span>
-                      <span class="account-role">Hesap</span>
-                    </span>
-                  </button>
-                  <div id="accountMenuPanel" class="account-panel" role="menu" aria-labelledby="accountMenuButton" hidden>
-                    <div class="account-summary">
-                      <span id="accountPanelAvatar" class="account-avatar">P</span>
-                      <div class="account-copy">
-                        <strong id="accountPanelUsername">Panel kullanıcısı</strong>
-                        <span id="accountPanelMode" class="account-role">Oturum açık</span>
-                      </div>
-                    </div>
-                    <button class="menu-item danger" type="button" role="menuitem" onclick="logout()">Çıkış</button>
-                  </div>
-                </div>
-              </div>
             </div>
           </header>
 
@@ -794,41 +698,6 @@
         setMetricHint('metricClosedHint', closed ? 'tamamlandı' : 'kapalı yok');
         setMetricHint('metricWorkerHint', workerList.length ? 'servis görünümü' : 'worker yok', availableWorkers === 0 && workerList.length > 0);
       }
-      function accountDisplayName(data){
-        return String(data?.auth?.username || 'Panel kullanıcısı');
-      }
-      function accountInitials(name){
-        const cleaned = String(name || 'Panel').trim();
-        const parts = cleaned.split(/\s+/).filter(Boolean);
-        const initials = parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : cleaned.slice(0, 2);
-        return (initials || 'P').toLocaleUpperCase('tr-TR');
-      }
-      function setAccountMenuOpen(open, focusMenu = false){
-        accountMenuPanel.hidden = !open;
-        accountMenuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-        if (open && focusMenu) {
-          const firstItem = accountMenuPanel.querySelector('[role="menuitem"]');
-          if (firstItem) firstItem.focus();
-        }
-      }
-      function toggleAccountMenu(){
-        setAccountMenuOpen(accountMenuPanel.hidden, true);
-      }
-      function closeAccountMenu(refocus = false){
-        if (accountMenuPanel.hidden) return;
-        setAccountMenuOpen(false);
-        if (refocus) accountMenuButton.focus();
-      }
-      function renderAccount(data){
-        const name = accountDisplayName(data);
-        const initials = accountInitials(name);
-        const mode = data?.auth?.auth_mode === 'username_password' ? 'Panel hesabı' : 'Panel oturumu';
-        accountName.textContent = name;
-        accountAvatar.textContent = initials;
-        accountPanelUsername.textContent = name;
-        accountPanelAvatar.textContent = initials;
-        accountPanelMode.textContent = mode;
-      }
       function setFilterOptions(selectEl, defaultLabel, values){
         const current = selectEl.value;
         const html = `<option value="">${esc(defaultLabel)}</option>` + values.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
@@ -1072,7 +941,6 @@
       }
       function render(data){
         latest = data;
-        renderAccount(data);
         renderMetrics();
         renderMemoryOs(data);
         fillFilters();
@@ -1082,39 +950,6 @@
         const res = await fetch('/api/status', {cache:'no-store'});
         render(await res.json());
       }
-      async function logout(){
-        await fetch('/api/auth/logout', {method:'POST'});
-        location.href = '/login';
-      }
-      document.addEventListener('click', event => {
-        if (!accountMenu.contains(event.target)) closeAccountMenu();
-      });
-      accountMenuButton.addEventListener('keydown', event => {
-        if (event.key === 'ArrowDown') {
-          event.preventDefault();
-          setAccountMenuOpen(true, true);
-        }
-      });
-      accountMenuPanel.addEventListener('keydown', event => {
-        const items = [...accountMenuPanel.querySelectorAll('[role="menuitem"]')];
-        const index = items.indexOf(document.activeElement);
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          closeAccountMenu(true);
-        } else if (event.key === 'ArrowDown') {
-          event.preventDefault();
-          items[(index + 1) % items.length]?.focus();
-        } else if (event.key === 'ArrowUp') {
-          event.preventDefault();
-          items[(index - 1 + items.length) % items.length]?.focus();
-        } else if (event.key === 'Home') {
-          event.preventDefault();
-          items[0]?.focus();
-        } else if (event.key === 'End') {
-          event.preventDefault();
-          items[items.length - 1]?.focus();
-        }
-      });
       search.addEventListener('input', renderTasks);
       pageSearch.addEventListener('input', event => {
         search.value = event.target.value;

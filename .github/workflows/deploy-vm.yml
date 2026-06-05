@@ -311,31 +311,23 @@ jobs:
           done
           test -s /tmp/codex-health.json
 
-          echo "===== LOGIN PAGE ====="
-          curl -fsS --max-time 10 "$DASHBOARD_URL/login" >/tmp/codex-login.html
-          grep -q "Kullanıcı adı" /tmp/codex-login.html
-          grep -q "Şifre" /tmp/codex-login.html
+          echo "===== DIRECT DASHBOARD ====="
+          curl -fsS --max-time 10 "$DASHBOARD_URL/" >/tmp/codex-dashboard.html
+          grep -q "Dashboard" /tmp/codex-dashboard.html
+          grep -q "Pipeline Flow" /tmp/codex-dashboard.html
 
-          echo "===== API AUTH BEHAVIOR ====="
-          unauth_code="$(curl -sS -o /tmp/codex-status-unauth.json -w "%{http_code}" --max-time 10 "$DASHBOARD_URL/api/status")"
-          test "$unauth_code" = "401"
-          auth_header="$(cd "$RUNTIME_DIR" && python3 - <<'PY'
-          import sys
-          from pathlib import Path
-          sys.path.insert(0, str(Path("web_panel").resolve()))
-          import auth  # noqa: E402
-          print("Cookie: " + auth.automation_cookie_header())
-          PY
-          )"
-          curl -fsS --max-time 10 -H "$auth_header" "$DASHBOARD_URL/api/status" >/tmp/codex-status-auth.json
-          grep -q '"ok": true' /tmp/codex-status-auth.json
+          echo "===== PUBLIC API STATUS ====="
+          curl -fsS --max-time 10 "$DASHBOARD_URL/api/status" >/tmp/codex-status-public.json
+          grep -q '"ok": true' /tmp/codex-status-public.json
 
           echo "===== PUBLIC DASHBOARD ====="
           curl -fsS --max-time 10 "$PUBLIC_DASHBOARD_URL/health" >/tmp/codex-public-health.json
           grep -q '"ok": true' /tmp/codex-public-health.json
-          curl -fsS --max-time 10 "$PUBLIC_DASHBOARD_URL/login" >/tmp/codex-public-login.html
-          grep -q "Kullanıcı adı" /tmp/codex-public-login.html
-          grep -q "Şifre" /tmp/codex-public-login.html
+          curl -fsS --max-time 10 "$PUBLIC_DASHBOARD_URL/" >/tmp/codex-public-dashboard.html
+          grep -q "Dashboard" /tmp/codex-public-dashboard.html
+          grep -q "Pipeline Flow" /tmp/codex-public-dashboard.html
+          curl -fsS --max-time 10 "$PUBLIC_DASHBOARD_URL/api/status" >/tmp/codex-public-status.json
+          grep -q '"ok": true' /tmp/codex-public-status.json
           echo "smoke=PASS" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deployment summary

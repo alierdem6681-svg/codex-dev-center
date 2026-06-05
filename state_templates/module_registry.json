@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:30:29+00:00",
+  "updated_at": "2026-06-05T13:01:25+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -33,17 +33,13 @@
     {
       "id": "panel_auth",
       "name": "Panel Authentication",
-      "status": "active",
-      "risk": "medium",
+      "status": "disabled",
+      "risk": "low",
       "settings_enabled": true,
-      "actions_enabled": true,
-      "dashboard_visible": true,
-      "description": "Username/password login, signed session cookie and safe first-user setup for the management panel.",
-      "actions": [
-        "panel_login",
-        "panel_logout",
-        "panel_first_user_setup"
-      ]
+      "actions_enabled": false,
+      "dashboard_visible": false,
+      "description": "Panel membership/login flow is disabled; dashboard and read-only status APIs open directly.",
+      "actions": []
     },
     {
       "id": "supervisor",

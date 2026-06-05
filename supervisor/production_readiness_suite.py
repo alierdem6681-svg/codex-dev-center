@@ -222,8 +222,6 @@ def required_file_regression(results: dict[str, Any]) -> None:
         "supervisor/cto_autonomous_delivery.py",
         "supervisor/policy_sync.py",
         "supervisor/github_safe_flow.py",
-        "web_panel/auth.py",
-        "web_panel/static/login.html",
         ".github/workflows/deploy-vm.yml",
         "scripts/staging_deploy.sh",
         "scripts/production_deploy.sh",
@@ -280,13 +278,11 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Hata",
         "Kapalı",
         "Canlı",
-        "Çıkış",
     ]
     missing = [item for item in required_text if item not in index]
-    login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
-    login_required = ["Kullanıcı adı", "Şifre", "Giriş Yap", "İlk kullanıcıyı oluştur"]
-    login_missing = [item for item in login_required if item not in login]
-    record(results, "dashboard_route_api_test", not missing and not login_missing, {"missing_text": missing, "login_missing_text": login_missing})
+    forbidden_text = ["accountMenuButton", "/api/auth/logout", "location.href = '/login'"]
+    forbidden_found = [item for item in forbidden_text if item in index]
+    record(results, "dashboard_route_api_test", not missing and not forbidden_found, {"missing_text": missing, "forbidden_text": forbidden_found})
 
 
 def memory_os_dashboard_contract(results: dict[str, Any]) -> None:

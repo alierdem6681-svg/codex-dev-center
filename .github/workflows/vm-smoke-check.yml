@@ -58,9 +58,11 @@ jobs:
           echo "===== LOCAL DASHBOARD ====="
           curl -fsS --max-time 5 http://127.0.0.1:8080/health >/tmp/codex-smoke-health.json
           cat /tmp/codex-smoke-health.json
-          curl -fsS --max-time 10 http://127.0.0.1:8080/login >/tmp/codex-smoke-login.html
-          grep -q "Kullanıcı adı" /tmp/codex-smoke-login.html
-          grep -q "Şifre" /tmp/codex-smoke-login.html
+          curl -fsS --max-time 10 http://127.0.0.1:8080/ >/tmp/codex-smoke-dashboard.html
+          grep -q "Dashboard" /tmp/codex-smoke-dashboard.html
+          grep -q "Pipeline Flow" /tmp/codex-smoke-dashboard.html
+          curl -fsS --max-time 10 http://127.0.0.1:8080/api/status >/tmp/codex-smoke-status.json
+          grep -q '"ok": true' /tmp/codex-smoke-status.json
 
       - name: Record smoke status
         run: |

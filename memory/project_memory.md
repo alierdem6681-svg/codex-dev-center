@@ -435,3 +435,11 @@ Production readiness analizi devaminda arka plan ACK, progress-aware watchdog ve
 `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'ini ekledi. Gate gercek Telegram API cagrisi veya production deploy yapmadan simulator/static/helper sozlesmeleriyle sunlari dogrular: async ACK 3 saniye beklentisi, duplicate ACK suppression markerlari, stdout gürültüsünü anlamli progress saymayan watchdog ayrimi, timeout/usage-limit/gecici worker failure retryable karari, proposal uretmeden tamamlanan veya kritik destructive isteklerin non-retryable/approval kapsaminda kalmasi.
 
 Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sabitlendi. Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS ve anayasa kayitlari yeni gate'e hizalandi. Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+## 2026-06-05 Dashboard Direct Access Cleanup Apply
+
+Dashboard alan temizligi istegiyle panel uyelik/giris akisi devre disi birakildi. Ana panel `/` dogrudan dashboard'u acar; `/api/status` ve read-only dashboard API'lari login/cookie gerektirmeden okunabilir. `/login` dashboard'a yonlenir; auth setup/login endpointleri `auth_disabled` cevabiyla kapali kalir.
+
+Dashboard ust hesap menusu ve cikis JS'i kaldirildi. Deploy, VM smoke, bootstrap ve readiness kontrolleri artik login sayfasi yerine dogrudan dashboard/API erisimini dogrular. Disa acik POST operasyonlari direct access ile otomatik yetki kazanmayacak sekilde read-only/gate sinirinda kalir.
+
+Bu paket production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.

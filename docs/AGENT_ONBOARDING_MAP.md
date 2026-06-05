@@ -113,6 +113,8 @@ Ajan şu klasörleri inceler:
 - docs/worker_queue_production_sync_repair_20260604_054726.md
 
 Dashboard status API notu:
+- Panel uyelik/giris akisi kapali kabul edilir. `/` dogrudan dashboard'u acmali; `/api/status` ve read-only dashboard API'lari login/cookie gerektirmeden okunabilmelidir.
+- Bu direct access gorunurlugu production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez; public POST operasyonlari read-only/gate sinirinda kalmalidir.
 - `/api/status` payload'u `controlled_execution` alaninda son controlled execution proposal durumunu, task id'sini, rapor adini ve proposal modunda repo/deploy kapilarinin kapali oldugunu gosterir.
 - Ana `web_panel/panel_server.py` ve legacy `web_panel/server.py` `/api/status` payload'lari `github_actions` ve `pipeline_status` alanlarini dondurerek `Pipeline Gözlemi` dashboard bolumunu ayni runtime state dosyalariyla besler.
 - Runtime marker dosyalari henuz yoksa bu iki alan bos nesne olarak kalmali; payload anahtarlari kaldirilmamalidir.

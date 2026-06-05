@@ -1,21 +1,23 @@
 {
-  "updated_at": "2026-06-05T12:30:29+00:00",
+  "updated_at": "2026-06-05T13:01:25+00:00",
   "actions": [
     {
       "id": "panel_login",
       "label": "Panel Girişi",
       "module": "panel_auth",
       "risk": "low",
-      "enabled": true,
-      "requires_approval": false
+      "enabled": false,
+      "requires_approval": false,
+      "disabled_reason": "panel_auth_disabled_direct_dashboard_access"
     },
     {
       "id": "panel_logout",
       "label": "Panel Çıkışı",
       "module": "panel_auth",
       "risk": "low",
-      "enabled": true,
-      "requires_approval": false
+      "enabled": false,
+      "requires_approval": false,
+      "disabled_reason": "panel_auth_disabled_direct_dashboard_access"
     },
     {
       "id": "view_pipeline_flow",
@@ -54,9 +56,10 @@
       "label": "İlk Panel Kullanıcısını Oluştur",
       "module": "panel_auth",
       "risk": "medium",
-      "enabled": true,
+      "enabled": false,
       "requires_approval": false,
-      "local_only_by_default": true
+      "local_only_by_default": true,
+      "disabled_reason": "panel_auth_disabled_direct_dashboard_access"
     },
     {
       "id": "production_readiness_suite",

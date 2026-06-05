@@ -198,6 +198,12 @@ Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk pro
 
 `report_text.readiness` ham markdown metni tek basina guncel PASS kaniti sayilamaz. Ana ve legacy `/api/status` payload'lari `report_text_status.readiness` metadata alanini dondurur; readiness raporu policy `updated_at` tarihinden eskiyse veya policy `required_gates` listesini tam icermiyorsa status `UNKNOWN`, freshness `stale` veya ilgili reason code ile isaretlenir.
 
+## DASHBOARD DIRECT ACCESS V1
+
+Panel uyelik/giris akisi devre disidir. `http://34.185.153.184:8080/` adresi dogrudan dashboard'u acmali; `/api/status` ve read-only dashboard API'lari cookie veya login gerektirmeden okunabilir olmalidir.
+
+Bu gorunurluk production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez. Disa acik POST operasyonlari read-only blokaj veya ayrica gate gerektirir.
+
 ## TELEGRAM READINESS RESULT REPORT CONTRACT V1
 
 `supervisor/production_readiness_suite.py` `telegram_result_report_flow` kapisiyla staging health/smoke, rollback plani, readiness sonucu ve production deploy yapilmadi bilgisini Telegram-safe kisa ozet sozlesmesiyle dogrular.

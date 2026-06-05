@@ -2341,7 +2341,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 """
                 <title>Codex Dev Center Yönetim Paneli</title>
                 <div>Görevler, pipeline flow ve güvenli panel yönetimi</div>
-                <nav>Pipeline Flow Görevler Workers Çıkış</nav>
+                <nav>Pipeline Flow Görevler Workers</nav>
                 <main>
                   <span>Aktif Kuyruk</span>
                   <span>Canlı İşler</span>
@@ -2364,11 +2364,6 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 """,
                 encoding="utf-8",
             )
-            (static / "login.html").write_text(
-                "Kullanıcı adı Şifre Giriş Yap İlk kullanıcıyı oluştur",
-                encoding="utf-8",
-            )
-
             original_root = production_readiness_suite.ROOT
             production_readiness_suite.ROOT = root
             try:
@@ -2619,7 +2614,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 return {
                     "ok": True,
                     "status": 200,
-                    "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
+                    "body": "Pipeline Flow Görevler Canlıya alınanları göster",
                 }
 
             with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}), \
@@ -6114,7 +6109,7 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(updated["github_origin_main_commit"], "new-head")
         self.assertTrue(updated["production_github_sync"])
 
-    def test_environment_manager_health_accepts_auth_required_status_api(self):
+    def test_environment_manager_health_requires_public_status_api(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
             state = runtime / "state"
@@ -6161,8 +6156,8 @@ class SystemRepairControlsTest(unittest.TestCase):
                     production_environment_manager.service_discovery,
                 ) = originals
 
-        self.assertTrue(payload["ok"])
-        self.assertTrue(payload["status_api"]["ok"])
+        self.assertFalse(payload["ok"])
+        self.assertFalse(payload["status_api"]["ok"])
         self.assertTrue(payload["status_api"]["auth_required"])
 
     def test_environment_manager_smoke_accepts_current_dashboard_labels(self):
@@ -6192,7 +6187,7 @@ class SystemRepairControlsTest(unittest.TestCase):
             }
             production_environment_manager.http_text = lambda port, path: {
                 "ok": True,
-                "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
+                "body": "Pipeline Flow Görevler Canlıya alınanları göster",
             }
             try:
                 payload = production_environment_manager.smoke_test("production")

@@ -130,14 +130,7 @@ def powershell_bin() -> str | None:
 
 
 def automation_headers() -> dict[str, str]:
-    try:
-        if str(ROOT) not in sys.path:
-            sys.path.insert(0, str(ROOT))
-        from web_panel import auth as panel_auth
-
-        return {"Cookie": panel_auth.automation_cookie_header()}
-    except Exception:
-        return {}
+    return {}
 
 
 def deploy_policy() -> dict[str, Any]:
@@ -525,7 +518,7 @@ def health_check(scope: str = "production") -> dict[str, Any]:
     ]
     health = http_json(port, "/health")
     status = http_json(port, "/api/status") if health.get("ok") else {"ok": False, "reason": "health_failed"}
-    status_ok = bool(status.get("ok") or status_api_auth_required(status))
+    status_ok = bool(status.get("ok"))
     payload = {
         "ok": bool(health.get("ok") and status_ok and all(path.exists() for path in required)),
         "scope": scope,
@@ -559,19 +552,17 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     index = http_text(port, "/")
     body = status.get("body") if isinstance(status.get("body"), dict) else {}
     body_text = index.get("body", "")
-    auth_required = status_api_auth_required(status)
     labels = [
         "Pipeline Flow",
         "Görevler",
         "Canlıya alınanları göster",
-        "Çıkış",
     ]
     checks = {
         "health_pass": bool(health.get("ok")),
-        "status_api_pass": bool(status.get("ok") or auth_required),
-        "dashboard_has_production_environment": auth_required or "production_environment" in body,
-        "dashboard_has_deploy_commands": auth_required or "deploy_commands" in body,
-        "index_turkish_labels": auth_required or all(label in body_text for label in labels),
+        "status_api_pass": bool(status.get("ok")),
+        "dashboard_has_production_environment": "production_environment" in body,
+        "dashboard_has_deploy_commands": "deploy_commands" in body,
+        "index_turkish_labels": all(label in body_text for label in labels),
     }
     payload = {
         "ok": all(checks.values()),
