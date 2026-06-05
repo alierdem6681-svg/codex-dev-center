@@ -91,7 +91,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `parallel_worker_regression` kapısı dört dummy/simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
-- supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
+- supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `worker_task_id`, `actor`, `correlation_id`, `allowed_operations`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
@@ -143,7 +143,7 @@ Safe test scratch notu:
 Queue/status normalizer notu:
 - `supervisor/task_status_constants.py` queue task statuslarini merkezi olarak normalize eder.
 - Status aliaslari case farki ve yaygin ayirici varyantlariyla okunur; `ready for validation`, `ready-for-validation`, `ready/for.validation`, `FAILED TIMEOUT` ve `FAILED.TIMEOUT` gibi girdiler standart enumlara cevrilir.
-- Queue normalizasyonu dispatch contract alanlarını da tamamlar: `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
+- Queue normalizasyonu dispatch contract alanlarını da tamamlar: `root_task_id`, `dispatch_id`, `worker_task_id`, `worker_id`, `actor`, `correlation_id`, `allowed_operations`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at`, `finished_at`.
 - Worker claim akışı `worker_id` ve `claimed_at` yazar; bu görünürlük production deploy veya runtime state dışı mutasyon yetkisi vermez.
 - Worker claim/finish akışında `task_queue.json` ve `workers.json` ortak worker state transaction lock altında güncellenir; queue `RUNNING/finished_at` alanları ile worker `current_task` birbirinden ayrı yazılmamalıdır.
 - Worker aktif `current_task` taşıyorsa aynı worker ikinci task claim etmemelidir; stale aktif sahiplik onarımı dispatch/recovery kapısında yapılır.

@@ -180,7 +180,7 @@ Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi 
 
 ## WORKER DISPATCH CONTRACT V1
 
-Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
+Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_task_id`, `worker_id`, `actor`, `correlation_id`, `allowed_operations`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
 
 ## PARALLEL WORKER REGRESSION GATE V1
 

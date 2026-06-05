@@ -44,6 +44,13 @@ TASK_STATUS_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 TASK_STATUS_BLOCKED = "BLOCKED"
 TASK_STATUS_DEPLOYED = "DEPLOYED"
 TASK_DEFAULT_MAX_ATTEMPTS = 1
+DEFAULT_WORKER_ALLOWED_OPERATIONS = [
+    "read_only_analysis",
+    "code_review",
+    "test_planning",
+    "documentation",
+    "isolated_workspace_files",
+]
 
 KNOWN_TASK_STATUSES = {
     TASK_STATUS_RECEIVED,
@@ -197,6 +204,22 @@ def _positive_int(value: Any, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def _string_list(value: Any, default: list[str]) -> list[str]:
+    if isinstance(value, list):
+        items = value
+    elif isinstance(value, str):
+        items = [part.strip() for part in value.split(",")]
+    else:
+        items = []
+
+    cleaned: list[str] = []
+    for item in items:
+        text = str(item or "").strip()
+        if text and text not in cleaned:
+            cleaned.append(text)
+    return cleaned or list(default)
+
+
 def ensure_dispatch_contract(task: dict[str, Any]) -> dict[str, Any]:
     task_id = str(task.get("id") or "").strip()
     parent_task_id = str(task.get("parent_task_id") or "").strip()
@@ -220,6 +243,31 @@ def ensure_dispatch_contract(task: dict[str, Any]) -> dict[str, Any]:
     if worker_id:
         task["worker_id"] = worker_id
 
+    if task_id:
+        task["worker_task_id"] = str(task.get("worker_task_id") or task_id).strip() or task_id
+
+    actor = str(task.get("actor") or task.get("requested_by") or task.get("parent_actor") or "").strip()
+    if not actor:
+        source = str(task.get("source") or "").strip().lower()
+        parent_source = str(task.get("parent_source") or "").strip().lower()
+        actor = parent_source if parent_task_id and parent_source else source or "local"
+    task["actor"] = actor
+
+    correlation_id = str(
+        task.get("correlation_id")
+        or task.get("request_id")
+        or task.get("conversation_id")
+        or root_task_id
+        or dispatch_id
+        or task_id
+    ).strip()
+    if correlation_id:
+        task["correlation_id"] = correlation_id
+
+    task["allowed_operations"] = _string_list(
+        task.get("allowed_operations"),
+        DEFAULT_WORKER_ALLOWED_OPERATIONS,
+    )
     task.setdefault("last_error_code", "")
     task.setdefault("claimed_at", None)
     task.setdefault("finished_at", None)

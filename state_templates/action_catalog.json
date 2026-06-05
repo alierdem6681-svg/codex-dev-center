@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T14:05:40+00:00",
+  "updated_at": "2026-06-05T14:39:01+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -258,6 +258,8 @@
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
       "dispatch_contract_metadata_required": true,
+      "dispatch_contract_actor_correlation_required": true,
+      "dispatch_allowed_operations_required": true,
       "stale_claim_retry_dispatch_enabled": true,
       "stale_claim_terminal_status": "FAILED_TIMEOUT"
     },
@@ -272,6 +274,8 @@
       "status_alias_space_hyphen_normalization": true,
       "status_alias_separator_normalization": true,
       "dispatch_contract_metadata_required": true,
+      "dispatch_contract_actor_correlation_required": true,
+      "dispatch_allowed_operations_required": true,
       "stale_claim_retry_dispatch_enabled": true,
       "stale_claim_terminal_status": "FAILED_TIMEOUT"
     },

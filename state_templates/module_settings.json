@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T14:05:40+00:00",
+  "updated_at": "2026-06-05T14:39:01+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -200,7 +200,11 @@
     "dispatch_contract_fields": [
       "root_task_id",
       "dispatch_id",
+      "worker_task_id",
       "worker_id",
+      "actor",
+      "correlation_id",
+      "allowed_operations",
       "attempt",
       "max_attempts",
       "last_error_code",
@@ -466,6 +470,8 @@
     "audit_raw_content_logged": false,
     "safe_metadata_allowlist": [
       "actor",
+      "allowed_operations",
+      "correlation_id",
       "intent_domain",
       "module",
       "parent_task_id",
@@ -475,6 +481,7 @@
       "source",
       "status",
       "task_id",
+      "worker_task_id",
       "worker_id"
     ]
   },

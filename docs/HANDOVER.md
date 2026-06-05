@@ -1257,3 +1257,31 @@ Test:
 Not:
 - Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+
+---
+
+## CTO Router Dispatch Envelope Metadata Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-143254 / CTO-TASK-20260605-132342-107817-PRODUCTION-READINESS-ANALIZI-SUB2
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/task_status_constants.py` dispatch contract normalizasyonu `worker_task_id`, `actor`, `correlation_id` ve safe `allowed_operations` alanlarini varsayilanlar.
+- `supervisor/cto_task_router.py` parent ve router subtasks icin ayni actor/correlation izini ve allowlist operasyon sozlesmesini yazar; audit/router state ozeti actor ve correlation id tasir.
+- `tests/test_runtime_status_model.py` router subtask dispatch metadata testini yeni envelope alanlariyla genisletti.
+- `state_templates/` module registry/settings/action catalog kayitlari ve onboarding/anayasa/AGENTS dokumanlari yeni dispatch envelope alanlarina hizalandi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_get_dispatch_contract_metadata` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_get_dispatch_contract_metadata tests.test_runtime_status_model.WorkerStatusModelTest.test_router_suppresses_active_duplicate_telegram_task tests.test_runtime_status_model.WorkerStatusModelTest.test_control_readiness_request_routes_as_proposal_only` PASS.
+- `python3 -m unittest tests.test_staging_readiness_wrappers` PASS.
+- `python3 -m compileall -q supervisor tests` PASS.
+- `python3 -m json.tool` ile `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` PASS.
+- `git diff --check` PASS.
+- Changed-file secret pattern scan PASS.
+- `python3 -m unittest tests.test_runtime_status_model` bu sandbox'ta `/opt/codex-dev-center/state/task_queue.json.lock` read-only filesystem hatasi nedeniyle 233 test icinde 1 hata ile tamamlanamadi; hedefli router testleri ayrica PASS alindi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
