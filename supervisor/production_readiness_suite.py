@@ -618,7 +618,8 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     workflow_ok = (
         "name: Deploy to VM" in workflow_text
         and "workflow_dispatch" in workflow_text
-        and "DEPLOY-CODEX-VM" in workflow_text
+        and "ref:" in workflow_text
+        and "DEPLOY-CODEX-VM" not in workflow_text
         and "codex-dev-center-01" in workflow_text
         and "/opt/codex-dev-center" in workflow_text
     )
