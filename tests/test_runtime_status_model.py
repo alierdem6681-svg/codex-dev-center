@@ -352,9 +352,20 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         parent = result["task"]
         subtasks = result["subtasks"]
+        expected_allowed_operations = [
+            "read_only_analysis",
+            "code_review",
+            "test_planning",
+            "documentation",
+            "isolated_workspace_files",
+        ]
 
         self.assertEqual(parent["root_task_id"], parent["id"])
         self.assertEqual(parent["dispatch_id"], parent["id"])
+        self.assertEqual(parent["worker_task_id"], parent["id"])
+        self.assertEqual(parent["actor"], "dashboard")
+        self.assertEqual(parent["correlation_id"], parent["id"])
+        self.assertEqual(parent["allowed_operations"], expected_allowed_operations)
         self.assertEqual(parent["attempt"], 1)
         self.assertEqual(parent["max_attempts"], 1)
         self.assertIsNone(parent["claimed_at"])
@@ -363,6 +374,10 @@ class WorkerStatusModelTest(unittest.TestCase):
         for subtask in subtasks:
             self.assertEqual(subtask["root_task_id"], parent["id"])
             self.assertEqual(subtask["dispatch_id"], subtask["id"])
+            self.assertEqual(subtask["worker_task_id"], subtask["id"])
+            self.assertEqual(subtask["actor"], "dashboard")
+            self.assertEqual(subtask["correlation_id"], parent["id"])
+            self.assertEqual(subtask["allowed_operations"], expected_allowed_operations)
             self.assertEqual(subtask["attempt"], 1)
             self.assertEqual(subtask["max_attempts"], 1)
             self.assertEqual(subtask["last_error_code"], "")

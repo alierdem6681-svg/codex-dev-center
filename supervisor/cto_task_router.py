@@ -21,6 +21,7 @@ try:
     )
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
+        DEFAULT_WORKER_ALLOWED_OPERATIONS,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_QUEUED,
@@ -48,6 +49,7 @@ except ImportError:
     )
     from state_file_lock import state_file_lock
     from task_status_constants import (
+        DEFAULT_WORKER_ALLOWED_OPERATIONS,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED,
         TASK_STATUS_QUEUED,
@@ -354,6 +356,8 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
         return []
     parent_id = parent["id"]
     stored_message = redact_sensitive_text(message)
+    actor = str(parent.get("actor") or parent.get("requested_by") or parent.get("source") or "cto_router").strip()
+    correlation_id = str(parent.get("correlation_id") or parent.get("conversation_id") or parent_id).strip()
     base = [
         (
             "Runtime Queue And Status Normalization",
@@ -370,11 +374,17 @@ def planning_subtasks(parent: dict[str, Any], message: str) -> list[dict[str, An
     ]
     tasks: list[dict[str, Any]] = []
     for idx, (title, description) in enumerate(base, 1):
+        subtask_id = f"{parent_id}-SUB{idx}"
         tasks.append(
             {
-                "id": f"{parent_id}-SUB{idx}",
+                "id": subtask_id,
+                "worker_task_id": subtask_id,
                 "parent_task_id": parent_id,
                 "parent_source": parent.get("source"),
+                "parent_actor": actor,
+                "actor": actor,
+                "correlation_id": correlation_id,
+                "allowed_operations": list(DEFAULT_WORKER_ALLOWED_OPERATIONS),
                 "title": title,
                 "description": description,
                 "raw_message": stored_message,
@@ -494,12 +504,17 @@ def submit_task(
                 atomic_write_json(qpath, normalized)
             else:
                 parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
+                parent_id = next_id("CTO-TASK", title)
                 parent = {
-                    "id": next_id("CTO-TASK", title),
+                    "id": parent_id,
+                    "worker_task_id": parent_id,
                     "title": title,
                     "description": stored_message,
                     "raw_message": stored_message,
                     "source": source,
+                    "actor": requested_by or source,
+                    "correlation_id": conversation_id or parent_id,
+                    "allowed_operations": list(DEFAULT_WORKER_ALLOWED_OPERATIONS),
                     "priority": priority,
                     "status": parent_status,
                     "risk": effective_risk,
@@ -582,6 +597,8 @@ def submit_task(
             "last_subtask_count": len(created_subtasks),
             "last_task_class": route["task_class"],
             "last_control_type": route["control_type"],
+            "last_actor": parent.get("actor", ""),
+            "last_correlation_id": parent.get("correlation_id", ""),
             "last_memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "last_memory_os_bound_to_existing_scope": bound_existing_memory_scope,
             "last_duplicate_suppressed": duplicate_suppressed,
@@ -598,6 +615,8 @@ def submit_task(
             "source": source,
             "risk": effective_risk,
             "priority": priority,
+            "actor": parent.get("actor", ""),
+            "correlation_id": parent.get("correlation_id", ""),
             "worker_eligible": worker_eligible,
             "subtasks": len(created_subtasks),
             "memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),

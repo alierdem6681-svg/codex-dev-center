@@ -461,3 +461,9 @@ Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` b
 Production readiness analizi devamında staging health/smoke default command kaynakları wrapper scriptlere hizalandı. `production_environment_manager` ve `production_deploy_controller` default map'leri, deploy policy template, module settings ve action catalog artık `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` komutlarını gösterir.
 
 Doğrudan `production_environment_manager.py health-check/smoke-test --scope staging` çağrıları wrapper iç uygulaması olarak kalır; policy/action/default görünürlüğü wrapper scriptleri tek kaynak yapar. Davranış `tests/test_staging_readiness_wrappers.py` içine eklenen regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## 2026-06-05 CTO Router Dispatch Envelope Metadata Apply
+
+CTO Router And Worker Dispatch Review apply paketi dispatch envelope izlenebilirligini genisletti. Queue normalizasyonu artik `worker_task_id`, `actor`, `correlation_id` ve safe `allowed_operations` alanlarini `root_task_id`/`dispatch_id` sozlesmesiyle birlikte tamamlar.
+
+Router parent ve alt gorevleri ayni actor/correlation izini tasir; audit ve router state ozeti bu alanlari kaydeder. Davranis `tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_get_dispatch_contract_metadata` hedefli unit testiyle sabitlendi. Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

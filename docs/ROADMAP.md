@@ -401,3 +401,11 @@ Faz 19B-10A Model Policy
 - [x] Markup regresyon testi scenic background referansının geri eklenmemesini doğrular.
 - [x] Dashboard settings/module/action template kayıtları nötr arka plan sözleşmesine hizalandı.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 59 - CTO Router Dispatch Envelope Metadata
+
+- [x] Dispatch contract normalizasyonu `worker_task_id`, `actor`, `correlation_id` ve `allowed_operations` alanlarini tamamlar.
+- [x] CTO router parent/subtask uretimi ayni actor ve correlation id izini alt gorevlere tasir.
+- [x] Router audit/state ozeti actor ve correlation id alanlarini kaydeder.
+- [x] Davranis hedefli `tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_get_dispatch_contract_metadata` unit testiyle sabitlendi.
+- [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
