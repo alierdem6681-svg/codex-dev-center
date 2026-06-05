@@ -46,7 +46,7 @@ Env değişkenleri tanımlıysa yerel controller doğrulamalarında önceliklidi
 - `state_templates/action_catalog.json`
 - `state_templates/module_registry.json`
 
-Bu nedenle eksik env readiness raporunu gereksiz yere BLOCKED bırakmaz. Ancak `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur.
+Bu nedenle eksik env readiness raporunu gereksiz yere BLOCKED bırakmaz. Ancak `production_deploy_channel=github_actions_manual` olduğunda controller GitHub Actions dışında production deploy'u `github_actions_workflow_required` blocker'ı ile durdurur. `CODEX_LOCAL_DEPLOY_FALLBACK`, `CODEX_DEPLOY_ACTOR=cto_finalizer` veya policy fallback bayrakları bu kanalda GitHub Actions kapısını bypass edemez.
 
 Production deploy için kullanılacak gerçek yol `.github/workflows/deploy-vm.yml` dosyasıdır. Bu workflow backup, validate, runtime sync, non-secret policy sync, service restart ve smoke check adımlarını self-hosted runner üzerinde yürütür.
 

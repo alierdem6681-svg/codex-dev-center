@@ -169,6 +169,19 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(task["repo_apply_allowed"])
         self.assertEqual(result["subtasks"], [])
 
+    def test_deploy_script_check_requires_github_actions_manual_gate_contract(self):
+        results = {}
+
+        production_readiness_suite.deploy_script_checks(results)
+
+        gate = results["deploy_script_command_check"]
+        details = gate["details"]["github_actions_manual_gate"]
+        self.assertEqual(gate["status"], "PASS")
+        self.assertTrue(details["workflow_has_confirm_input"])
+        self.assertTrue(details["workflow_validates_confirm"])
+        self.assertTrue(all(item["ok"] for item in details["policy_checks"]))
+        self.assertFalse(details["local_vm_fallback_allowed"])
+
     def test_worker_bootstrap_preflight_blocks_required_missing_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_codex_config=True)
@@ -2019,13 +2032,20 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             return True
 
         originals = (
+            telegram_direct_cto.APP,
+            telegram_direct_cto.STATE,
             telegram_direct_cto.LOGS,
             telegram_direct_cto.audit_passthrough,
             telegram_direct_cto.start_async_job,
             telegram_direct_cto.send_message,
         )
         with tempfile.TemporaryDirectory() as tmp:
-            telegram_direct_cto.LOGS = Path(tmp)
+            runtime = Path(tmp)
+            (runtime / "state").mkdir()
+            (runtime / "logs").mkdir()
+            telegram_direct_cto.APP = runtime
+            telegram_direct_cto.STATE = runtime / "state"
+            telegram_direct_cto.LOGS = runtime / "logs"
             telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
             telegram_direct_cto.start_async_job = fake_start_async_job
             telegram_direct_cto.send_message = fake_send_message
@@ -2042,6 +2062,8 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
                 )
             finally:
                 (
+                    telegram_direct_cto.APP,
+                    telegram_direct_cto.STATE,
                     telegram_direct_cto.LOGS,
                     telegram_direct_cto.audit_passthrough,
                     telegram_direct_cto.start_async_job,
@@ -2271,13 +2293,20 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
             return True
 
         originals = (
+            telegram_direct_cto.APP,
+            telegram_direct_cto.STATE,
             telegram_direct_cto.LOGS,
             telegram_direct_cto.audit_passthrough,
             telegram_direct_cto.start_async_job,
             telegram_direct_cto.send_message,
         )
         with tempfile.TemporaryDirectory() as tmp:
-            telegram_direct_cto.LOGS = Path(tmp)
+            runtime = Path(tmp)
+            (runtime / "state").mkdir()
+            (runtime / "logs").mkdir()
+            telegram_direct_cto.APP = runtime
+            telegram_direct_cto.STATE = runtime / "state"
+            telegram_direct_cto.LOGS = runtime / "logs"
             telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
             telegram_direct_cto.start_async_job = fake_start_async_job
             telegram_direct_cto.send_message = fake_send_message
@@ -2293,6 +2322,8 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
                 )
             finally:
                 (
+                    telegram_direct_cto.APP,
+                    telegram_direct_cto.STATE,
                     telegram_direct_cto.LOGS,
                     telegram_direct_cto.audit_passthrough,
                     telegram_direct_cto.start_async_job,
@@ -3905,7 +3936,9 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertIn("DEPLOY_REF_SHA", workflow_text)
         self.assertIn("uses: actions/checkout@v5", workflow_text)
         self.assertNotIn("ref: ${{ inputs.ref }}", workflow_text)
-        self.assertNotIn("inputs.confirm", workflow_text)
+        self.assertIn("confirm:", workflow_text)
+        self.assertIn("inputs.confirm", workflow_text)
+        self.assertIn("CONFIRM_PHRASE: DEPLOY-CODEX-VM", workflow_text)
         self.assertNotIn('--exclude ".github/"', workflow_text)
 
     def test_cto_dispatch_deploy_uses_branch_ref_input(self):
@@ -4155,6 +4188,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
                     base_policy = cto_autonomous_delivery.policy
                     cto_autonomous_delivery.policy = lambda: {
                         **base_policy(),
+                        "production_deploy_channel": "local_controller",
                         "local_vm_deploy_fallback_enabled": True,
                         "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
                     }
@@ -4209,6 +4243,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
                     base_policy = cto_autonomous_delivery.policy
                     cto_autonomous_delivery.policy = lambda: {
                         **base_policy(),
+                        "production_deploy_channel": "local_controller",
                         "local_vm_deploy_fallback_enabled": True,
                         "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
                     }
@@ -6059,7 +6094,7 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(running, 1)
         self.assertEqual(active, 4)
 
-    def test_github_actions_channel_allows_cto_local_fallback_context(self):
+    def test_github_actions_channel_rejects_cto_local_fallback_context(self):
         cfg = {
             "production_deploy_channel": "github_actions_manual",
             "local_vm_deploy_fallback_enabled": True,
@@ -6070,12 +6105,12 @@ class SystemRepairControlsTest(unittest.TestCase):
             os.environ.pop("GITHUB_ACTIONS", None)
             os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
             os.environ["CODEX_DEPLOY_ACTOR"] = "cto_finalizer"
-            self.assertTrue(production_deploy_controller.github_actions_local_fallback_allowed(cfg))
+            self.assertFalse(production_deploy_controller.github_actions_local_fallback_allowed(cfg))
         finally:
             os.environ.clear()
             os.environ.update(original_env)
 
-    def test_environment_manager_github_actions_blocker_is_bypassed_only_for_local_fallback(self):
+    def test_environment_manager_github_actions_blocker_is_not_bypassed_by_local_fallback(self):
         original_policy = production_environment_manager.deploy_policy
         original_env = os.environ.copy()
         production_environment_manager.deploy_policy = lambda: {
@@ -6093,9 +6128,26 @@ class SystemRepairControlsTest(unittest.TestCase):
             self.assertFalse(production_environment_manager.github_actions_local_fallback_allowed())
             os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
             os.environ["CODEX_DEPLOY_ACTOR"] = "cto_finalizer"
-            self.assertTrue(production_environment_manager.github_actions_local_fallback_allowed())
+            self.assertFalse(production_environment_manager.github_actions_local_fallback_allowed())
         finally:
             production_environment_manager.deploy_policy = original_policy
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    def test_cto_delivery_github_actions_channel_rejects_requested_local_fallback(self):
+        original_policy = cto_autonomous_delivery.policy
+        original_env = os.environ.copy()
+        cto_autonomous_delivery.policy = lambda: {
+            "production_deploy_channel": "github_actions_manual",
+            "local_vm_deploy_fallback_enabled": True,
+            "local_vm_deploy_fallback_allowed_actor": "cto_finalizer",
+        }
+        try:
+            os.environ["CODEX_LOCAL_DEPLOY_FALLBACK"] = "1"
+            os.environ["CODEX_DEPLOY_ACTOR"] = "cto_finalizer"
+            self.assertFalse(cto_autonomous_delivery.local_deploy_fallback_enabled())
+        finally:
+            cto_autonomous_delivery.policy = original_policy
             os.environ.clear()
             os.environ.update(original_env)
 

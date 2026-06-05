@@ -441,3 +441,13 @@ Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sa
 Dashboard ana shell arka planındaki doğa/manzara bitmap görseli kaldırıldı. `web_panel/static/index.html` artık nötr solid arka plan kullanır ve `web_panel/static/assets/dashboard-landscape.png` repo içinden silindi.
 
 Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regresyon testiyle sabitlendi; test scenic background referansının ve asset dosyasının geri eklenmemesini doğrular. Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
+
+## 2026-06-05 GitHub Actions Manual Gate Strictness Apply
+
+Production readiness analizi devamında GitHub Actions production kapısı strict hale getirildi. `Deploy to VM` workflow'u artık `confirm=DEPLOY-CODEX-VM` input doğrulaması olmadan ilerleyemez.
+
+`github_actions_manual` kanalında local VM fallback bypass kapatıldı. `CODEX_LOCAL_DEPLOY_FALLBACK`, `CODEX_DEPLOY_ACTOR=cto_finalizer` veya policy fallback bayrakları controller, production environment manager veya CTO delivery katmanında GitHub Actions kapısını atlayamaz.
+
+`deploy_script_command_check` workflow confirm, deploy policy, production policy, module settings ve CTO delivery policy kaynaklarında confirm phrase, direct VM SSH/file mutation yasağı ve local fallback kapalı sözleşmesini statik olarak doğrular. Bu paket production deploy, staging deploy, VM SSH, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
+
+Doğrulama: JSON validation, compileall, hedefli manual gate/fallback testleri, `tests.test_runtime_status_model` ve `CHECK_MODE=read_only` production readiness suite PASS oldu; readiness state/report yazımları `write-skipped` kaldı.

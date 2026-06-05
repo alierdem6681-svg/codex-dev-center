@@ -184,6 +184,11 @@ Staging readiness wrapper notu:
 - Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur; `tests/test_staging_readiness_wrappers.py` bunu statik dogrular.
 - Bu sozlesme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+GitHub Actions manual gate notu:
+- `Deploy to VM` workflow'u `confirm=DEPLOY-CODEX-VM` input/validasyon adimini tasimalidir.
+- `production_deploy_channel=github_actions_manual` iken local VM fallback kapali kalir; `CODEX_LOCAL_DEPLOY_FALLBACK` veya `CODEX_DEPLOY_ACTOR=cto_finalizer` GitHub Actions kapisini bypass edemez.
+- `supervisor/production_readiness_suite.py` `deploy_script_command_check` altinda workflow confirm, deploy policy, production policy, module settings ve CTO delivery policy kaynaklarini birlikte dogrular.
+
 Observed issue completion notu:
 - Drift registry/settings eksikleri `classify_module_registry_settings_candidates()` ile candidate olarak siniflandirilir; tek drift alert sinyali otomatik registry/settings eklemek icin yeterli degildir.
 - Repo apply no-change sonucu `classify_repo_apply_outcome()` ile terminal `NO_CHANGE` veya `DONE` olur; terminal sonuclar retry/backlog enqueue etmez.

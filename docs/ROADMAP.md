@@ -389,3 +389,11 @@ Faz 19B-10A Model Policy
 - [x] Markup regresyon testi scenic background referansının geri eklenmemesini doğrular.
 - [x] Dashboard settings/module/action template kayıtları nötr arka plan sözleşmesine hizalandı.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 59 - GitHub Actions Manual Gate Strictness
+
+- [x] `Deploy to VM` workflow confirm input'u `DEPLOY-CODEX-VM` olarak zorunlu hale getirildi.
+- [x] `github_actions_manual` kanalında local VM fallback/env bypass davranışı controller, environment manager ve CTO delivery katmanında kapatıldı.
+- [x] `deploy_script_command_check` workflow confirm ve policy sıkılık sözleşmesini statik olarak doğrular.
+- [x] Deploy policy, production policy, module settings ve CTO delivery policy template'leri direct VM/file mutation yasakları ve fallback kapalı sözleşmesine hizalandı.
+- [x] Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

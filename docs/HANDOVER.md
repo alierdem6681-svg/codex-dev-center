@@ -1186,3 +1186,31 @@ Not:
 - Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## GitHub Actions Manual Gate Strictness Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-132620 / CTO-TASK-20260605-132117-915759-PRODUCTION-READINESS-ANALIZI
+Worker: worker-4
+
+Eklenenler:
+- `.github/workflows/deploy-vm.yml` production workflow'una zorunlu `confirm` input'u ve `DEPLOY-CODEX-VM` doğrulama adımı eklendi.
+- `supervisor/production_deploy_controller.py`, `supervisor/production_environment_manager.py` ve `supervisor/cto_autonomous_delivery.py` `github_actions_manual` kanalında local VM fallback/env bypass kabul etmeyecek şekilde güncellendi.
+- `supervisor/production_readiness_suite.py` `deploy_script_command_check` altında workflow confirm, policy confirm, direct VM/file mutation yasağı ve local fallback kapalı sözleşmesini statik olarak doğrular.
+- Deploy policy, production policy, module settings, CTO delivery policy ve production readiness policy template'leri strict manual gate sözleşmesine hizalandı.
+- Onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m json.tool` ile `deploy_policy`, `production_policy`, `module_settings`, `cto_delivery_policy` ve `production_readiness_policy` JSON doğrulaması PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- Hedefli manual gate / fallback regresyon testleri PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 231 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `deploy_script_command_check.github_actions_manual_gate=PASS`, state/report yazımları read-only modda `write-skipped`.
+- `git diff --check` PASS.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+- Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector PR oluşturma aracı bu oturumda görünmedi; main branch'e push yapılmadı.

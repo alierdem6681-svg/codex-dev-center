@@ -600,6 +600,10 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
         ROOT / "scripts/staging_smoke_test.sh",
     ]
     policy = read_json(ROOT / "state_templates/deploy_policy.json", {})
+    production_policy = read_json(ROOT / "state_templates/production_policy.json", {})
+    module_settings = read_json(ROOT / "state_templates/module_settings.json", {})
+    deploy_pipeline = module_settings.get("deploy_pipeline", {}) if isinstance(module_settings, dict) else {}
+    cto_delivery_policy = read_json(ROOT / "state_templates/cto_delivery_policy.json", {})
     commands = policy.get("commands", {}) if isinstance(policy, dict) else {}
     env_defaults = policy.get("environment_defaults", {}) if isinstance(policy, dict) else {}
     required_commands = [
@@ -615,23 +619,64 @@ def deploy_script_checks(results: dict[str, Any]) -> None:
     execute_default = str(env_defaults.get("CODEX_PRODUCTION_DEPLOY_EXECUTE", ""))
     workflow = source_path(".github/workflows/deploy-vm.yml")
     workflow_text = workflow.read_text(encoding="utf-8", errors="replace") if workflow.exists() else ""
+    workflow_has_confirm_input = re.search(r"(?m)^\s+confirm:\s*$", workflow_text) is not None
+    workflow_validates_confirm = (
+        "${{ inputs.confirm }}" in workflow_text
+        and "CONFIRM_PHRASE: DEPLOY-CODEX-VM" in workflow_text
+        and "DEPLOY-CODEX-VM" in workflow_text
+    )
     workflow_ok = (
         "name: Deploy to VM" in workflow_text
         and "workflow_dispatch" in workflow_text
         and "ref:" in workflow_text
-        and "DEPLOY-CODEX-VM" not in workflow_text
+        and workflow_has_confirm_input
+        and workflow_validates_confirm
         and "codex-dev-center-01" in workflow_text
         and "/opt/codex-dev-center" in workflow_text
     )
+    gate_policy_sources = {
+        "deploy_policy": policy,
+        "production_policy": production_policy,
+        "module_settings.deploy_pipeline": deploy_pipeline,
+        "cto_delivery_policy": cto_delivery_policy,
+    }
+    gate_policy_checks = []
+    for source_name, source_policy in gate_policy_sources.items():
+        source_policy = source_policy if isinstance(source_policy, dict) else {}
+        gate_policy_checks.append(
+            {
+                "source": source_name,
+                "production_deploy_channel": source_policy.get("production_deploy_channel"),
+                "github_actions_confirm_phrase": source_policy.get("github_actions_confirm_phrase"),
+                "direct_vm_ssh_forbidden": source_policy.get("direct_vm_ssh_forbidden"),
+                "direct_production_file_mutation_forbidden": source_policy.get("direct_production_file_mutation_forbidden"),
+                "local_vm_deploy_fallback_enabled": source_policy.get("local_vm_deploy_fallback_enabled"),
+                "ok": (
+                    source_policy.get("production_deploy_channel") == "github_actions_manual"
+                    and source_policy.get("github_actions_confirm_phrase") == "DEPLOY-CODEX-VM"
+                    and source_policy.get("direct_vm_ssh_forbidden") is True
+                    and source_policy.get("direct_production_file_mutation_forbidden") is True
+                    and source_policy.get("local_vm_deploy_fallback_enabled") is False
+                ),
+            }
+        )
+    manual_gate_ok = workflow_ok and all(item["ok"] for item in gate_policy_checks)
     record(
         results,
         "deploy_script_command_check",
-        all(path.exists() for path in scripts) and not missing_commands and execute_default == "1" and workflow_ok,
+        all(path.exists() for path in scripts) and not missing_commands and execute_default == "1" and manual_gate_ok,
         {
             "scripts": [str(path.relative_to(ROOT)) for path in scripts],
             "missing_commands": missing_commands,
             "execute_default": execute_default,
             "workflow_ok": workflow_ok,
+            "github_actions_manual_gate": {
+                "ok": manual_gate_ok,
+                "workflow_has_confirm_input": workflow_has_confirm_input,
+                "workflow_validates_confirm": workflow_validates_confirm,
+                "policy_checks": gate_policy_checks,
+                "local_vm_fallback_allowed": False,
+            },
         },
     )
 

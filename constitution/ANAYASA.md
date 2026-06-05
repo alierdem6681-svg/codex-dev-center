@@ -63,6 +63,8 @@ Codex Dev Center uygulamasının kendi repo/app deploy akışı için GitHub Act
 
 Production için staging, production ve rollback komutları environment veya policy default ile tanımlanmalıdır. `CODEX_PRODUCTION_DEPLOY_EXECUTE=1` environment veya policy default olmadan production komutu çalışmaz. `production_deploy_channel=github_actions_manual` olduğunda GitHub Actions dışındaki production deploy denemeleri `github_actions_workflow_required` blocker'ı ile durur.
 
+GitHub Actions manuel production kapısı sıkıdır: `Deploy to VM` workflow'u `confirm=DEPLOY-CODEX-VM` doğrulaması yapmadan ilerleyemez. Local VM fallback veya `CODEX_LOCAL_DEPLOY_FALLBACK` gibi env bayrakları `github_actions_manual` kanalında production deploy bypass yolu olamaz. Deploy policy template'lerinde direct VM SSH ve direct production file mutation yasak, local VM fallback kapalı kalmalıdır.
+
 Codex Dev Center kendi uygulama kapsamında policy default komutlar `state_templates/deploy_policy.json` içinde tanımlıdır. Bu kapsam Google Ads, IAM, secret, billing, database, DNS/firewall veya müşteri verisi mutate işlemlerini kapsamaz.
 
 Dashboard controlled execution proposal görünürlüğü salt okunurdur. Proposal durumu göstermek production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi anlamına gelmez.

@@ -132,6 +132,12 @@ Canliya alma sadece su kosullarda calisabilir:
 
 Kritik istisnalar otomatik yapilmaz: secret degeri gorme/degistirme, IAM owner/editor degisikligi, billing, database veri silme, geri dondurulemez migration, kritik DNS/firewall degisikligi, Google Ads live mutate ve canli veri kaybi riski. Bu hallerde controller durur ve risk raporu uretir.
 
+## GITHUB ACTIONS MANUAL GATE STRICTNESS V1
+
+`Deploy to VM` workflow'u `confirm` input'u olmadan production deploy calistiramaz; confirm degeri tam olarak `DEPLOY-CODEX-VM` olmalidir.
+
+`production_deploy_channel=github_actions_manual` iken `CODEX_LOCAL_DEPLOY_FALLBACK`, `CODEX_DEPLOY_ACTOR=cto_finalizer` veya policy fallback bayraklari GitHub Actions kapisini bypass edemez. `state_templates/deploy_policy.json`, `production_policy.json`, `module_settings.json` ve `cto_delivery_policy.json` local VM fallback'i kapali, direct VM SSH ve direct production file mutation yasakli tutmalidir. `production_readiness_suite.py` bu sozlesmeyi `deploy_script_command_check` altinda statik olarak dogrular.
+
 ## AUTONOMOUS PRODUCTION ENVIRONMENT V1
 
 Deploy komutlari artik `state_templates/deploy_policy.json` icinde policy-bound default olarak tanimlidir. Environment variable varsa override eder; yoksa controller default komutlari kullanir.
