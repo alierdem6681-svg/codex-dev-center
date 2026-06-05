@@ -381,3 +381,11 @@ Faz 19B-10A Model Policy
 - [x] Pipeline evidence tanısı log içeriği okumadan sadece güvenli artefakt adı/marker yollarını raporlar.
 - [x] Davranış hedefli `tests.test_runtime_status_model.WorkerStatusModelTest` unit testleriyle sabitlendi.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 58 - Dashboard Historical Task Filter
+
+- [x] Gorevler ana listesi tamamlanmis/kapali gecmis kayitlari varsayilan olarak gizler.
+- [x] `Gecmis kayitlari goster` checkbox'i gecmis kayitlari geri acmak icin eklendi.
+- [x] Canli kayit checkbox davranisi korundu; canli kayitlar kendi kontroluyle dahil edilir.
+- [x] Bos guncel liste ve filtre sonucu icin empty-state metni eklendi.
+- [x] Davranis dashboard markup regresyon testiyle sabitlendi.

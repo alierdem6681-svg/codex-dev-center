@@ -71,15 +71,22 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
 
         self.assertIn('id="showLiveTasks"', html)
         self.assertIn("Canlıya alınanları göster", html)
+        self.assertIn('id="showHistoricalTasks"', html)
+        self.assertIn("Geçmiş kayıtları göster", html)
         self.assertIn("function taskIsLive(t)", html)
         self.assertIn("t.deployment_status || t.deploymentStatus || t.delivery_level", html)
         self.assertIn("function taskIsRunning(t){ return taskStatus(t) === 'RUNNING'; }", html)
         self.assertIn("if (taskIsRunning(a) !== taskIsRunning(b))", html)
         self.assertIn("list = list.filter(t => !taskIsLive(t));", html)
+        self.assertIn("list = list.filter(t => taskIsLive(t) || !taskIsClosed(t));", html)
         self.assertIn("list.sort(compareTasks);", html)
+        self.assertIn("function taskEmptyStateMessage()", html)
+        self.assertIn("Filtrelere uyan görev yok.", html)
+        self.assertIn("Güncel görev yok.", html)
+        self.assertIn('class="empty-state"', html)
         self.assertIn("function setFilterOptions(selectEl, defaultLabel, values)", html)
         self.assertIn("selectEl.dataset.optionsHtml !== html", html)
-        self.assertIn("[statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks]", html)
+        self.assertIn("[statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks, showHistoricalTasks]", html)
         self.assertIn("el.addEventListener('change', event =>", html)
 
 

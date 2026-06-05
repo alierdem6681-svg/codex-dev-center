@@ -435,3 +435,11 @@ Production readiness analizi devaminda arka plan ACK, progress-aware watchdog ve
 `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'ini ekledi. Gate gercek Telegram API cagrisi veya production deploy yapmadan simulator/static/helper sozlesmeleriyle sunlari dogrular: async ACK 3 saniye beklentisi, duplicate ACK suppression markerlari, stdout gürültüsünü anlamli progress saymayan watchdog ayrimi, timeout/usage-limit/gecici worker failure retryable karari, proposal uretmeden tamamlanan veya kritik destructive isteklerin non-retryable/approval kapsaminda kalmasi.
 
 Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sabitlendi. Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS ve anayasa kayitlari yeni gate'e hizalandi. Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+## 2026-06-05 Dashboard Historical Task Filter Apply
+
+Dashboard Gorevler ana listesi artik tamamlanmis/kapali gecmis kayitlari varsayilan olarak gizler. `Gecmis kayitlari goster` checkbox'i bu kayitlari geri acmak icin eklendi; `Canliya alinanlari goster` davranisi korunur.
+
+Bos sonuc icin desktop table ve mobile card alanlari `Guncel gorev yok.` veya aktif filtre varsa `Filtrelere uyan gorev yok.` empty-state metni gosterir. Davranis dashboard markup testi, runtime status regresyon paketi ve read-only production readiness suite ile sabitlendi.
+
+Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi. Bu apply clone'da `.git/index.lock` read-only filesystem nedeniyle commit hazirlanamadi; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` olarak dondugu icin PR acilamadi.

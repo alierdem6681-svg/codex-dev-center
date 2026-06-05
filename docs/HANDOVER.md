@@ -1159,3 +1159,31 @@ Not:
 - Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector mevcut, ancak yerel commit/tree üretilemediği ve büyük dosya değişiklikleri tam içerik/blob akışı gerektirdiği için güvenli PR açılamadı.
+
+---
+
+## Dashboard Historical Task Filter Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-125306 / CTO-TASK-20260605-075400-123336-DASHBOARD-GÖREV-LISTESI-DÜZENI
+Worker: worker-3
+
+Eklenenler:
+- `web_panel/static/index.html` Gorevler ana listesinde tamamlanmis/kapali gecmis kayitlari varsayilan olarak gizler.
+- `Gecmis kayitlari goster` checkbox'i gecmis kayitlari geri acmak icin eklendi.
+- Canli kayit filtresi korundu; canli kayitlar `Canliya alinanlari goster` kontroluyle dahil edilir.
+- Bos guncel liste ve filtre sonucu icin table/mobile empty-state metni eklendi.
+- `tests/test_dashboard_account_menu_markup.py` yeni filtre ve empty-state sozlesmesini sabitledi.
+
+Test:
+- `python3 -m compileall -q web_panel tests` PASS.
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 227 test.
+- `git diff --check` PASS.
+- Secret pattern diff scan PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazimlari `write-skipped`.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari okundu.
+- Commit/PR tamamlanamadi: `git add` `.git/index.lock` olustururken read-only filesystem hatasi aldi; GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` olarak dondu.
