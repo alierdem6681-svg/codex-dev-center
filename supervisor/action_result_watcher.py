@@ -46,6 +46,18 @@ EXPECTED = [
     "WORKER_SUMMARY.md",
 ]
 
+ACTION_WATCHER_TERMINAL_SKIP_STATUSES = {
+    "ARCHIVED",
+    "ARCHIVED_STALE",
+    "APPROVAL_REQUIRED",
+    "BLOCKED",
+    "CANCELLED",
+    "CANCELLED_BY_OWNER_CLEANUP",
+    "DEPLOYED",
+    "DONE",
+    "NO_CHANGE",
+}
+
 def now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -132,6 +144,16 @@ def is_pr_ready_repo_apply_record(task):
     )
 
 
+def should_skip_action_result_task(task):
+    status = normalize_status(task.get("status"))
+    result = str(task.get("result") or "").lower()
+    return (
+        status in ACTION_WATCHER_TERMINAL_SKIP_STATUSES
+        or result.startswith("cancelled_")
+        or bool(task.get("misroute_cancelled_by"))
+    )
+
+
 def main():
     LOGS.mkdir(parents=True, exist_ok=True)
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -170,6 +192,10 @@ def main():
                 created = sum(1 for x in EXPECTED if (Path(ws) / x).exists())
 
             status = normalize_status(t.get("status"))
+
+            if should_skip_action_result_task(t):
+                details.append(f"{tid}: TERMINAL_SKIP")
+                continue
 
             if is_deployed_record(t):
                 deployed_preserved += 1

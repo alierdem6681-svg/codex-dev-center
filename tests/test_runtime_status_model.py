@@ -381,6 +381,18 @@ class WorkerStatusModelTest(unittest.TestCase):
             "telegram_parent_requires_explicit_action_tasks",
         )
 
+    def test_action_result_watcher_skips_cancelled_action_tasks(self):
+        self.assertTrue(
+            action_result_watcher.should_skip_action_result_task(
+                {
+                    "id": "CTO-ACTION-OLD",
+                    "status": "CANCELLED",
+                    "result": "cancelled_by_codex_final_attention_cleanup",
+                    "misroute_cancelled_by": "windows_codex_direct_monitor",
+                }
+            )
+        )
+
     def test_information_question_does_not_become_action_task(self):
         message = "hafıza konusu ile ilgili tamamlanmış devam eden veya henüz planlama aşamasında olan görevler var mı sadece bilgi istiyorum"
 
