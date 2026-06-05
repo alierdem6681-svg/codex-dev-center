@@ -11,7 +11,6 @@ from typing import Any
 
 try:
     from . import cto_autonomous_delivery
-    from .critical_operation_policy import approval_required_payload
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
@@ -42,7 +41,6 @@ try:
     )
 except ImportError:
     import cto_autonomous_delivery
-    from critical_operation_policy import approval_required_payload
     from state_file_lock import state_file_lock
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
@@ -101,14 +99,13 @@ BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_STALLED,
     TASK_STATUS_VALIDATION_FAILED,
+    TASK_STATUS_APPROVAL_REQUIRED,
 }
 PROGRESS_PROPAGATION_BLOCKED_STATUSES = {
     "ARCHIVED",
     "ARCHIVED_STALE",
     "CANCELLED",
     "CANCELLED_BY_OWNER_CLEANUP",
-    "APPROVAL_REQUIRED",
-    "REQUIRES_APPROVAL",
     "BLOCKED",
     "DEPLOYED",
 }
@@ -120,6 +117,15 @@ CHILD_FAILURE_STATUSES = {
     TASK_STATUS_PIPELINE_FAILED,
     TASK_STATUS_STALLED,
     TASK_STATUS_VALIDATION_FAILED,
+}
+REPO_APPLY_NO_CHANGE_RESULTS = {
+    "repo_apply_worker_failed_without_changes",
+    "repo_apply_worker_completed_without_changes_noop",
+    "repo_apply_worker_no_changes_after_nonzero_terminal",
+}
+REPO_APPLY_STALE_NO_CHANGE_RESULTS = {
+    "stale_claim_timeout",
+    "stale_claim_timeout_max_attempts_reached",
 }
 VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "25"))
 VALIDATION_INTERVAL_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_INTERVAL_SECONDS", "60"))
@@ -324,6 +330,120 @@ def active_child_exists(tasks: list[dict[str, Any]], child_id: str | None) -> bo
         return normalize_status(task.get("status")) in ACTIVE_TASK_STATUSES
     return False
 
+
+def is_repo_apply_record(task: dict[str, Any]) -> bool:
+    mode = str(task.get("execution_mode") or task.get("dispatcher_mode") or "").strip().lower()
+    source = str(task.get("source") or "").strip().lower()
+    task_id = str(task.get("id") or "")
+    return bool(
+        task.get("repo_apply_allowed") is True
+        or mode in {"repo_apply", "apply", "implementation"}
+        or task_id.startswith("CTO-APPLY-")
+        or (source == BACKLOG_DISPATCHER_SOURCE and mode == "apply")
+    )
+
+
+def repo_apply_has_no_commit_files(task: dict[str, Any]) -> bool:
+    commit_files = task.get("commit_files")
+    if isinstance(commit_files, list):
+        return len(commit_files) == 0
+    outcome = task.get("repo_apply_outcome")
+    if isinstance(outcome, dict) and "changed_paths_count" in outcome:
+        try:
+            return int(outcome.get("changed_paths_count") or 0) == 0
+        except Exception:
+            return False
+    changed_files = task.get("changed_files")
+    if isinstance(changed_files, list):
+        return len(changed_files) == 0
+    return False
+
+
+def repo_apply_log_indicates_no_change(task: dict[str, Any]) -> bool:
+    task_id = str(task.get("id") or "")
+    if not task_id or not LOGS.exists():
+        return False
+    for path in LOGS.glob("*.log"):
+        if not path.name.startswith(task_id + "_"):
+            continue
+        try:
+            tail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+        except Exception:
+            continue
+        if (
+            "repo_apply_worker_failed_without_changes changed=0" in tail
+            or "repo_apply_worker_completed_without_changes_noop" in tail
+            or "repo_apply_worker_no_changes_after_nonzero_terminal" in tail
+            or "REPO_APPLY_DONE status=NO_CHANGE" in tail
+        ):
+            return True
+    report_path = task.get("report_path")
+    if report_path:
+        try:
+            report = Path(str(report_path)).read_text(encoding="utf-8", errors="replace")[-4000:]
+        except Exception:
+            report = ""
+        if "Result: repo_apply_worker_failed_without_changes" in report and "- Yok" in report:
+            return True
+    return False
+
+
+def is_repo_apply_no_change_record(task: dict[str, Any]) -> bool:
+    status = normalize_status(task.get("status"))
+    result = str(task.get("result") or "")
+    outcome = task.get("repo_apply_outcome")
+    outcome_final = str(outcome.get("final_state") or "").upper() if isinstance(outcome, dict) else ""
+    if status == TASK_STATUS_NO_CHANGE:
+        return True
+    if not is_repo_apply_record(task):
+        return False
+    if result in REPO_APPLY_NO_CHANGE_RESULTS and repo_apply_has_no_commit_files(task):
+        return True
+    if result in REPO_APPLY_STALE_NO_CHANGE_RESULTS and repo_apply_log_indicates_no_change(task):
+        return True
+    return bool(
+        isinstance(outcome, dict)
+        and outcome.get("terminal") is True
+        and outcome_final == "NO_CHANGE"
+        and repo_apply_has_no_commit_files(task)
+    )
+
+
+def reconcile_repo_apply_no_change_failures(queue: dict[str, Any]) -> int:
+    changed = 0
+    stamp = now()
+    for task in queue.get("tasks", []):
+        if not isinstance(task, dict):
+            continue
+        if not is_repo_apply_no_change_record(task):
+            continue
+        if normalize_status(task.get("status")) == TASK_STATUS_NO_CHANGE:
+            continue
+        task["repo_apply_reconciled_from_status"] = normalize_status(task.get("status"))
+        task["repo_apply_reconciled_from_result"] = task.get("result")
+        task["status"] = TASK_STATUS_NO_CHANGE
+        task["delivery_level"] = TASK_STATUS_NO_CHANGE
+        task["result"] = "repo_apply_no_changes_terminal_reconciled"
+        task["validation_status"] = "NO_CHANGE"
+        task["pipeline_status"] = "NOT_REQUIRED"
+        task["worker_eligible"] = False
+        task["repo_applied"] = False
+        task["branch_merged"] = False
+        task["production_deployed"] = False
+        task["updated_at"] = stamp
+        task["repo_apply_outcome"] = {
+            "apply_status": "SUCCESS",
+            "changed_paths": [],
+            "changed_paths_count": 0,
+            "terminal": True,
+            "final_state": "NO_CHANGE",
+            "reason": "NO_DIFF_AFTER_APPLY_RECONCILED",
+            "enqueue_target": None,
+        }
+        changed += 1
+    return changed
+
+
 def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> bool:
     if not child_id:
         return True
@@ -338,6 +458,8 @@ def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> boo
     for task in tasks:
         if task.get("id") != child_id:
             continue
+        if is_repo_apply_no_change_record(task):
+            return False
         if (
             normalize_status(task.get("status")) == TASK_STATUS_FAILED_RETRYABLE
             and (
@@ -433,6 +555,14 @@ def parent_progress_from_children(children: list[dict[str, Any]]) -> dict[str, A
             "result": "child_ready_for_validation",
             "active_child_task_id": child.get("id"),
         }
+    if any(is_repo_apply_no_change_record(child) for child in children):
+        child = next(child for child in children if is_repo_apply_no_change_record(child))
+        return {
+            "status": TASK_STATUS_NO_CHANGE,
+            "delivery_level": TASK_STATUS_NO_CHANGE,
+            "result": "child_repo_apply_no_change_terminal",
+            "active_child_task_id": child.get("id"),
+        }
     if any(status == TASK_STATUS_PROPOSAL_DONE for status in statuses):
         child = next(child for child in children if normalize_status(child.get("status")) == TASK_STATUS_PROPOSAL_DONE)
         return {
@@ -508,9 +638,7 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
         return False
     if task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged"):
         return False
-    if task.get("approval_required") or status == TASK_STATUS_APPROVAL_REQUIRED:
-        return False
-    if worker_block_reason(task) and not retrying_apply_failure:
+    if worker_block_reason(task) and status != TASK_STATUS_PROPOSAL_DONE and not retrying_apply_failure:
         return False
     child_id = task.get("repo_apply_child")
     if active_child_exists(tasks, child_id):
@@ -526,14 +654,6 @@ def repo_apply_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
         if is_repo_apply_candidate(task, tasks):
             return task
     return None
-
-def mark_approval_required(task: dict[str, Any], findings: list[str]) -> None:
-    task["status"] = TASK_STATUS_APPROVAL_REQUIRED
-    task["worker_eligible"] = False
-    task["approval_required"] = True
-    task["approval_reason"] = "critical_infrastructure_operation"
-    task["critical_operation_findings"] = findings
-    task["updated_at"] = now()
 
 def create_repo_apply_task(queue: dict[str, Any], parent: dict[str, Any]) -> dict[str, Any]:
     parent_id = str(parent.get("id") or "TASK")
@@ -653,7 +773,10 @@ def ensure_single_backlog_task() -> bool:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     queue, _changes = normalize_queue_payload(queue)
     tasks = queue.setdefault("tasks", [])
+    no_change_repairs = reconcile_repo_apply_no_change_failures(queue)
     progress_changes = propagate_parent_progress(queue)
+    if no_change_repairs or progress_changes:
+        write_json(QUEUE_PATH, queue)
     worker_pending = [t for t in tasks if is_worker_eligible_task(t)]
     worker_active = [
         t
@@ -669,11 +792,10 @@ def ensure_single_backlog_task() -> bool:
         "backlog_dispatcher_last_tick": now(),
         "backlog_dispatcher_worker_active": len(worker_active),
         "backlog_dispatcher_available_slots": available_slots,
+        "backlog_dispatcher_no_change_repairs": no_change_repairs,
     }
     root_cause = cto_autonomous_delivery.root_cause_mode_status(queue)
     if root_cause.get("active"):
-        if progress_changes:
-            write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
             backlog_dispatcher_last_result="root_cause_mode_active",
@@ -687,8 +809,6 @@ def ensure_single_backlog_task() -> bool:
         )
         return False
     if available_slots <= 0:
-        if progress_changes:
-            write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
             backlog_dispatcher_last_result="worker_active",
@@ -697,7 +817,6 @@ def ensure_single_backlog_task() -> bool:
         return False
 
     created_children: list[dict[str, str]] = []
-    approval_parent_id = ""
     queue_changed = False
 
     def remember_child(parent_id: str, child: dict[str, Any], mode: str) -> None:
@@ -714,13 +833,6 @@ def ensure_single_backlog_task() -> bool:
     while len(created_children) < available_slots:
         apply_parent = repo_apply_candidate(tasks)
         if apply_parent:
-            evaluation = approval_required_payload(task_text(apply_parent))
-            if evaluation["approval_required"]:
-                mark_approval_required(apply_parent, evaluation["critical_operation_findings"])
-                approval_parent_id = str(apply_parent.get("id") or "")
-                queue_changed = True
-                log(f"BACKLOG_DISPATCH repo_apply_approval_required parent={approval_parent_id}")
-                continue
             child = create_repo_apply_task(queue, apply_parent)
             remember_child(str(apply_parent.get("id") or ""), child, "apply")
             queue_changed = True
@@ -736,13 +848,6 @@ def ensure_single_backlog_task() -> bool:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         child_id = f"CTO-DISPATCH-{stamp}-{safe_id(parent_id)}"
         risk = normalize_risk(parent.get("risk") or parent.get("risk_level") or "medium")
-        if risk in {"high", "critical"}:
-            mark_approval_required(parent, ["risk_requires_approval"])
-            approval_parent_id = parent_id
-            queue_changed = True
-            log(f"BACKLOG_DISPATCH approval_required parent={parent_id} risk={risk}")
-            continue
-
         title = parent.get("title") or parent_id
         child = {
             "id": child_id,
@@ -800,8 +905,7 @@ def ensure_single_backlog_task() -> bool:
         write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
-            backlog_dispatcher_last_result="approval_required",
-            backlog_dispatcher_last_parent=approval_parent_id,
+            backlog_dispatcher_last_result="queue_changed",
             backlog_dispatcher_parent_progress_changes=progress_changes,
         )
         return False

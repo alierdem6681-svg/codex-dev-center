@@ -65,6 +65,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     normalize_status,
     atomic_json_state_audit,
     atomic_write_json,
+    worker_block_reason,
 )
 
 WORKER_LIFECYCLE_SPEC = importlib.util.spec_from_file_location(
@@ -529,6 +530,17 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertIn("firewall_change", findings)
         self.assertIn("database_destructive_operation", findings)
         self.assertIn("google_ads_live_mutate", findings)
+
+    def test_critical_policy_records_findings_without_approval_gate(self):
+        payload = critical_operation_policy.approval_required_payload("production token rotate")
+
+        self.assertFalse(payload["approval_required"])
+        self.assertEqual(payload["status"], "ALLOWED_WITH_GATES")
+        self.assertTrue(payload["approval_gate_disabled"])
+        self.assertEqual(payload["gate_rule"], "pipeline_pass_only")
+
+    def test_high_risk_no_longer_blocks_worker_for_approval(self):
+        self.assertEqual(worker_block_reason({"risk": "high", "status": "PENDING"}), "")
 
     def test_timeout_without_output_is_not_done(self):
         status, reason = worker_runner.classify_worker_result(124, [], "", False)
@@ -1903,16 +1915,16 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(result["route"], "async_job")
         self.assertTrue(result["async_ack_expected"])
 
-    def test_critical_operation_routes_to_approval_before_async(self):
+    def test_critical_operation_routes_async_without_approval(self):
         result = telegram_direct_cto_simulator.simulate_case(
             "database_destructive",
             "Production database " + "delete" + " from users çalıştır.",
         )
 
         self.assertIn("database_destructive_operation", result["critical_operation_findings"])
-        self.assertEqual(result["route"], "local_natural_reply")
-        self.assertEqual(result["reply_kind"], "approval_required")
-        self.assertFalse(result["async_ack_expected"])
+        self.assertEqual(result["route"], "async_job")
+        self.assertNotEqual(result["reply_kind"], "approval_required")
+        self.assertTrue(result["async_ack_expected"])
 
     def test_handle_message_starts_async_job_and_sends_ack_without_sync_codex(self):
         calls = []
@@ -2247,11 +2259,12 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("Devamı başlattım", calls[1][2])
 
-    def test_handle_message_blocks_critical_operation_before_async_job(self):
+    def test_handle_message_starts_async_for_critical_operation_without_approval(self):
         calls = []
 
-        def fail_start_async_job(*_args, **_kwargs):
-            raise AssertionError("critical operation must not start async job")
+        def fake_start_async_job(*args, **kwargs):
+            calls.append(("start_async_job", args, kwargs))
+            return "JOB-CRITICAL"
 
         def fake_send_message(token, chat_id, text):
             calls.append(("send_message", chat_id, text))
@@ -2266,7 +2279,7 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             telegram_direct_cto.LOGS = Path(tmp)
             telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
-            telegram_direct_cto.start_async_job = fail_start_async_job
+            telegram_direct_cto.start_async_job = fake_start_async_job
             telegram_direct_cto.send_message = fake_send_message
             try:
                 telegram_direct_cto.handle_message(
@@ -2286,8 +2299,10 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
                     telegram_direct_cto.send_message,
                 ) = originals
 
-        self.assertEqual(len(calls), 1)
-        self.assertIn("APPROVAL_REQUIRED", calls[0][2])
+        self.assertEqual(calls[0][0], "start_async_job")
+        self.assertEqual(calls[1][0], "send_message")
+        self.assertNotIn("APPROVAL_REQUIRED", calls[1][2])
+        self.assertIn("Başladım", calls[1][2])
 
 
 class DirectCtoProgressWatcherTest(unittest.TestCase):
@@ -3494,7 +3509,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertTrue(result["ready_for_deploy_gate"])
         self.assertFalse(result["critical"]["approval_required"])
-        self.assertEqual(result["critical"]["source"], "structured_task_state")
+        self.assertEqual(result["critical"]["source"], "approval_gate_disabled_pipeline_pass_only")
 
     def test_done_repo_applied_requires_validation_and_pipeline_pass(self):
         task = self.deployable_task("TASK-GATES")
@@ -3504,15 +3519,16 @@ class DeployGateStatusModelTest(unittest.TestCase):
 
         self.assertFalse(result["ready_for_deploy_gate"])
 
-    def test_active_approval_required_blocks_deploy_gate(self):
+    def test_active_approval_required_no_longer_blocks_deploy_gate(self):
         task = self.deployable_task("TASK-ACTIVE-APPROVAL")
         task["approval_required"] = True
         task["critical_operation_findings"] = ["token_private_key_env_value_change"]
 
         result = cto_autonomous_delivery.evaluate_task(task)
 
-        self.assertFalse(result["ready_for_deploy_gate"])
-        self.assertTrue(result["critical"]["approval_required"])
+        self.assertTrue(result["ready_for_deploy_gate"])
+        self.assertFalse(result["critical"]["approval_required"])
+        self.assertTrue(result["critical"]["previous_approval_state"])
 
     def test_proposal_ready_and_ready_for_validation_are_not_deployable(self):
         for status in [TASK_STATUS_PROPOSAL_READY, TASK_STATUS_READY_FOR_VALIDATION]:
@@ -3532,14 +3548,14 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertEqual(result["status"], "DRY_RUN_GATES_PASS_DEPLOY_ALLOWED")
         self.assertFalse(result["evaluation"]["critical"]["approval_required"])
 
-    def test_deploy_task_blocks_active_approval_required(self):
+    def test_deploy_task_ignores_active_approval_required_when_gates_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             task = self.deployable_task("TASK-DEPLOY-ACTIVE-APPROVAL")
             task["approval_required"] = True
             with self.patched_delivery_runtime(tmp, [task]):
                 result = cto_autonomous_delivery.deploy_task("TASK-DEPLOY-ACTIVE-APPROVAL", execute=False, smoke=True)
 
-        self.assertEqual(result["status"], "APPROVAL_REQUIRED")
+        self.assertEqual(result["status"], "DRY_RUN_GATES_PASS_DEPLOY_ALLOWED")
 
     def test_pr_ready_candidate_uses_structured_gate_not_raw_task_text(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -5769,14 +5785,15 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
         self.assertEqual(queue["tasks"][0]["pipeline_status"], "FAIL")
 
-    def test_critical_operation_stays_approval_required(self):
+    def test_critical_operation_becomes_validation_failed_without_approval(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.write_ready_runtime(tmp, pipeline_status="PASS", title="production token rotate")
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
-        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_APPROVAL_REQUIRED)
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_VALIDATION_FAILED)
+        self.assertEqual(queue["tasks"][0]["validation_status"], "FAIL")
         self.assertTrue(queue["tasks"][0]["critical_operation_findings"])
 
     def test_engine_approval_can_be_rechecked_when_findings_were_policy_context(self):

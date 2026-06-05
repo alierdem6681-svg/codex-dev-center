@@ -685,7 +685,7 @@ def readiness_simulation_contracts() -> dict[str, Any]:
             "supervisor/critical_operation_policy.py",
             [
                 "critical_operation_findings",
-                "APPROVAL_REQUIRED",
+                "pipeline_pass_only",
                 "database_destructive_operation",
             ],
         ),

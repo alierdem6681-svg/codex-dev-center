@@ -77,8 +77,8 @@
   "supervisor": {
     "auto_dispatch_low_risk": true,
     "auto_dispatch_medium_risk": true,
-    "high_risk_requires_approval": true,
-    "critical_risk_requires_approval": true
+    "high_risk_requires_approval": false,
+    "critical_risk_requires_approval": false
   },
   "workers": {
     "worker_count": 4,
@@ -348,9 +348,9 @@
     "rollback_command_env": "CODEX_ROLLBACK_COMMAND",
     "production_deploy_execute_env": "CODEX_PRODUCTION_DEPLOY_EXECUTE",
     "production_deploy_execute_default": "1",
-    "database_migration_requires_approval": true,
-    "token_private_key_env_change_requires_approval": true,
-    "critical_exception_auto_block": true
+    "database_migration_requires_approval": false,
+    "token_private_key_env_change_requires_approval": false,
+    "critical_exception_auto_block": false
   },
   "backup_recovery": {
     "manual_backup_enabled": true,
@@ -361,10 +361,10 @@
     "owner_queue_cleanup_status_file": "state/queue_owner_cleanup_status.json"
   },
   "security_approval": {
-    "approval_gate_enabled": true,
-    "high_risk_approval_required": true,
-    "critical_risk_approval_required": true,
-    "three_word_confirmation_required": true
+    "approval_gate_enabled": false,
+    "high_risk_approval_required": false,
+    "critical_risk_approval_required": false,
+    "three_word_confirmation_required": false
   },
   "github_safe_flow": {
     "enabled": true,

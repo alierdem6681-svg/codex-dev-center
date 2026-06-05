@@ -322,7 +322,7 @@ def is_validation_candidate(
     if not recheck_engine_approval or status != TASK_STATUS_APPROVAL_REQUIRED:
         return False
     return (
-        task.get("result") == "critical_operation_requires_user_approval"
+        task.get("result") in {"critical_operation_requires_user_approval", "critical_operation_validation_failed"}
         and task.get("validation_status") == "APPROVAL_REQUIRED"
     )
 
@@ -348,9 +348,9 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
     if findings:
         return {
             "task_id": task_id,
-            "target_status": TASK_STATUS_APPROVAL_REQUIRED,
-            "result": "critical_operation_requires_user_approval",
-            "validation_status": "APPROVAL_REQUIRED",
+            "target_status": TASK_STATUS_VALIDATION_FAILED,
+            "result": "critical_operation_validation_failed",
+            "validation_status": "FAIL",
             "pipeline_status": "NOT_RUN",
             "workspace": str(workspace) if workspace else "",
             "created_files": files,

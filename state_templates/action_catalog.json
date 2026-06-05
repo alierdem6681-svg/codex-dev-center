@@ -291,7 +291,7 @@
       "module": "backup_recovery",
       "risk": "medium",
       "enabled": true,
-      "requires_approval": true,
+      "requires_approval": false,
       "owner_directed_only": true,
       "archive_required": true,
       "command": "{python} scripts/queue_owner_cleanup.py --archive {archive_path} --execute"

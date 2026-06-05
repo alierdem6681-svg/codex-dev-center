@@ -13,6 +13,7 @@ try:
     from .task_status_constants import (
         TASK_STATUS_DEPLOYED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
         normalize_queue_payload,
@@ -24,6 +25,7 @@ except ImportError:
     from task_status_constants import (
         TASK_STATUS_DEPLOYED,
         TASK_STATUS_FAILED_NO_PROPOSAL,
+        TASK_STATUS_NO_CHANGE,
         TASK_STATUS_READY_FOR_VALIDATION,
         atomic_write_json,
         normalize_queue_payload,
@@ -56,6 +58,13 @@ ACTION_WATCHER_TERMINAL_SKIP_STATUSES = {
     "DEPLOYED",
     "DONE",
     "NO_CHANGE",
+}
+
+REPO_APPLY_NO_CHANGE_RESULTS = {
+    "repo_apply_worker_failed_without_changes",
+    "repo_apply_worker_completed_without_changes_noop",
+    "repo_apply_worker_no_changes_after_nonzero_terminal",
+    "repo_apply_no_changes_terminal_reconciled",
 }
 
 def now():
@@ -154,6 +163,44 @@ def should_skip_action_result_task(task):
     )
 
 
+def task_children(tasks, parent_id):
+    children = []
+    for task in tasks:
+        if str(task.get("parent_task") or "") == parent_id or str(task.get("parent_task_id") or "") == parent_id:
+            children.append(task)
+    return children
+
+
+def has_no_commit_files(task):
+    commit_files = task.get("commit_files")
+    if isinstance(commit_files, list):
+        return len(commit_files) == 0
+    changed_files = task.get("changed_files")
+    if isinstance(changed_files, list):
+        return len(changed_files) == 0
+    outcome = task.get("repo_apply_outcome")
+    if isinstance(outcome, dict) and "changed_paths_count" in outcome:
+        try:
+            return int(outcome.get("changed_paths_count") or 0) == 0
+        except Exception:
+            return False
+    return False
+
+
+def no_change_repo_apply_child(tasks, parent_id):
+    for child in task_children(tasks, parent_id):
+        status = normalize_status(child.get("status"))
+        result = str(child.get("result") or "")
+        child_id = str(child.get("id") or "")
+        mode = str(child.get("execution_mode") or child.get("dispatcher_mode") or "").lower()
+        is_apply = child_id.startswith("CTO-APPLY-") or mode in {"repo_apply", "apply", "implementation"}
+        if status == TASK_STATUS_NO_CHANGE and is_apply:
+            return child
+        if is_apply and result in REPO_APPLY_NO_CHANGE_RESULTS and has_no_commit_files(child):
+            return child
+    return None
+
+
 def main():
     LOGS.mkdir(parents=True, exist_ok=True)
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -200,6 +247,21 @@ def main():
             if is_deployed_record(t):
                 deployed_preserved += 1
                 details.append(f"{tid}: DEPLOYED_PRESERVED")
+                continue
+
+            no_change_child = no_change_repo_apply_child(tasks, str(tid))
+            if no_change_child:
+                t["status"] = TASK_STATUS_NO_CHANGE
+                t["result"] = "child_repo_apply_no_change_terminal"
+                t["delivery_level"] = TASK_STATUS_NO_CHANGE
+                t["validation_status"] = "NO_CHANGE"
+                t["pipeline_status"] = "NOT_REQUIRED"
+                t["repo_applied"] = False
+                t["staging_deployed"] = False
+                t["production_deployed"] = False
+                t["active_child_task_id"] = no_change_child.get("id")
+                t["updated_at"] = now()
+                details.append(f"{tid}: NO_CHANGE_CHILD {no_change_child.get('id')}")
                 continue
 
             if is_pr_ready_repo_apply_record(t):
