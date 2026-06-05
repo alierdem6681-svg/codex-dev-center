@@ -276,6 +276,29 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         self.assertEqual(result["subtasks"], [])
 
+    def test_memory_os_router_uses_feature_delivery_lane(self):
+        route = cto_task_router.classify_task_route(
+            "Kapsamlı şekilde memory os modülünü hazırla, CTO'ya bağla ve canlıya al."
+        )
+
+        self.assertEqual(route["task_class"], "feature_task")
+        self.assertEqual(route["delivery_mode"], "feature_delivery")
+        self.assertEqual(route["pipeline_lane"], "Memory OS Delivery")
+        self.assertEqual(route["intent_domain"], "memory_os")
+        self.assertFalse(
+            cto_task_router.should_split(
+                "CTO-MEMORY-OS-20260603-RO işini devam ettirelim ve canlıya alalım."
+            )
+        )
+
+    def test_infrastructure_access_router_is_control_lane_not_dashboard_cleanup(self):
+        message = "Dashboard SSL/HTTPS erişimini düzeltelim, domain ve sertifika kontrolü gerekebilir."
+        route = cto_task_router.classify_task_route(message)
+
+        self.assertFalse(cto_task_router.is_dashboard_cleanup_request(message))
+        self.assertEqual(route["task_class"], "control_task")
+        self.assertEqual(route["control_type"], "infrastructure_access_readiness")
+
     def test_telegram_dashboard_cleanup_metadata_uses_dashboard_title(self):
         message = (
             "dashboarddaki Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, "
@@ -298,6 +321,24 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         self.assertEqual(meta["name"], "Dashboard Görev Listesi Düzeni")
         self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
+    def test_memory_os_metadata_is_not_production_readiness(self):
+        message = (
+            "CTO-MEMORY-OS-20260603-RO işini devam ettirelim ve tamamladıktan sonra canlıya alalım."
+        )
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Memory OS Modülü")
+        self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
+    def test_dashboard_ssl_request_is_not_dashboard_cleanup(self):
+        message = "Dashboard için SSL/HTTPS erişimini düzeltelim ve canlıya alalım."
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Infrastructure Access Readiness")
+        self.assertNotEqual(meta["name"], "Dashboard Alan Temizliği")
 
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
@@ -1633,6 +1674,31 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertTrue(all(task.get("execution_mode") == "repo_apply" for task in tasks))
         self.assertTrue(all(task.get("delivery_level") == "REPO_APPLY_QUEUED" for task in tasks))
         self.assertTrue(all("plan/proposal ile durma" in task.get("description", "") for task in tasks))
+
+    def test_action_mode_memory_os_creates_specific_apply_tasks(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "Kapsamlı şekilde memory os görevini incele, plan yap, modül hazırla, CTO'ya bağla ve canlıya al.",
+            "20260605-TEST",
+        )
+
+        self.assertEqual(
+            [task["title"] for task in tasks],
+            [
+                "Memory OS Intent Contract",
+                "Memory OS Runtime Module",
+                "CTO Memory OS Integration",
+                "Memory OS Dashboard And Tests",
+            ],
+        )
+        self.assertTrue(all(task.get("repo_apply_allowed") is True for task in tasks))
+        self.assertTrue(all(task.get("execution_mode") == "repo_apply" for task in tasks))
+        self.assertTrue(all(task.get("delivery_level") == "REPO_APPLY_QUEUED" for task in tasks))
+
+    def test_action_mode_pure_deploy_command_still_waits_for_gates(self):
+        reply = direct_cto_action_mode.run_action_mode("canlıya al")
+
+        self.assertIn("readiness kapıları", reply)
+        self.assertNotIn("Paketler:", reply)
 
     def test_action_mode_plan_prompt_stays_proposal_only(self):
         tasks = direct_cto_action_mode.build_backlog(
@@ -4055,6 +4121,48 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(system_state["backlog_dispatcher_created_count"], 4)
         self.assertEqual(system_state["backlog_dispatcher_available_slots"], 0)
         self.assertEqual(system_state["backlog_dispatcher_last_result"], "parallel_children_created")
+
+    def test_parent_progress_propagates_from_active_apply_child_without_worker_claim(self):
+        queue = {
+            "tasks": [
+                {
+                    "id": "ROOT",
+                    "status": TASK_STATUS_PROPOSAL_READY,
+                    "source": "telegram",
+                    "worker_eligible": False,
+                    "risk": "medium",
+                },
+                {
+                    "id": "BACKLOG",
+                    "status": TASK_STATUS_PROPOSAL_DONE,
+                    "source": "cto",
+                    "parent_task_id": "ROOT",
+                    "root_task_id": "ROOT",
+                    "worker_eligible": True,
+                    "risk": "medium",
+                },
+                {
+                    "id": "APPLY",
+                    "status": TASK_STATUS_RUNNING,
+                    "source": lifecycle_manager.BACKLOG_DISPATCHER_SOURCE,
+                    "parent_task_id": "BACKLOG",
+                    "root_task_id": "BACKLOG",
+                    "worker_eligible": True,
+                    "dispatcher_mode": "apply",
+                    "risk": "medium",
+                },
+            ]
+        }
+
+        changed = lifecycle_manager.propagate_parent_progress(queue)
+        tasks = {task["id"]: task for task in queue["tasks"]}
+
+        self.assertGreaterEqual(changed, 2)
+        self.assertEqual(tasks["BACKLOG"]["status"], TASK_STATUS_RUNNING)
+        self.assertEqual(tasks["BACKLOG"]["delivery_level"], "REPO_APPLY_RUNNING")
+        self.assertFalse(tasks["BACKLOG"]["worker_eligible"])
+        self.assertEqual(tasks["ROOT"]["status"], TASK_STATUS_RUNNING)
+        self.assertEqual(tasks["ROOT"]["active_child_task_id"], "BACKLOG")
 
     def test_pr_ready_merge_blocked_child_does_not_create_repo_apply_retry(self):
         tasks = [

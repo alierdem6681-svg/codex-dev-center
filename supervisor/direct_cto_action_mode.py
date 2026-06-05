@@ -52,6 +52,9 @@ IMPLEMENTATION_SIGNALS = [
     "uygula",
     "düzelt",
     "duzelt",
+    "hazırla",
+    "hazirla",
+    "tamamla",
     "kaldır",
     "kaldir",
     "ekle",
@@ -77,7 +80,70 @@ def wants_implementation_mode(text):
     lowered = (text or "").lower()
     implementation = any(signal in lowered for signal in IMPLEMENTATION_SIGNALS)
     plan_only = any(signal in lowered for signal in PLAN_ONLY_SIGNALS)
-    return implementation and not (plan_only and not any(signal in lowered for signal in ["uygula", "düzelt", "duzelt", "yap"]))
+    override = any(
+        signal in lowered
+        for signal in [
+            "uygula",
+            "düzelt",
+            "duzelt",
+            "hazırla",
+            "hazirla",
+            "tamamla",
+            "yap",
+            "canlıya al",
+            "canliya al",
+        ]
+    )
+    return implementation and not (plan_only and not override)
+
+
+def normalize_turkish(value):
+    return (
+        str(value or "").lower()
+        .replace("ı", "i")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ö", "o")
+        .replace("ç", "c")
+    )
+
+
+def wants_memory_os(text):
+    normalized = normalize_turkish(text)
+    return any(
+        marker in normalized
+        for marker in [
+            "memory os",
+            "memory-os",
+            "cto-memory-os",
+            "cto memory os",
+            "memoryos",
+            "hafiza os",
+            "hafiza sistemi",
+            "hafiza modulu",
+        ]
+    )
+
+
+def is_pure_deploy_command(text):
+    normalized = normalize_turkish(text)
+    deploy_terms = ["canliya al", "production'a al", "productiona al", "deploy et"]
+    feature_terms = [
+        "gelistir",
+        "duzelt",
+        "hazirla",
+        "tamamla",
+        "modul",
+        "ekle",
+        "kur",
+        "memory os",
+        "dashboard",
+        "telegram",
+        "worker",
+        "pipeline flow",
+    ]
+    return any(term in normalized for term in deploy_terms) and not any(term in normalized for term in feature_terms)
 
 
 def make_task(run_id, seq, slug, title, description, worker, risk="medium", implementation=False):
@@ -214,6 +280,43 @@ def build_backlog(raw_text, run_id):
 
     if wants_observed_issue_backlog(raw_text):
         return observed_issue_backlog(run_id, implementation=implementation)
+
+    if wants_memory_os(raw_text):
+        tasks = [
+            make_task(
+                run_id, 1,
+                "memory-os-intent-contract",
+                "Memory OS Intent Contract",
+                "Memory OS isteklerini Production Readiness veya genel görev dağıtımına düşürmeden domain intent olarak sınıflandır. Önceki CTO-MEMORY-OS referansını, devam/başlat/onay takip mesajlarını ve canlıya alma hedefini aynı root task zincirinde koru.",
+                "worker-1",
+                implementation=implementation,
+            ),
+            make_task(
+                run_id, 2,
+                "memory-os-runtime-module",
+                "Memory OS Runtime Module",
+                "Memory OS için güvenli runtime state, kayıt formatı, özetleme/geri çağırma sözleşmesi ve modül registry entegrasyonunu hazırla. Secret/env/token/private key değerlerini kaydetme veya gösterme.",
+                "worker-3",
+                implementation=implementation,
+            ),
+            make_task(
+                run_id, 3,
+                "cto-memory-os-integration",
+                "CTO Memory OS Integration",
+                "Direct CTO, async job, action mode ve worker dispatch akışlarında Memory OS bağlamını kullan. Aynı konuşmadaki devam/onay mesajları son Memory OS kapsamına bağlansın; yeni kök görev çoğaltılmasın.",
+                "worker-2",
+                implementation=implementation,
+            ),
+            make_task(
+                run_id, 4,
+                "memory-os-dashboard-tests",
+                "Memory OS Dashboard And Tests",
+                "Dashboardda salt okunur Memory OS health/last context görünürlüğü, unit testler, simulator vakaları, production readiness, smoke ve living-docs güncellemelerini tamamla.",
+                "worker-4",
+                implementation=implementation,
+            ),
+        ]
+        return tasks
 
     telegram_asset_requested = "telegram" in text and any(x in text for x in [
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
@@ -382,9 +485,8 @@ def build_backlog(raw_text, run_id):
 
 def run_action_mode(raw_text):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    lower = (raw_text or "").lower()
 
-    if any(x in lower for x in ["production'a al", "productiona al", "canlıya al", "canliya al", "deploy et"]):
+    if is_pure_deploy_command(raw_text):
         return (
             "Production aşaması için önce readiness kapıları tamamlanmalı.\n"
             "Quality gate, staging health, smoke test ve rollback planı PASS olursa ayrıca onay istemeden GitHub Actions deploy başlatılabilir."

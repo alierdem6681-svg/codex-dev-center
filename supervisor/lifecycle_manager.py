@@ -102,6 +102,25 @@ BACKLOG_RECOVERABLE_STATUSES = {
     TASK_STATUS_STALLED,
     TASK_STATUS_VALIDATION_FAILED,
 }
+PROGRESS_PROPAGATION_BLOCKED_STATUSES = {
+    "ARCHIVED",
+    "ARCHIVED_STALE",
+    "CANCELLED",
+    "CANCELLED_BY_OWNER_CLEANUP",
+    "APPROVAL_REQUIRED",
+    "REQUIRES_APPROVAL",
+    "BLOCKED",
+    "DEPLOYED",
+}
+CHILD_FAILURE_STATUSES = {
+    TASK_STATUS_FAILED,
+    TASK_STATUS_FAILED_NO_PROPOSAL,
+    TASK_STATUS_FAILED_RETRYABLE,
+    TASK_STATUS_FAILED_TIMEOUT,
+    TASK_STATUS_PIPELINE_FAILED,
+    TASK_STATUS_STALLED,
+    TASK_STATUS_VALIDATION_FAILED,
+}
 VALIDATION_BATCH_SIZE = int(os.environ.get("CODEX_TASK_VALIDATION_BATCH_SIZE", "25"))
 VALIDATION_INTERVAL_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_INTERVAL_SECONDS", "60"))
 VALIDATION_PIPELINE_MAX_AGE_SECONDS = int(os.environ.get("CODEX_TASK_VALIDATION_PIPELINE_MAX_AGE_SECONDS", "86400"))
@@ -358,6 +377,104 @@ def backlog_description(parent: dict[str, Any], mode: str) -> str:
 def task_text(task: dict[str, Any]) -> str:
     return "\n".join(str(task.get(key, "")) for key in ["title", "description", "raw_message"])
 
+
+def children_by_parent(tasks: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    by_parent: dict[str, list[dict[str, Any]]] = {}
+    ids = {str(task.get("id") or "") for task in tasks if isinstance(task, dict)}
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        child_id = str(task.get("id") or "")
+        parent_ids = {
+            str(task.get("parent_task_id") or ""),
+            str(task.get("parent_task") or ""),
+        }
+        root_id = str(task.get("root_task_id") or "")
+        if root_id and root_id in ids and root_id != child_id:
+            parent_ids.add(root_id)
+        for parent_id in parent_ids:
+            if parent_id and parent_id != child_id:
+                by_parent.setdefault(parent_id, []).append(task)
+    return by_parent
+
+
+def parent_progress_from_children(children: list[dict[str, Any]]) -> dict[str, Any] | None:
+    statuses = [normalize_status(child.get("status")) for child in children]
+    if any(status in ACTIVE_TASK_STATUSES for status in statuses):
+        active_child = next(child for child in children if normalize_status(child.get("status")) in ACTIVE_TASK_STATUSES)
+        mode = str(active_child.get("dispatcher_mode") or active_child.get("execution_mode") or "child").upper()
+        return {
+            "status": TASK_STATUS_RUNNING,
+            "delivery_level": "REPO_APPLY_RUNNING" if "APPLY" in mode else "CHILD_RUNNING",
+            "result": "child_task_in_progress",
+            "active_child_task_id": active_child.get("id"),
+        }
+    if any(str(child.get("delivery_level") or "").upper() == "PR_READY" for child in children):
+        child = next(child for child in children if str(child.get("delivery_level") or "").upper() == "PR_READY")
+        return {
+            "status": TASK_STATUS_READY_FOR_VALIDATION,
+            "delivery_level": "PR_READY",
+            "result": "child_pr_ready_for_finalizer",
+            "active_child_task_id": child.get("id"),
+        }
+    if any(status == TASK_STATUS_READY_FOR_VALIDATION for status in statuses):
+        child = next(child for child in children if normalize_status(child.get("status")) == TASK_STATUS_READY_FOR_VALIDATION)
+        return {
+            "status": TASK_STATUS_READY_FOR_VALIDATION,
+            "delivery_level": TASK_STATUS_READY_FOR_VALIDATION,
+            "result": "child_ready_for_validation",
+            "active_child_task_id": child.get("id"),
+        }
+    if any(status == TASK_STATUS_PROPOSAL_DONE for status in statuses):
+        child = next(child for child in children if normalize_status(child.get("status")) == TASK_STATUS_PROPOSAL_DONE)
+        return {
+            "status": TASK_STATUS_PROPOSAL_DONE,
+            "delivery_level": TASK_STATUS_PROPOSAL_DONE,
+            "result": "child_proposal_done",
+            "active_child_task_id": child.get("id"),
+        }
+    if children and all(status in CHILD_FAILURE_STATUSES for status in statuses):
+        child = children[-1]
+        return {
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "delivery_level": "CHILD_FAILED_RETRYABLE",
+            "result": "child_task_failed_root_cause_required",
+            "active_child_task_id": child.get("id"),
+        }
+    return None
+
+
+def propagate_parent_progress(queue: dict[str, Any]) -> int:
+    tasks = [task for task in queue.get("tasks", []) if isinstance(task, dict)]
+    changed = 0
+    for _pass in range(4):
+        pass_changed = 0
+        grouped = children_by_parent(tasks)
+        by_id = {str(task.get("id") or ""): task for task in tasks}
+        for parent_id, children in grouped.items():
+            parent = by_id.get(parent_id)
+            if not parent:
+                continue
+            if normalize_status(parent.get("status")) in PROGRESS_PROPAGATION_BLOCKED_STATUSES:
+                continue
+            progress = parent_progress_from_children(children)
+            if not progress:
+                continue
+            if normalize_status(parent.get("status")) == progress["status"] and parent.get("delivery_level") == progress["delivery_level"]:
+                continue
+            parent["status"] = progress["status"]
+            parent["delivery_level"] = progress["delivery_level"]
+            parent["result"] = progress["result"]
+            parent["active_child_task_id"] = progress.get("active_child_task_id")
+            parent["parent_progress_propagated"] = True
+            parent["worker_eligible"] = False
+            parent["updated_at"] = now()
+            pass_changed += 1
+        changed += pass_changed
+        if not pass_changed:
+            break
+    return changed
+
 def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -> bool:
     status = normalize_status(task.get("status"))
     if status not in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
@@ -515,6 +632,7 @@ def ensure_single_backlog_task() -> bool:
     queue = read_json(QUEUE_PATH, {"tasks": []})
     queue, _changes = normalize_queue_payload(queue)
     tasks = queue.setdefault("tasks", [])
+    progress_changes = propagate_parent_progress(queue)
     worker_pending = [t for t in tasks if is_worker_eligible_task(t)]
     worker_active = [
         t
@@ -533,9 +651,12 @@ def ensure_single_backlog_task() -> bool:
     }
     root_cause = cto_autonomous_delivery.root_cause_mode_status(queue)
     if root_cause.get("active"):
+        if progress_changes:
+            write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
             backlog_dispatcher_last_result="root_cause_mode_active",
+            backlog_dispatcher_parent_progress_changes=progress_changes,
             backlog_dispatcher_root_cause=root_cause,
         )
         log(
@@ -545,7 +666,13 @@ def ensure_single_backlog_task() -> bool:
         )
         return False
     if available_slots <= 0:
-        update_system_state(**state_updates, backlog_dispatcher_last_result="worker_active")
+        if progress_changes:
+            write_json(QUEUE_PATH, queue)
+        update_system_state(
+            **state_updates,
+            backlog_dispatcher_last_result="worker_active",
+            backlog_dispatcher_parent_progress_changes=progress_changes,
+        )
         return False
 
     created_children: list[dict[str, str]] = []
@@ -626,6 +753,7 @@ def ensure_single_backlog_task() -> bool:
         log(f"BACKLOG_DISPATCH created child={child_id} parent={parent_id} mode={mode}")
 
     if created_children:
+        progress_changes += propagate_parent_progress(queue)
         write_json(QUEUE_PATH, queue)
         last_child = created_children[-1]
         result = "parallel_children_created"
@@ -641,26 +769,32 @@ def ensure_single_backlog_task() -> bool:
             "backlog_dispatcher_last_mode": last_child["mode"],
             "backlog_dispatcher_worker_active": len(worker_active),
             "backlog_dispatcher_available_slots": max(0, max_workers - len(worker_active)),
+            "backlog_dispatcher_parent_progress_changes": progress_changes,
         }
         update_system_state(**final_state_updates)
         return True
 
     if queue_changed:
+        progress_changes += propagate_parent_progress(queue)
         write_json(QUEUE_PATH, queue)
         update_system_state(
             **state_updates,
             backlog_dispatcher_last_result="approval_required",
             backlog_dispatcher_last_parent=approval_parent_id,
+            backlog_dispatcher_parent_progress_changes=progress_changes,
         )
         return False
 
     if ensure_autonomous_backlog_fallback(state_updates):
         return True
+    if progress_changes:
+        write_json(QUEUE_PATH, queue)
     recoverable = sum(1 for t in tasks if normalize_status(t.get("status")) in BACKLOG_RECOVERABLE_STATUSES)
     update_system_state(
         **state_updates,
         backlog_dispatcher_last_result="no_recoverable_worker_eligible_task",
         backlog_dispatcher_recoverable_count=recoverable,
+        backlog_dispatcher_parent_progress_changes=progress_changes,
     )
     return False
 

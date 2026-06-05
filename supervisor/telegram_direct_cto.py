@@ -363,18 +363,28 @@ def output_guard(raw):
 
 def classify_job_metadata(text):
     lowered = (text or "").lower()
+    normalized = normalize_turkish(lowered)
     length = len(text or "")
 
+    memory_os = is_memory_os_request(text)
+    infrastructure_access = is_infrastructure_access_request(text)
     dashboard_cleanup = (
         any(x in lowered for x in ["dashboard", "navbar", "panel", "menü", "menu", "ui"])
         and any(x in lowered for x in ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"])
+        and not infrastructure_access
     )
     task_list_ui = (
         any(x in lowered for x in ["görevler menüsü", "gorevler menusu", "görev list", "gorev list", "görev kuyruğu", "gorev kuyrugu"])
         or ("filtre" in lowered and "checkbox" in lowered)
     )
 
-    if dashboard_cleanup:
+    if memory_os:
+        name = "Memory OS Modülü"
+        eta = "20-45 dakika"
+        first_update = "yaklaşık 2 dakika içinde"
+        interval = 300
+        risk = "orta; normal app kodu gate PASS ise otomatik deploy, kritik altyapı işlemi varsa onay gerekli"
+    elif dashboard_cleanup:
         name = "Dashboard Alan Temizliği"
         eta = "5-10 dakika"
         first_update = "yaklaşık 1 dakika içinde"
@@ -386,6 +396,12 @@ def classify_job_metadata(text):
         first_update = "yaklaşık 1 dakika içinde"
         interval = 180
         risk = "düşük/orta"
+    elif infrastructure_access:
+        name = "Infrastructure Access Readiness"
+        eta = "10-20 dakika"
+        first_update = "yaklaşık 2 dakika içinde"
+        interval = 600
+        risk = "orta/yüksek; DNS/firewall/sertifika gibi kritik değişiklik gerekirse APPROVAL_REQUIRED"
     elif any(x in lowered for x in ["production", "canlı", "canli", "deploy", "staging", "rollback"]):
         name = "Production Readiness Analizi"
         eta = "10-20 dakika"
@@ -425,6 +441,55 @@ def classify_job_metadata(text):
         "risk": risk
     }
 
+
+def normalize_turkish(value):
+    return (
+        str(value or "").lower()
+        .replace("ı", "i")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ö", "o")
+        .replace("ç", "c")
+    )
+
+
+def is_memory_os_request(text):
+    normalized = normalize_turkish(text)
+    return any(
+        marker in normalized
+        for marker in [
+            "memory os",
+            "memory-os",
+            "cto-memory-os",
+            "cto memory os",
+            "memoryos",
+            "hafiza os",
+            "hafiza sistemi",
+            "hafiza modulu",
+        ]
+    )
+
+
+def is_infrastructure_access_request(text):
+    normalized = normalize_turkish(text)
+    infra_terms = [
+        "ssl",
+        "https",
+        "tls",
+        "sertifika",
+        "certificate",
+        "domain",
+        "dns",
+        "firewall",
+        "port",
+        "nginx",
+        "load balancer",
+        "reverse proxy",
+        "proxy",
+    ]
+    return any(term in normalized for term in infra_terms)
+
 def is_action_command(text):
     lowered = (text or "").lower()
     action_words = [
@@ -436,7 +501,9 @@ def is_action_command(text):
         "görevlendir", "gorevlendir",
         "geliştirmeye başla", "gelistirmeye basla", "geliştirmeye başlayalım",
         "gelistirmeye baslayalim", "düzeltelim", "duzeltelim", "bunu düzelt",
-        "bunu duzelt", "bunu çözelim", "bunu cozelim", "çözelim", "cozelim"
+        "bunu duzelt", "bunu çözelim", "bunu cozelim", "çözelim", "cozelim",
+        "hazırla", "hazirla", "tamamla", "canlıya al", "canliya al",
+        "production'a al", "productiona al", "deploy et"
     ]
     return any(w in lowered for w in action_words)
 

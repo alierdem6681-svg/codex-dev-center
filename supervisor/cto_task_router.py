@@ -90,11 +90,66 @@ def classify_risk(text: str, requested: str | None = None) -> str:
     return "low"
 
 
+def normalize_turkish(value: str) -> str:
+    return (
+        str(value or "").lower()
+        .replace("ı", "i")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ö", "o")
+        .replace("ç", "c")
+    )
+
+
+def is_memory_os_request(text: str) -> bool:
+    normalized = normalize_turkish(text)
+    return any(
+        marker in normalized
+        for marker in [
+            "memory os",
+            "memory-os",
+            "cto-memory-os",
+            "cto memory os",
+            "memoryos",
+            "hafiza os",
+            "hafiza sistemi",
+            "hafiza modulu",
+        ]
+    )
+
+
+def is_infrastructure_access_change(text: str) -> bool:
+    normalized = normalize_turkish(text)
+    return any(
+        term in normalized
+        for term in [
+            "ssl",
+            "https",
+            "tls",
+            "sertifika",
+            "certificate",
+            "domain",
+            "dns",
+            "firewall",
+            "port",
+            "nginx",
+            "load balancer",
+            "reverse proxy",
+            "proxy",
+        ]
+    )
+
+
 def is_dashboard_cleanup_request(text: str) -> bool:
     lowered = (text or "").lower()
     dashboard_terms = ["dashboard", "navbar", "panel", "menü", "menu", "ui"]
     cleanup_terms = ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"]
-    return any(term in lowered for term in dashboard_terms) and any(term in lowered for term in cleanup_terms)
+    return (
+        any(term in lowered for term in dashboard_terms)
+        and any(term in lowered for term in cleanup_terms)
+        and not is_infrastructure_access_change(text)
+    )
 
 
 CONTROL_SIGNAL_MAP = [
@@ -121,6 +176,24 @@ DELIVERY_SIGNALS = [
 
 def classify_task_route(text: str) -> dict[str, Any]:
     lowered = (text or "").lower()
+    if is_memory_os_request(text):
+        return {
+            "task_class": "feature_task",
+            "control_type": "",
+            "delivery_mode": "feature_delivery",
+            "pipeline_lane": "Memory OS Delivery",
+            "explicit_delivery_signal": True,
+            "intent_domain": "memory_os",
+        }
+    if is_infrastructure_access_change(text):
+        return {
+            "task_class": "control_task",
+            "control_type": "infrastructure_access_readiness",
+            "delivery_mode": "proposal_only",
+            "pipeline_lane": "Controls / Infrastructure Access",
+            "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+            "intent_domain": "infrastructure_access",
+        }
     control_type = ""
     for candidate, signals in CONTROL_SIGNAL_MAP:
         if any(signal in lowered for signal in signals):
@@ -145,6 +218,7 @@ def classify_task_route(text: str) -> dict[str, Any]:
             "delivery_mode": "proposal_only",
             "pipeline_lane": "Controls / Readiness",
             "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+            "intent_domain": control_type or "review_only",
         }
     return {
         "task_class": "feature_task" if any(signal in lowered for signal in DELIVERY_SIGNALS) else "triage_task",
@@ -152,11 +226,14 @@ def classify_task_route(text: str) -> dict[str, Any]:
         "delivery_mode": "feature_delivery",
         "pipeline_lane": "Feature Delivery",
         "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+        "intent_domain": "feature_delivery" if any(signal in lowered for signal in DELIVERY_SIGNALS) else "triage",
     }
 
 
 def should_split(text: str) -> bool:
     if is_dashboard_cleanup_request(text):
+        return False
+    if is_memory_os_request(text):
         return False
     route = classify_task_route(text)
     if route["task_class"] == "control_task":
@@ -299,6 +376,7 @@ def submit_task(
             "control_type": route["control_type"],
             "delivery_mode": route["delivery_mode"],
             "pipeline_lane": route["pipeline_lane"],
+            "intent_domain": route.get("intent_domain", ""),
         }
         if route["task_class"] == "control_task":
             parent["repo_apply_allowed"] = False
