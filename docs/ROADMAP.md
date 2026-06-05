@@ -358,3 +358,10 @@ Faz 19B-10A Model Policy
 - [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
+
+## Faz 56 - Dashboard Neutral Background
+
+- [x] Dashboard kabugundaki doga/manzara arka plan gorseli kaldirildi.
+- [x] `web_panel/static/assets/dashboard-landscape.png` kullanilmayan repo asset'i olarak silindi.
+- [x] Markup regresyon testi dashboard arka planinda asset `url()` referansi bulunmamasini dogrular.
+- [x] Dashboard template ayarlari `background_image_enabled=false` olarak guncellendi.

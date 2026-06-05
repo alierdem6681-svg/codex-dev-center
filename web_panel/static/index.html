@@ -243,14 +243,7 @@
       }
       body {
         min-height: 100vh;
-        background: #dfe8e5 url('/assets/dashboard-landscape.png') center top / cover fixed no-repeat;
-      }
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background: rgba(255, 255, 255, .2);
+        background: var(--bg);
       }
       .dashboard-canvas {
         position: relative;
