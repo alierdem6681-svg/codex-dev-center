@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .critical_operation_policy import critical_operation_findings
+    from .critical_operation_policy import critical_operation_findings, is_safe_critical_context_line
     from .memory_os_context import (
         bind_existing_scope_in_queue,
         bind_task_to_scope,
@@ -36,7 +37,7 @@ try:
         worker_block_reason,
     )
 except ImportError:
-    from critical_operation_policy import critical_operation_findings
+    from critical_operation_policy import critical_operation_findings, is_safe_critical_context_line
     from memory_os_context import (
         bind_existing_scope_in_queue,
         bind_task_to_scope,
@@ -65,6 +66,33 @@ except ImportError:
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 WORKERS = ["worker-1", "worker-2", "worker-3", "worker-4"]
+ROUTER_POLICY_VERSION = "cto_router_dispatch_review_v1"
+WORKER_FORBIDDEN_REQUESTED_PERMISSIONS = {
+    "production_deploy",
+    "secret_value_view_or_change",
+    "token_private_key_env_value_change",
+    "iam_owner_editor_change",
+    "billing_change",
+    "firewall_change",
+    "dns_change",
+    "database_destructive_operation",
+    "irreversible_migration",
+    "google_ads_live_mutate",
+    "live_customer_or_data_loss_risk",
+    "gcloud_mutate",
+}
+CRITICAL_FINDING_TO_PERMISSION = {
+    "secret_value_view_or_change": "secret_value_view_or_change",
+    "token_private_key_env_value_change": "token_private_key_env_value_change",
+    "iam_owner_editor_change": "iam_owner_editor_change",
+    "billing_change": "billing_change",
+    "firewall_change": "firewall_change",
+    "dns_change": "dns_change",
+    "database_destructive_operation": "database_destructive_operation",
+    "irreversible_migration": "irreversible_migration",
+    "google_ads_live_mutate": "google_ads_live_mutate",
+    "live_customer_or_data_loss_risk": "live_customer_or_data_loss_risk",
+}
 
 
 def runtime_root(value: str | None = None) -> Path:
@@ -118,6 +146,223 @@ def normalize_turkish(value: str) -> str:
         .replace("ö", "o")
         .replace("ç", "c")
     )
+
+
+def canonical_source(value: str | None) -> str:
+    source = str(value or "local").strip().lower()
+    if source == "ssh":
+        return "windows_codex_ssh"
+    return source or "local"
+
+
+def stable_router_hash(*parts: Any, length: int = 16) -> str:
+    raw = "\n".join(str(part or "") for part in parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:length]
+
+
+def is_safe_router_operation_line(text: str) -> bool:
+    if is_safe_critical_context_line(text):
+        return True
+    normalized = normalize_turkish(text)
+    negation_terms = [
+        "do not",
+        "don't",
+        "dont",
+        "never",
+        "not allowed",
+        "forbidden",
+        "blocked",
+        "yasak",
+        "yapma",
+        "yapmayacak",
+        "yapilmayacak",
+        "yapilmadi",
+        "yapmadi",
+        "yok",
+        "dokunma",
+        "dokunulmadi",
+        "kapsam disi",
+        "sinirlar",
+    ]
+    return any(term in normalized for term in negation_terms)
+
+
+def production_deploy_requested(text: str) -> bool:
+    for raw_line in str(text or "").splitlines() or [str(text or "")]:
+        line = raw_line.strip()
+        if not line or is_safe_router_operation_line(line):
+            continue
+        normalized = normalize_turkish(line)
+        if "production" not in normalized and "canli deploy" not in normalized:
+            continue
+        if any(term in normalized for term in ["deploy", "canliya al", "yayina al"]):
+            return True
+    return False
+
+
+def requested_permissions_for_text(text: str) -> list[str]:
+    permissions = {
+        CRITICAL_FINDING_TO_PERMISSION.get(finding, finding)
+        for finding in critical_operation_findings(text)
+    }
+    if production_deploy_requested(text):
+        permissions.add("production_deploy")
+    for raw_line in str(text or "").splitlines() or [str(text or "")]:
+        if is_safe_router_operation_line(raw_line):
+            continue
+        normalized = normalize_turkish(raw_line)
+        if "gcloud" in normalized and any(
+            term in normalized
+            for term in ["mutate", "set-iam-policy", "add-iam-policy", "delete", "update", "create"]
+        ):
+            permissions.add("gcloud_mutate")
+    return sorted(item for item in permissions if item)
+
+
+def reply_policy_for_source(source: str) -> dict[str, Any]:
+    if source == "telegram":
+        return {
+            "channel": "telegram",
+            "allow_technical_output": False,
+            "max_summary_chars": 900,
+            "safe_summary_required": True,
+        }
+    return {
+        "channel": source or "local",
+        "allow_technical_output": source not in {"dashboard"},
+        "max_summary_chars": 4000,
+        "safe_summary_required": source in {"dashboard"},
+    }
+
+
+def router_worker_eligibility(
+    *,
+    source: str,
+    risk: str,
+    requested_permissions: list[str],
+    route: dict[str, Any],
+    requested_worker_eligible: bool | None,
+) -> dict[str, Any]:
+    if requested_worker_eligible is None:
+        eligible = source != "telegram" and risk not in {"high", "critical"}
+    else:
+        eligible = bool(requested_worker_eligible)
+
+    reason = "worker_task_allowed" if eligible else "worker_eligible_false"
+    forbidden_permissions = sorted(set(requested_permissions) & WORKER_FORBIDDEN_REQUESTED_PERMISSIONS)
+    if source == "telegram":
+        eligible = False
+        reason = "telegram_reserved_for_cto"
+    elif route.get("task_class") == "control_task":
+        eligible = False
+        reason = "control_task_not_worker_eligible"
+    elif risk in {"high", "critical"}:
+        eligible = False
+        reason = "risk_requires_router_review"
+    elif forbidden_permissions:
+        eligible = False
+        reason = "forbidden_permission_requested"
+
+    return {
+        "worker_eligible": eligible,
+        "status": "eligible" if eligible else "blocked",
+        "reason": reason,
+        "forbidden_permissions": forbidden_permissions,
+    }
+
+
+def build_task_envelope(
+    *,
+    source: str,
+    title: str,
+    message: str,
+    risk: str,
+    route: dict[str, Any],
+    requested_by: str = "",
+    conversation_id: str = "",
+    requested_worker_eligible: bool | None = None,
+) -> dict[str, Any]:
+    source = canonical_source(source)
+    actor_id = str(requested_by or conversation_id or "unspecified").strip() or "unspecified"
+    request_id = f"{source}:{stable_router_hash(source, actor_id, title, message)}"
+    correlation_id = str(conversation_id or request_id).strip()
+    idempotency_key = f"{source}:{stable_router_hash(source, actor_id, title, message, route.get('intent_domain'))}"
+    requested_permissions = requested_permissions_for_text(f"{title}\n{message}")
+    reply_policy = reply_policy_for_source(source)
+    eligibility = router_worker_eligibility(
+        source=source,
+        risk=risk,
+        requested_permissions=requested_permissions,
+        route=route,
+        requested_worker_eligible=requested_worker_eligible,
+    )
+    return {
+        "schema_version": 1,
+        "router_policy_version": ROUTER_POLICY_VERSION,
+        "source": source,
+        "actor_id": actor_id,
+        "actor_verified": actor_id != "unspecified",
+        "request_id": request_id,
+        "correlation_id": correlation_id,
+        "idempotency_key": idempotency_key,
+        "task_type": route.get("intent_domain") or route.get("task_class") or "task",
+        "risk_level": risk,
+        "requested_permissions": requested_permissions,
+        "reply_policy": reply_policy,
+        "payload": {
+            "title": redact_sensitive_text(title),
+            "message": redact_sensitive_text(message),
+        },
+        "worker_eligibility": eligibility,
+    }
+
+
+def task_metadata_from_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
+    eligibility = envelope.get("worker_eligibility") or {}
+    return {
+        "router_policy_version": envelope.get("router_policy_version", ROUTER_POLICY_VERSION),
+        "task_envelope": envelope,
+        "request_id": envelope.get("request_id", ""),
+        "correlation_id": envelope.get("correlation_id", ""),
+        "idempotency_key": envelope.get("idempotency_key", ""),
+        "requested_permissions": envelope.get("requested_permissions", []),
+        "reply_policy": envelope.get("reply_policy", {}),
+        "worker_eligible": bool(eligibility.get("worker_eligible")),
+        "worker_eligibility_status": eligibility.get("status", "blocked"),
+        "worker_eligibility_reason": eligibility.get("reason", "worker_eligible_false"),
+        "router_forbidden_permissions": eligibility.get("forbidden_permissions", []),
+    }
+
+
+def apply_subtask_router_metadata(parent: dict[str, Any], subtask: dict[str, Any], index: int) -> None:
+    correlation_id = str(parent.get("correlation_id") or parent.get("id") or "")
+    idempotency_key = f"{parent.get('idempotency_key') or parent.get('id')}:{index}"
+    envelope = {
+        "schema_version": 1,
+        "router_policy_version": ROUTER_POLICY_VERSION,
+        "source": "cto",
+        "actor_id": "cto_router",
+        "actor_verified": True,
+        "request_id": str(subtask.get("id") or ""),
+        "correlation_id": correlation_id,
+        "idempotency_key": idempotency_key,
+        "task_type": "worker_subtask",
+        "risk_level": subtask.get("risk_level") or subtask.get("risk") or "medium",
+        "requested_permissions": [],
+        "reply_policy": reply_policy_for_source("cto"),
+        "payload": {
+            "title": redact_sensitive_text(subtask.get("title", "")),
+            "message": redact_sensitive_text(subtask.get("description", "")),
+        },
+        "worker_eligibility": {
+            "worker_eligible": True,
+            "status": "eligible",
+            "reason": "router_subtask_allowed",
+            "forbidden_permissions": [],
+        },
+    }
+    subtask.update(task_metadata_from_envelope(envelope))
+    subtask["parent_correlation_id"] = correlation_id
 
 
 def is_memory_os_request(text: str) -> bool:
@@ -377,10 +622,22 @@ def submit_task(
     state_dir.mkdir(parents=True, exist_ok=True)
 
     qpath = queue_path(root)
-    source = str(source or "local").strip().lower()
+    source = canonical_source(source)
     effective_risk = classify_risk(f"{title}\n{message}", risk)
     stored_message = redact_sensitive_text(message)
     route = classify_task_route(f"{title}\n{message}")
+    envelope = build_task_envelope(
+        source=source,
+        title=title,
+        message=message,
+        risk=effective_risk,
+        route=route,
+        requested_by=requested_by,
+        conversation_id=conversation_id,
+        requested_worker_eligible=worker_eligible,
+    )
+    router_metadata = task_metadata_from_envelope(envelope)
+    worker_eligible = bool(router_metadata["worker_eligible"])
     memory_conversation_id = memory_os_conversation_key(
         source=source,
         requested_by=requested_by,
@@ -389,10 +646,6 @@ def submit_task(
     memory_text = f"{title}\n{message}"
     memory_intent = is_memory_os_request(memory_text)
     memory_followup = is_memory_os_followup_text(message) or is_memory_os_followup_text(title)
-    if worker_eligible is None:
-        worker_eligible = source != "telegram" and effective_risk not in {"high", "critical"}
-    if effective_risk in {"high", "critical"}:
-        worker_eligible = False
 
     bound_existing_memory_scope = False
     memory_scope: dict[str, Any] = {}
@@ -449,6 +702,7 @@ def submit_task(
                 "pipeline_lane": route["pipeline_lane"],
                 "intent_domain": route.get("intent_domain", ""),
             }
+            parent.update(router_metadata)
             if memory_intent:
                 memory_scope = {
                     "schema_version": 1,
@@ -471,6 +725,8 @@ def submit_task(
 
             should_create_subtasks = should_split(message) if split is None else split
             created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+            for idx, subtask in enumerate(created_subtasks, 1):
+                apply_subtask_router_metadata(parent, subtask, idx)
             if memory_scope and created_subtasks:
                 for subtask in created_subtasks:
                     bind_task_to_scope(subtask, memory_scope, root_task_id=parent["id"])
@@ -511,6 +767,9 @@ def submit_task(
             "last_subtask_count": len(created_subtasks),
             "last_task_class": route["task_class"],
             "last_control_type": route["control_type"],
+            "last_router_policy_version": router_metadata.get("router_policy_version", ROUTER_POLICY_VERSION),
+            "last_requested_permissions": router_metadata.get("requested_permissions", []),
+            "last_correlation_id": router_metadata.get("correlation_id", ""),
             "last_memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "last_memory_os_bound_to_existing_scope": bound_existing_memory_scope,
             "queue_normalization_changes": len(changes),
@@ -527,6 +786,10 @@ def submit_task(
             "risk": effective_risk,
             "priority": priority,
             "worker_eligible": worker_eligible,
+            "worker_eligibility_reason": router_metadata.get("worker_eligibility_reason", ""),
+            "requested_permissions": router_metadata.get("requested_permissions", []),
+            "correlation_id": router_metadata.get("correlation_id", ""),
+            "idempotency_key": router_metadata.get("idempotency_key", ""),
             "subtasks": len(created_subtasks),
             "memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
             "memory_os_bound_to_existing_scope": bound_existing_memory_scope,

@@ -1211,3 +1211,30 @@ Not:
 - Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## CTO Router Dispatch Envelope Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-135905 / CTO-TASK-20260605-132117-915759-PRODUCTION-READINESS-ANALIZI-SUB2
+Worker: worker-3
+
+Eklenenler:
+- `supervisor/cto_task_router.py` parent task kayitlarina TaskEnvelope v1 metadata'si ekler: source, actor_id, request_id, correlation_id, idempotency_key, task_type, risk_level, requested_permissions, reply_policy ve redacted payload.
+- Router eligibility control/readiness tasklarini, Telegram parent tasklarini ve production deploy/secret/IAM/billing/DNS/firewall/destructive database/Google Ads/GCloud mutate permissionlarini worker dispatch oncesi bloke eder.
+- Worker subtasks `source=cto` olarak parent correlation ID ve idempotency zincirini tasir.
+- `supervisor/task_status_constants.py` legacy string `worker_eligible=false/0/no/off/blocked` degerlerini dispatch icin false kabul eder ve requested forbidden permission bulunan tasklari worker-dispatch disinda tutar.
+- `supervisor/supervisor_cli.py add-task` ve `supervisor/task_queue.py enqueue_task` eski giris yollari ayni router metadata helper'ina hizalandi.
+- State template, onboarding, roadmap, AGENTS, anayasa ve memory kayitlari guncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_control_readiness_request_routes_as_proposal_only tests.test_runtime_status_model.WorkerStatusModelTest.test_router_blocks_forbidden_permissions_before_worker_dispatch tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_inherit_parent_correlation_and_idempotency tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_block_reason_handles_legacy_string_false_and_permissions tests.test_runtime_status_model.WorkerStatusModelTest.test_legacy_task_queue_enqueue_uses_router_metadata tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_get_dispatch_contract_metadata` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest` PASS, 66 test.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazimlari read-only modda `write-skipped`.
+
+Not:
+- `python3 -m unittest tests.test_runtime_status_model` tam kosusu bu sandbox'ta `/opt/codex-dev-center/state/task_queue.json.lock` read-only filesystem hatasina takildi; ilgili degisiklik kapsamindaki hedefli testler PASS.
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` yazimi, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.

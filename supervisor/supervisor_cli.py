@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 try:
+    from .cto_task_router import submit_task as submit_router_task
     from .memory_os_context import task_is_memory_os
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
@@ -25,6 +26,7 @@ try:
         normalize_status,
     )
 except ImportError:
+    from cto_task_router import submit_task as submit_router_task
     from memory_os_context import task_is_memory_os
     from state_file_lock import state_file_lock
     from task_status_constants import (
@@ -239,29 +241,16 @@ def status(_args):
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 def add_task(args):
-    queue_path = STATE_DIR / "task_queue.json"
-    queue = read_json(queue_path, {"tasks": []})
-    tasks = queue.setdefault("tasks", [])
-
-    task_id = f"TASK-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    task = {
-        "id": task_id,
-        "title": args.title,
-        "description": args.description or args.title,
-        "status": TASK_STATUS_PENDING,
-        "assigned_worker": None,
-        "risk": normalize_risk(args.risk),
-        "risk_level": normalize_risk(args.risk),
-        "source": args.source,
-        "priority": args.priority,
-        "worker_eligible": args.source != "telegram" and normalize_risk(args.risk) not in {"high", "critical"},
-        "created_at": now(),
-        "updated_at": now()
-    }
-    tasks.append(task)
-    queue, _changes = normalize_queue_payload(queue)
-    write_json(queue_path, queue)
-    log(f"TASK_ADDED {task_id} {args.title}")
+    result = submit_router_task(
+        root=STATE_DIR.parent,
+        source=args.source,
+        title=args.title,
+        message=args.description or args.title,
+        priority=args.priority,
+        risk=args.risk,
+    )
+    task = result["task"]
+    log(f"TASK_ADDED {task.get('id')} {args.title}")
     print(json.dumps({"ok": True, "task": task}, indent=2, ensure_ascii=False))
 
 def set_worker(args):

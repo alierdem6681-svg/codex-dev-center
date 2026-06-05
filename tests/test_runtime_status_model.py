@@ -37,6 +37,7 @@ from supervisor import (  # noqa: E402
     direct_cto_async_job,
     direct_cto_progress_watcher,
     supervisor_cli,
+    task_queue,
     task_recovery_engine,
     task_validation_engine,
     telegram_asset_intake,
@@ -59,6 +60,7 @@ from supervisor.task_status_constants import (  # noqa: E402
     TASK_STATUS_PROPOSAL_DONE,
     TASK_STATUS_PROPOSAL_READY,
     TASK_STATUS_READY_FOR_VALIDATION,
+    TASK_STATUS_ROUTED,
     TASK_STATUS_RUNNING,
     TASK_STATUS_VALIDATION_FAILED,
     normalize_queue_payload,
@@ -167,7 +169,92 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(task["delivery_mode"], "proposal_only")
         self.assertEqual(task["pipeline_lane"], "Controls / Readiness")
         self.assertFalse(task["repo_apply_allowed"])
+        self.assertFalse(task["worker_eligible"])
+        self.assertEqual(task["worker_eligibility_reason"], "control_task_not_worker_eligible")
+        self.assertEqual(task["status"], TASK_STATUS_ROUTED)
+        self.assertEqual(task["task_envelope"]["source"], "dashboard")
+        self.assertEqual(task["task_envelope"]["correlation_id"], task["correlation_id"])
+        self.assertFalse(task["reply_policy"]["allow_technical_output"])
         self.assertEqual(result["subtasks"], [])
+
+    def test_router_blocks_forbidden_permissions_before_worker_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Production Deploy",
+                message="Production deploy komutunu şimdi çalıştır.",
+                risk="medium",
+                split=False,
+                worker_eligible=True,
+            )
+
+        task = result["task"]
+        self.assertFalse(task["worker_eligible"])
+        self.assertEqual(task["status"], TASK_STATUS_ROUTED)
+        self.assertEqual(task["worker_eligibility_reason"], "forbidden_permission_requested")
+        self.assertIn("production_deploy", task["requested_permissions"])
+        self.assertIn("production_deploy", task["router_forbidden_permissions"])
+        self.assertEqual(worker_block_reason(task), "forbidden_permission_requested")
+
+    def test_router_subtasks_inherit_parent_correlation_and_idempotency(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="dashboard",
+                title="Worker Dispatch Review",
+                message="worker queue pipeline",
+                risk="medium",
+                split=True,
+                requested_by="dashboard-user",
+            )
+
+        parent = result["task"]
+        self.assertEqual(len(result["subtasks"]), 3)
+        for index, subtask in enumerate(result["subtasks"], 1):
+            self.assertEqual(subtask["correlation_id"], parent["correlation_id"])
+            self.assertEqual(subtask["parent_correlation_id"], parent["correlation_id"])
+            self.assertEqual(subtask["idempotency_key"], f"{parent['idempotency_key']}:{index}")
+            self.assertEqual(subtask["task_envelope"]["source"], "cto")
+            self.assertTrue(subtask["worker_eligible"])
+
+    def test_worker_block_reason_handles_legacy_string_false_and_permissions(self):
+        self.assertEqual(
+            worker_block_reason({"status": "QUEUED", "worker_eligible": "false"}),
+            "worker_eligible_false",
+        )
+        self.assertEqual(
+            worker_block_reason(
+                {
+                    "status": "QUEUED",
+                    "worker_eligible": True,
+                    "requested_permissions": ["dns_change"],
+                    "worker_eligibility_reason": "forbidden_permission_requested",
+                }
+            ),
+            "forbidden_permission_requested",
+        )
+
+    def test_legacy_task_queue_enqueue_uses_router_metadata(self):
+        originals = (task_queue.STATE_DIR, task_queue.QUEUE_FILE, task_queue.WORKERS_FILE)
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            try:
+                task_queue.STATE_DIR = state_dir
+                task_queue.QUEUE_FILE = state_dir / "task_queue.json"
+                task_queue.WORKERS_FILE = state_dir / "workers.json"
+                task = task_queue.enqueue_task(
+                    title="Production Deploy",
+                    raw_message="Production deploy çalıştır.",
+                    source="dashboard",
+                    risk_level="medium",
+                )
+            finally:
+                task_queue.STATE_DIR, task_queue.QUEUE_FILE, task_queue.WORKERS_FILE = originals
+        self.assertEqual(task["status"], TASK_STATUS_ROUTED)
+        self.assertFalse(task["worker_eligible"])
+        self.assertEqual(task["worker_eligibility_reason"], "forbidden_permission_requested")
+        self.assertEqual(task["task_envelope"]["source"], "dashboard")
 
     def test_worker_bootstrap_preflight_blocks_required_missing_config(self):
         with tempfile.TemporaryDirectory() as tmp:

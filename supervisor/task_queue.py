@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .cto_task_router import build_task_envelope, canonical_source, classify_task_route, task_metadata_from_envelope
     from .task_status_constants import (
+        TASK_STATUS_ROUTED,
         TASK_STATUS_QUEUED,
         atomic_write_json,
         normalize_queue_payload,
@@ -15,7 +17,9 @@ try:
         utc_now,
     )
 except ImportError:
+    from cto_task_router import build_task_envelope, canonical_source, classify_task_route, task_metadata_from_envelope
     from task_status_constants import (
+        TASK_STATUS_ROUTED,
         TASK_STATUS_QUEUED,
         atomic_write_json,
         normalize_queue_payload,
@@ -86,21 +90,38 @@ def enqueue_task(
     queue = read_json(QUEUE_FILE, {"tasks": []})
     task_id = next_task_id(queue)
     risk = normalize_risk(risk_level)
+    source = canonical_source(source)
+    route = classify_task_route(f"{title}\n{raw_message}")
+    envelope = build_task_envelope(
+        source=source,
+        title=title,
+        message=raw_message,
+        risk=risk,
+        route=route,
+        requested_worker_eligible=None,
+    )
+    router_metadata = task_metadata_from_envelope(envelope)
+    worker_eligible = bool(router_metadata["worker_eligible"])
     task = {
         "id": task_id,
         "title": title,
         "source": source,
         "raw_message": raw_message,
-        "assigned_worker": choose_worker(worker),
+        "assigned_worker": choose_worker(worker) if worker_eligible else None,
         "risk": risk,
         "risk_level": risk,
-        "status": TASK_STATUS_QUEUED,
+        "status": TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED,
         "created_at": utc_now(),
         "updated_at": utc_now(),
-        "worker_eligible": str(source).lower() != "telegram" and risk not in {"high", "critical"},
         "log_path": f"logs/{task_id}.log",
         "report_path": f"reports/{task_id}_REPORT.md",
+        "task_class": route["task_class"],
+        "control_type": route["control_type"],
+        "delivery_mode": route["delivery_mode"],
+        "pipeline_lane": route["pipeline_lane"],
+        "intent_domain": route.get("intent_domain", ""),
     }
+    task.update(router_metadata)
     queue.setdefault("tasks", []).append(task)
     queue, _changes = normalize_queue_payload(queue)
     write_json(QUEUE_FILE, queue)

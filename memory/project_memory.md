@@ -447,3 +447,11 @@ Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regres
 Dashboard Görevler listesi geçmiş görev kalabalığını veri silmeden UI filtre katmanında temizleyecek şekilde güncellendi. Varsayılan görünüm canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change ve tamamlanmış kayıtları gizler; `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak dahil eder.
 
 Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` boş durumu görünür. Davranış `tests/test_dashboard_account_menu_markup.py` markup regresyon testiyle sabitlendi ve dashboard state template kayıtları yeni sözleşmeye hizalandı. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## 2026-06-05 CTO Router Dispatch Envelope Apply
+
+CTO Router and Worker Dispatch Review apply paketi parent task kayitlarini TaskEnvelope v1 metadata'sina hizaladi. `supervisor/cto_task_router.py` source, actor_id, request_id, correlation_id, idempotency_key, task_type, risk_level, requested_permissions, reply_policy ve redacted payload alanlarini yazar.
+
+Worker eligibility router kararindan gelir: Telegram parent tasklari, control/readiness tasklari, production deploy ve secret/IAM/billing/DNS/firewall/destructive database/Google Ads/GCloud mutate permissionlari worker dispatch oncesi bloke edilir. `supervisor/task_status_constants.py` legacy string `worker_eligible=false/0/no/off/blocked` degerlerini dispatch icin false kabul eder. `supervisor_cli add-task` ve `task_queue.enqueue_task` eski yolları ayni router metadata helper'ina baglandi; worker subtasks parent correlation ID ve idempotency zincirini tasir.
+
+Test: hedefli router/dispatch unit testleri PASS, `WorkerStatusModelTest` PASS, compileall PASS ve `CHECK_MODE=read_only production_readiness_suite.py --json` PASS. `tests.test_runtime_status_model` tam kosusu bu sandbox'ta `/opt/codex-dev-center/state/task_queue.json.lock` read-only runtime kilidine takildi. Production deploy, staging deploy, runtime state/log/report yazimi, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

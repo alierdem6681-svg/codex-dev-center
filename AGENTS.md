@@ -178,6 +178,14 @@ Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi 
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.
 
+## CTO ROUTER DISPATCH ENVELOPE V1
+
+Telegram, SSH/dashboard ve legacy local enqueue kaynaklari merkezi router metadata sozlesmesine hizalanir. Parent task kaydi `task_envelope` icinde `source`, `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `risk_level`, `requested_permissions`, `reply_policy` ve redacted `payload` alanlarini tasir.
+
+Worker dispatch eligibility router kararindan gelir. Telegram parent task, control/readiness task, production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database, Google Ads live mutate ve GCloud mutate permissionlari worker dispatch oncesi bloke edilir; source `cto` worker subtasks parent correlation ID ve idempotency zincirini tasir.
+
+Legacy kayitlarda `worker_eligible` string `false`, `0`, `no`, `off` veya `blocked` gelirse worker dispatch icin false kabul edilir. Bu sozlesme production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## PARALLEL WORKER REGRESSION GATE V1
 
 `supervisor/production_readiness_suite.py` `parallel_worker_regression` kapisiyla dort dummy/simulasyon task icin dispatch, lifecycle wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmamasi sozlesmesini gecici queue fixture'i uzerinden dogrular.
