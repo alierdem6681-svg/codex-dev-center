@@ -140,3 +140,9 @@ Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 
 Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 15. Worker Bootstrap Preflight Kuralı
+
+Worker bootstrap tanısı repo checkout, local `.git/` metadata ve test yüzeyi gereksinimleri açıkça istenmişse bunları hazır saymadan önce doğrulamalıdır. Repo apply akışı izole clone üzerinde bu sıkı preflight kapısını kullanır; eksik repo veya test yüzeyi `bootstrap_diagnostics.json` içinde açık reason code ile fail olur.
+
+Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz ve IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

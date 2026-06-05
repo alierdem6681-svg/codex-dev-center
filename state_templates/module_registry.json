@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T12:02:10+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -68,13 +68,14 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "worker-1..4 servisleri, görev işleme, queue/workers transaction claim safety, dispatch claim metadata, stale claim retry dispatch, controlled repo apply path validation, stage-plan control report ve log üretimi.",
+      "description": "worker-1..4 servisleri, görev işleme, queue/workers transaction claim safety, dispatch claim metadata, stale claim retry dispatch, controlled repo apply path validation, bootstrap repo/test preflight, stage-plan control report ve log üretimi.",
       "actions": [
         "start_worker",
         "stop_worker",
         "restart_worker",
         "view_worker_logs",
         "repo_apply_validation",
+        "validate_worker_bootstrap_preflight",
         "validate_worker_state_transaction"
       ]
     },

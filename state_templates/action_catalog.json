@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T12:02:10+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -307,6 +307,20 @@
       "requires_secret_scan": true,
       "requires_control_report": true,
       "requires_stage_plan_report": true
+    },
+    {
+      "id": "validate_worker_bootstrap_preflight",
+      "label": "Worker Bootstrap Preflight Doğrulaması",
+      "module": "workers",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_repo_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_test_surface_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface",
+      "requires_repo_checkout_check": true,
+      "requires_test_surface_check": true,
+      "secret_values_logged": false,
+      "production_deploy": false
     },
     {
       "id": "validate_worker_state_transaction",

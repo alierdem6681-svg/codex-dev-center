@@ -7,6 +7,8 @@ import json
 import contextlib
 import io
 import os
+import shutil
+import subprocess
 import time
 from pathlib import Path
 from unittest import mock
@@ -174,6 +176,49 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(payload["status"], "blocked_bootstrap_missing")
         self.assertIn("codex_config_missing", payload["issues"])
         self.assertFalse(payload["secret_values_logged"])
+
+    def test_worker_bootstrap_preflight_blocks_missing_repo_when_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_git_repo=True)
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "blocked_bootstrap_missing")
+        self.assertIn("repo_checkout_missing", payload["issues"])
+        self.assertEqual(payload["checks"]["git_repo"]["status"], "missing")
+        self.assertFalse(payload["secret_values_logged"])
+
+    def test_worker_bootstrap_preflight_blocks_missing_test_surface_when_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = worker_bootstrap.bootstrap_preflight(Path(tmp), require_test_surface=True)
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["status"], "blocked_no_test_surface")
+        self.assertIn("no_test_surface", payload["issues"])
+        self.assertEqual(payload["checks"]["test_surface"]["status"], "missing")
+        self.assertFalse(payload["secret_values_logged"])
+
+    def test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface(self):
+        if not shutil.which("git"):
+            self.skipTest("git not available")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(["git", "init"], cwd=root, text=True, capture_output=True, check=True)
+            tests_dir = root / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "test_bootstrap_surface.py").write_text("def test_demo():\n    assert True\n", encoding="utf-8")
+
+            payload = worker_bootstrap.bootstrap_preflight(
+                root,
+                require_git_repo=True,
+                require_local_git_metadata=True,
+                require_test_surface=True,
+            )
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "ready")
+        self.assertTrue(payload["checks"]["git_repo"]["local_metadata"])
+        self.assertEqual(payload["checks"]["test_surface"]["status"], "ready")
+        self.assertIn("tests/test_bootstrap_surface.py", payload["checks"]["test_surface"]["markers"])
 
     def test_retry_policy_schedules_same_task_with_idempotency_key(self):
         decision = retry_policy.decide_retry(
