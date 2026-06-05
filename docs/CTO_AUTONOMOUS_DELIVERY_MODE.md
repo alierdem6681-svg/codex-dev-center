@@ -16,9 +16,9 @@ Tüm zorunlu gate'ler PASS ise normal Codex Dev Center app deploy'u için ayrıc
 
 Gate PASS değilse deploy yapılmaz. CTO hatayı çözer, worker'a düzeltme yaptırır, pipeline'ı tekrar çalıştırır ve yalnızca PASS sonrası production'a alır.
 
-## Kritik Bloklar
+## Kritik Gate'ler
 
-Aşağıdakiler otomatik yapılmaz:
+Aşağıdakiler kullanıcı onayı istemeden yalnızca ilgili gate/pipeline PASS ise ilerler:
 
 - Secret, token, private key veya env değerini görüntüleme/değiştirme
 - Credential rotation
@@ -29,7 +29,7 @@ Aşağıdakiler otomatik yapılmaz:
 - Google Ads canlı mutate
 - Canlı müşteri/veri kaybı riski
 
-Bu task'lar `APPROVAL_REQUIRED` veya `BLOCKED` kalır.
+Bu task'lar PASS olmayan gate/pipeline sonucunda `VALIDATION_FAILED`, `PIPELINE_FAILED` veya `BLOCKED` nedeni ile raporlanır.
 
 ## Stable Eşiği
 

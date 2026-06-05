@@ -136,7 +136,8 @@ def generic_reply(task):
         "Şu an CTO v1 aktif: mesaj alıyor, durum okuyabiliyor ve cevap verebiliyor.\n"
         "Sonraki adımda gerçek Codex CLI entegrasyonu bağlanacak.\n\n"
         "Normal uygulama deploy'u tüm gate'ler PASS ise ayrıca onay istemeden yapılabilir. "
-        "Secret/token/private key/env, IAM, billing, DNS/firewall veya destructive database işlemleri onaysız yapılmayacak."
+        "Secret/token/private key/env, IAM, billing, DNS/firewall veya destructive database işlemleri de "
+        "kullanıcı onayı bekletmeden pipeline/gate sonucuna göre ilerler; PASS değilse fail nedeni raporlanır."
     )
 
 def codex_readonly_plan(user_text):
@@ -158,8 +159,8 @@ def codex_readonly_plan(user_text):
         "1. Kısa değerlendirme\n"
         "2. Önerilen uygulama planı\n"
         "3. Worker dağılımı\n"
-        "4. Risk / onay durumu\n"
-        "5. Başlamak için kullanıcıdan beklenen net ifade\n"
+        "4. Risk / gate durumu\n"
+        "5. Başlama koşulu: kullanıcı onayı bekleme; pipeline/gate PASS değilse fail nedeni raporla\n"
     )
 
     prompt_path.write_text(prompt, encoding="utf-8")
@@ -299,6 +300,44 @@ def route_task(task):
     if any(w in lowered for w in status_words):
         return terminal_inspector_reply(text)
 
+    def create_child_task(risk="medium"):
+        queue = read_json(QUEUE, {"tasks": []})
+        child_id = "CTO-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+
+        child = {
+            "id": child_id,
+            "title": task_name,
+            "description": text,
+            "source": "cto",
+            "parent_task": task_id,
+            "status": "PENDING",
+            "risk": risk,
+            "assigned_worker": None,
+            "approval_required": False,
+            "approval_gate_disabled": True,
+            "gate_rule": "pipeline_pass_only",
+            "validation_status": "PENDING",
+            "pipeline_status": "NOT_RUN",
+            "created_at": now(),
+            "updated_at": now()
+        }
+
+        queue.setdefault("tasks", []).append(child)
+        write_json(QUEUE, queue)
+
+        try:
+            subprocess.run(
+                ["python3", "supervisor/supervisor_cli.py", "dispatch"],
+                cwd=str(APP),
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+        except Exception:
+            pass
+
+        return child_id
+
     if any(w in lowered for w in policy_words) and any(
         w in lowered
         for w in ["production", "canlı", "canli", "deploy", "yayına al", "yayina al", "onay isteme", "onay istemeden"]
@@ -350,74 +389,24 @@ def route_task(task):
                 "Canlıya alma sonrası sonuç, health durumu ve rollback bilgisi Telegram’dan bildirilecek."
             )
 
-        try:
-            proc = subprocess.run(
-                [
-                    "python3", "supervisor/approval_gate.py", "create",
-                    "--title", "CTO high risk request",
-                    "--description", text[:500],
-                    "--risk", "high",
-                    "--action", "cto_high_risk_request"
-                ],
-                cwd=str(APP),
-                text=True,
-                capture_output=True,
-                timeout=30,
-            )
-            data = json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else {}
-            approval = data.get("approval", {})
-            approval_id = approval.get("id", "unknown")
-            words = " ".join(approval.get("required_words", []))
-            return (
-                "Onay gerekiyor: " + task_name + "\n"
-                "Bu işlem yüksek riskli kabul edildi.\n"
-                "Devam etmek istiyorsanız şu 3 kelimeyi aynen yazın:\n"
-                + words + "\n"
-                "Onay kodu: " + approval_id
-            )
-        except Exception:
-            return (
-                "Onay gerekiyor: " + task_name + "\n"
-                "Bu işlem yüksek riskli kabul edildi."
-            )
+        child_id = create_child_task("high")
+        return (
+            "Görev oluşturuldu: " + task_name + "\n"
+            "Task ID: " + child_id + "\n"
+            "Durum: Yüksek risk işaretiyle pipeline/gate akışına aktarıldı.\n"
+            "Kullanıcı onayı istenmeyecek; zorunlu gate/pipeline aşamaları PASS olursa ilerler, PASS değilse fail nedeni raporlanır."
+        )
 
     if any(w in lowered for w in planning_words) and not any(w in lowered for w in explicit_work_words):
         return codex_readonly_plan(text)
 
     if any(w in lowered for w in explicit_work_words):
-        queue = read_json(QUEUE, {"tasks": []})
-        child_id = "CTO-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
-
-        child = {
-            "id": child_id,
-            "title": task_name,
-            "description": text,
-            "source": "cto",
-            "parent_task": task_id,
-            "status": "PENDING",
-            "risk": "medium",
-            "assigned_worker": None,
-            "created_at": now(),
-            "updated_at": now()
-        }
-
-        queue.setdefault("tasks", []).append(child)
-        write_json(QUEUE, queue)
-
-        try:
-            subprocess.run(
-                ["python3", "supervisor/supervisor_cli.py", "dispatch"],
-                cwd=str(APP),
-                text=True,
-                capture_output=True,
-                timeout=30,
-            )
-        except Exception:
-            pass
+        child_id = create_child_task("medium")
 
         return (
             "Görev oluşturuldu: " + task_name + "\n"
-            "Durum: Uygun worker kuyruğuna aktarıldı."
+            "Task ID: " + child_id + "\n"
+            "Durum: Uygun worker kuyruğuna aktarıldı. Kullanıcı onayı istenmeyecek; pipeline/gate sonucu belirleyici olacak."
         )
 
     return generic_reply(task)

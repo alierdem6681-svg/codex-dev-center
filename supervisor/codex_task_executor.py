@@ -117,7 +117,7 @@ Mandatory rules:
 - Do not send long code/terminal output to Telegram.
 - Capture technical output to logs.
 
-This workspace is preparation-only unless approval policy allows execution.
+This workspace is pipeline-gated. Do not request user approval; report a failure if required gates cannot pass.
 """
     (workspace / "CODEX_TASK_PROMPT.md").write_text(prompt, encoding="utf-8")
     (workspace / "task.json").write_text(json.dumps(task, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -131,19 +131,15 @@ def request_approval(task_id):
     if not task:
         raise SystemExit(f"Task not found: {task_id}")
 
-    cmd = [
-        "python3", "supervisor/approval_gate.py", "create",
-        "--title", f"Codex execution approval for {task_id}",
-        "--description", f"Run Codex CLI for task: {task.get('title','')}",
-        "--risk", "high",
-        "--action", f"run_codex_task:{task_id}"
-    ]
-    p = subprocess.run(cmd, cwd=str(APP), text=True, capture_output=True, timeout=30)
-    log(f"REQUEST_APPROVAL task={task_id} rc={p.returncode}")
-    if p.returncode != 0:
-        print(json.dumps({"ok": False, "stdout": p.stdout, "stderr": p.stderr}, indent=2, ensure_ascii=False))
-        raise SystemExit(1)
-    print(p.stdout)
+    log(f"REQUEST_APPROVAL_DISABLED_PIPELINE_ONLY task={task_id}")
+    print(json.dumps({
+        "ok": True,
+        "task_id": task_id,
+        "approval_required": False,
+        "approval_gate_disabled": True,
+        "gate_rule": "pipeline_pass_only",
+        "next_action": "run_pipeline_gated_execution"
+    }, indent=2, ensure_ascii=False))
 
 def run_task(task_id):
     pol = policy()
@@ -152,9 +148,9 @@ def run_task(task_id):
         print(json.dumps({
             "ok": False,
             "blocked": True,
-            "reason": "codex_execution_disabled_or_requires_approval",
+            "reason": "codex_execution_disabled_or_pipeline_gate_not_configured",
             "task_id": task_id,
-            "next_action": "request_codex_execution_approval"
+            "next_action": "enable_unattended_execution_after_pipeline_gate"
         }, indent=2, ensure_ascii=False))
         return
 
@@ -172,14 +168,14 @@ def run_task(task_id):
         print(json.dumps({"ok": False, "error": "codex_cli_not_found"}, indent=2, ensure_ascii=False))
         return
 
-    # Bu bölüm policy açılana kadar çalışmaz.
+    # Bu bölüm pipeline-gated execution policy açılana kadar çalışmaz.
     log_file = LOGS / f"codex_task_{sid}.log"
     prompt_file = workspace / "CODEX_TASK_PROMPT.md"
 
     cmd = [codex_path]
     with log_file.open("a", encoding="utf-8") as f:
         f.write(f"{now()} WOULD_RUN_INTERACTIVE_CODEX task={task_id} prompt={prompt_file}\n")
-        f.write("Unattended execution policy is intentionally gated.\n")
+        f.write("Unattended execution policy is pipeline-gated; no user approval is requested.\n")
 
     print(json.dumps({
         "ok": True,

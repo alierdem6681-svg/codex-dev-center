@@ -20,9 +20,11 @@ sys.path.insert(0, str(ROOT / "web_panel"))
 
 from supervisor import (  # noqa: E402
     action_result_watcher,
+    codex_task_executor,
     codex_quality_gate,
     critical_operation_policy,
     cto_autonomous_delivery,
+    cto_service,
     cto_task_router,
     direct_cto_action_mode,
     direct_cto_job_recovery,
@@ -541,6 +543,68 @@ class WorkerStatusModelTest(unittest.TestCase):
 
     def test_high_risk_no_longer_blocks_worker_for_approval(self):
         self.assertEqual(worker_block_reason({"risk": "high", "status": "PENDING"}), "")
+
+    def test_cto_service_high_risk_message_creates_pipeline_gated_task_without_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            queue_path = state / "task_queue.json"
+            queue_path.write_text(json.dumps({"tasks": []}), encoding="utf-8")
+
+            originals = (cto_service.APP, cto_service.STATE, cto_service.QUEUE)
+            cto_service.APP = runtime
+            cto_service.STATE = state
+            cto_service.QUEUE = queue_path
+            try:
+                with mock.patch.object(cto_service.subprocess, "run") as run:
+                    reply = cto_service.route_task({
+                        "id": "PARENT",
+                        "title": "token değiştir",
+                        "description": "production token değiştir ve secret oku",
+                    })
+            finally:
+                cto_service.APP, cto_service.STATE, cto_service.QUEUE = originals
+
+            queue = json.loads(queue_path.read_text(encoding="utf-8"))
+
+        self.assertIn("Görev oluşturuldu", reply)
+        self.assertNotIn("Onay gerekiyor", reply)
+        self.assertEqual(len(queue["tasks"]), 1)
+        self.assertEqual(queue["tasks"][0]["risk"], "high")
+        self.assertFalse(queue["tasks"][0]["approval_required"])
+        self.assertTrue(queue["tasks"][0]["approval_gate_disabled"])
+        self.assertEqual(queue["tasks"][0]["gate_rule"], "pipeline_pass_only")
+        self.assertEqual(run.call_args[0][0], ["python3", "supervisor/supervisor_cli.py", "dispatch"])
+
+    def test_codex_task_executor_request_approval_is_pipeline_only_compatibility_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            state.mkdir()
+            (state / "task_queue.json").write_text(
+                json.dumps({"tasks": [{"id": "TASK-1", "title": "run me"}]}),
+                encoding="utf-8",
+            )
+
+            originals = (codex_task_executor.APP, codex_task_executor.STATE, codex_task_executor.LOGS)
+            codex_task_executor.APP = runtime
+            codex_task_executor.STATE = state
+            codex_task_executor.LOGS = logs
+            try:
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out), mock.patch.object(codex_task_executor.subprocess, "run") as run:
+                    codex_task_executor.request_approval("TASK-1")
+            finally:
+                codex_task_executor.APP, codex_task_executor.STATE, codex_task_executor.LOGS = originals
+
+            payload = json.loads(out.getvalue())
+
+        self.assertFalse(payload["approval_required"])
+        self.assertTrue(payload["approval_gate_disabled"])
+        self.assertEqual(payload["gate_rule"], "pipeline_pass_only")
+        run.assert_not_called()
 
     def test_timeout_without_output_is_not_done(self):
         status, reason = worker_runner.classify_worker_result(124, [], "", False)

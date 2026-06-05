@@ -139,7 +139,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Codex CLI görev yürütme framework hazır; çalıştırma onay kapısına bağlı.",
+      "description": "Codex CLI görev yürütme framework hazır; çalıştırma pipeline/gate sonucuna bağlı.",
       "actions": [
         "run_codex_task",
         "review_codex_output",
@@ -184,13 +184,13 @@
     },
     {
       "id": "security_approval",
-      "name": "Security / Approval Gates",
+      "name": "Security / Pipeline Gates",
       "status": "active",
       "risk": "critical",
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Yüksek riskli işlemler için onay kapıları.",
+      "description": "Yüksek riskli işlemler için kullanıcı onayı istemeyen pipeline/gate kontrolleri.",
       "actions": [
         "create_approval_request",
         "approve_action",

@@ -17,7 +17,7 @@ Her gorev sonunda kontrol:
 - Dashboard kaydi var mi?
 - Test edildi mi?
 - Risk seviyesi dogru mu?
-- Onay gerekiyorsa istendi mi?
+- Zorunlu gate/pipeline sonucu PASS mi?
 - Handover guncellendi mi?
 - Audit log yazildi mi?
 - Geri donus mumkun mu?
