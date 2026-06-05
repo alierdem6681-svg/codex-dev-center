@@ -74,7 +74,7 @@
       .controls {
         display: grid;
         gap: 8px;
-        grid-template-columns: minmax(150px, 1.3fr) repeat(4, minmax(120px, .6fr)) minmax(180px, .7fr);
+        grid-template-columns: minmax(150px, 1.3fr) repeat(4, minmax(120px, .55fr)) repeat(2, minmax(170px, .65fr));
         margin-bottom: 10px;
       }
       .control-check {
@@ -161,6 +161,7 @@
       table { width: 100%; border-collapse: collapse; }
       th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
       th { color: var(--muted); font-weight: 600; font-size: 12px; }
+      .empty-state { color: var(--muted); font-size: 12px; text-align: center; padding: 16px 8px; }
       pre { margin: 0; white-space: pre-wrap; background: #f2f4f6; padding: 10px; border-radius: 7px; max-height: 280px; overflow: auto; }
       .mobile-list { display: none; }
       .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -608,6 +609,10 @@
                     <input id="showLiveTasks" type="checkbox">
                     Canlıya alınanları göster
                   </label>
+                  <label class="control-check" for="showHistoricalTasks">
+                    <input id="showHistoricalTasks" type="checkbox">
+                    Geçmiş kayıtları göster
+                  </label>
                 </div>
                 <div id="tasksTable" class="desktop-table"></div>
                 <div id="tasksCards" class="mobile-list"></div>
@@ -851,6 +856,7 @@
       function filteredTasks(){
         let list = tasks();
         if (!showLiveTasks.checked) list = list.filter(t => !taskIsLive(t));
+        if (!showHistoricalTasks.checked) list = list.filter(t => taskIsLive(t) || !taskIsClosed(t));
         const q = search.value.toLowerCase();
         list = list.filter(t => {
           const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
@@ -862,8 +868,20 @@
         list.sort(compareTasks);
         return list;
       }
+      function taskListHasUserFilter(){
+        return Boolean(search.value.trim() || statusFilter.value || workerFilter.value || riskFilter.value);
+      }
+      function taskEmptyStateMessage(){
+        return taskListHasUserFilter() ? 'Filtrelere uyan görev yok.' : 'Güncel görev yok.';
+      }
       function renderTasks(){
         const list = filteredTasks();
+        if (!list.length) {
+          const message = esc(taskEmptyStateMessage());
+          tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody><tr><td class="empty-state" colspan="4">${message}</td></tr></tbody></table>`;
+          tasksCards.innerHTML = `<div class="item empty-state">${message}</div>`;
+          return;
+        }
         tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody>${
           list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
         }</tbody></table>`;
@@ -1120,7 +1138,7 @@
         search.value = event.target.value;
         renderTasks();
       });
-      [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks].forEach(el => {
+      [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks, showHistoricalTasks].forEach(el => {
         el.addEventListener('change', event => {
           event.preventDefault();
           renderTasks();

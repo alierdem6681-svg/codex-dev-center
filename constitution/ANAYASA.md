@@ -150,3 +150,9 @@ Worker bootstrap tanısı repo checkout, local `.git/` metadata ve test yüzeyi 
 Pipeline analizi ve kalite tanısı gibi işlerde CI/pipeline kanıtı ayrıca istenirse preflight `pipeline_evidence_missing` reason code'u üretmelidir. Bu tanı sadece güvenli marker/dosya adlarını raporlar; log dump veya secret/env/token/private key değeri okumaz.
 
 Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz ve IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 16. Dashboard Görev Listesi Kuralı
+
+Dashboard Görevler ana listesi geçmişi veri silmeden görünüm katmanında temizlemelidir. Tamamlanmış veya kapalı geçmiş kayıtlar varsayılan listede görünmez; kullanıcı `Geçmiş kayıtları göster` kontrolünü açarsa geri gösterilebilir.
+
+Canlı kayıt görünürlüğü ayrı `Canlıya alınanları göster` kontrolüyle korunur. Boş güncel liste kısa empty-state metniyle gösterilir. Bu kural production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

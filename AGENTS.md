@@ -156,6 +156,12 @@ Ana ve legacy panel `/api/status` payload'lari runtime `github_actions_status.js
 
 Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline stage sirasina read-only olarak mapler. Payload raw kullanici mesaji, uzun description, stdout/stderr, log, diff veya terminal dump dondurmemelidir. `DEPLOYED` stage siralamasinda son stage olarak kalir. Bu gorunurluk production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## DASHBOARD TASK LIST HISTORY FILTER V1
+
+Dashboard Gorevler ana listesi tamamlanmis/kapali gecmis kayitlari varsayilan olarak gizler. `Gecmis kayitlari goster` kontrolu acilmadikca liste guncel/aktif veya dikkat gerektiren kayitlara odaklanir; `Canliya alinanlari goster` kontrolu canli kayit gorunurlugunu ayrica korur.
+
+Bos sonuc dashboard'da kisa empty-state metniyle gosterilmelidir. Bu gorunurluk veri silme, production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## TELEGRAM ASSET SAFETY CONTRACT V1
 
 `supervisor/telegram_asset_safety.py` Telegram asset kabulu icin manifest, limit, checksum, MIME/uzanti, secret redaction, simulator ve dashboard-safe snapshot sozlesmesini test eder. Bu kontrat gercek Telegram API'ye fallback yapmaz, asset indirmez, runtime state/log/report mutate etmez ve production deploy yetkisi vermez.
