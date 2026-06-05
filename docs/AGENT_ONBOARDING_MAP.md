@@ -125,6 +125,7 @@ Dashboard status API notu:
 - `web_panel/static/index.html` ana dashboard shell icin nötr solid background kullanir; doğa/manzara bitmap arka planı ve `/assets/dashboard-landscape.png` referansi geri eklenmemelidir.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli ve kapali/gecmis gorevler varsayilan listeden gizlenir, `Gecmis/canli kayitlari goster` checkbox'i ile dahil edilir ve hic guncel gorev yoksa `Guncel gorev yok.` bos durumu gosterilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
+- Ana dashboard direct access modundadir: `/`, `/index.html`, `/api/status`, `/api/pipeline-flow` ve dashboard read-only API'leri oturum cookie'si istemeden calisir; eski `/login` URL'si dashboard'a yonlenir, public POST operasyon yuzeyi `dashboard_direct_access_read_only` ile kapali kalir ve username/password UI'i geri eklenmemelidir.
 
 Controlled apply notu:
 - Validated proposal apply isleri izole repo clone/worker branch uzerinde calisir; apply clone icinde yerel `.git/` metadata dizini bulunmalidir.

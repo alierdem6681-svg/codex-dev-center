@@ -164,6 +164,10 @@ Ana dashboard shell doğa/manzara bitmap arka planı kullanmaz. `web_panel/stati
 
 Ana dashboard `Görevler` listesi varsayılan olarak yalnızca güncel/aktif görev bağlamını göstermelidir. Canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change veya tamamlanmış geçmiş kayıtlar UI filtre katmanında gizlenir; veri silinmez. `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak listeye dahil eder. Hiç güncel görev yoksa boş durum `Güncel görev yok.` olarak gösterilir.
 
+## DASHBOARD DIRECT ACCESS V1
+
+Ana dashboard üyelik/login kapısı kullanmaz. `web_panel/panel_server.py` `/`, `/index.html`, `/api/status`, `/api/pipeline-flow` ve dashboard read-only API'lerini oturum cookie'si istemeden döndürmelidir. Eski `/login` URL'si dashboard'a yönlenir; public POST operasyon yüzeyi `dashboard_direct_access_read_only` ile kapalı kalır. İlk kullanıcı kurulumu, parola hash'i, session secret veya auth cookie zorunluluğu geri eklenirse regresyon testleri fail olmalıdır.
+
 ## TELEGRAM ASSET SAFETY CONTRACT V1
 
 `supervisor/telegram_asset_safety.py` Telegram asset kabulu icin manifest, limit, checksum, MIME/uzanti, secret redaction, simulator ve dashboard-safe snapshot sozlesmesini test eder. Bu kontrat gercek Telegram API'ye fallback yapmaz, asset indirmez, runtime state/log/report mutate etmez ve production deploy yetkisi vermez.

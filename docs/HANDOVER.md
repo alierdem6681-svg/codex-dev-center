@@ -261,6 +261,25 @@ Not:
 
 ---
 
+## Dashboard Direct Access Apply
+
+Tarih: 2026-06-05
+
+Görev: CTO-APPLY-20260605-135551 / CTO-TASK-20260605-075408-794462-DASHBOARD-ALAN-TEMIZLIĞI
+
+Degisen davranis:
+- Ana panel `/`, `/index.html`, `/api/status`, `/api/pipeline-flow` ve dashboard read-only API'lerini oturum cookie'si istemeden dondurur.
+- Eski `/login` ve `/login.html` URL'leri dashboard'a yonlenir; `web_panel/static/login.html` sadece eski baglantilar icin yonlendirme uyumlulugudur.
+- Dashboard hesap menusu, cikis butonu ve username/password UI izi kaldirildi.
+- Public POST operasyon yuzeyi `dashboard_direct_access_read_only` 403 cevabiyla kapali kalir; dashboard direct access production deploy veya kritik operasyon yetkisi vermez.
+- Deploy ve VM smoke workflow'lari login sayfasi yerine dashboard/status dogrudan erisimini dogrular.
+
+Not:
+- Production deploy calistirilmadi.
+- Secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+---
+
 ## 2026-06-05 Worker Bootstrap Pipeline Preflight Apply
 
 Görev: CTO-APPLY-20260605-115547 / CTO-TASK-20260605-075405-769907-PIPELINE-EKSIK-ANALIZI

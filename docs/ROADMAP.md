@@ -203,6 +203,15 @@ Faz 19B-10A Model Policy
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
 
+## Faz 35B - Dashboard Direct Access
+
+- [x] Ana panel username/password login kapisi kaldirildi.
+- [x] `/`, `/index.html`, `/api/status` ve dashboard read-only API'leri oturum cookie'si olmadan acilir.
+- [x] Eski `/login` URL'si dashboard'a yonlenir.
+- [x] Hesap menusu ve cikis UI'i ana dashboard markup'indan kaldirildi.
+- [x] Public POST operasyon yuzeyi read-only 403 sozlesmesiyle kapatildi.
+- [x] Deploy ve VM smoke kontrolleri login sayfasi yerine dogrudan dashboard/status kontrolune guncellendi.
+
 ## Faz 36 - Telegram Asset Manifest Contract
 
 - [x] Telegram asset manifest schema version `1` repo fixture olarak eklendi.

@@ -3,19 +3,21 @@
   "actions": [
     {
       "id": "panel_login",
-      "label": "Panel Girişi",
+      "label": "Panel Girişi (Pasif)",
       "module": "panel_auth",
       "risk": "low",
-      "enabled": true,
-      "requires_approval": false
+      "enabled": false,
+      "requires_approval": false,
+      "retired_reason": "dashboard_direct_access_enabled"
     },
     {
       "id": "panel_logout",
-      "label": "Panel Çıkışı",
+      "label": "Panel Çıkışı (Pasif)",
       "module": "panel_auth",
       "risk": "low",
-      "enabled": true,
-      "requires_approval": false
+      "enabled": false,
+      "requires_approval": false,
+      "retired_reason": "dashboard_direct_access_enabled"
     },
     {
       "id": "view_dashboard_shell",
@@ -27,6 +29,7 @@
       "non_mutating": true,
       "background_style": "solid_neutral",
       "background_image_enabled": false,
+      "direct_access_enabled": true,
       "task_list_hides_history_by_default": true,
       "task_list_history_toggle_enabled": true,
       "task_list_empty_state": "Güncel görev yok."
@@ -65,12 +68,13 @@
     },
     {
       "id": "panel_first_user_setup",
-      "label": "İlk Panel Kullanıcısını Oluştur",
+      "label": "İlk Panel Kullanıcısını Oluştur (Pasif)",
       "module": "panel_auth",
       "risk": "medium",
-      "enabled": true,
+      "enabled": false,
       "requires_approval": false,
-      "local_only_by_default": true
+      "local_only_by_default": true,
+      "retired_reason": "dashboard_direct_access_enabled"
     },
     {
       "id": "production_readiness_suite",

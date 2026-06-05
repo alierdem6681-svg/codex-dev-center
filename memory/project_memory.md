@@ -228,6 +228,14 @@ Canli gorev algisi `DEPLOYED`, `isLive`, `liveAt`, `deployment_status`, `deliver
 
 Davranis `tests/test_dashboard_account_menu_markup.py` icindeki dashboard markup regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapilmadi.
 
+## 2026-06-05 Dashboard Direct Access Apply
+
+Dashboard Alan Temizligi apply paketiyle ana panel üyelik/login kapısı devre dışı bırakıldı. `web_panel/panel_server.py` artık `/`, `/index.html`, `/api/status`, `/api/pipeline-flow` ve dashboard read-only API'lerini oturum cookie'si olmadan döndürür. Eski `/login` URL'si dashboard'a yönlenir; `web_panel/static/login.html` yalnızca eski bağlantılar için yönlendirme uyumluluğudur.
+
+`web_panel/static/index.html` hesap menüsü, çıkış butonu ve username/password UI izlerinden temizlendi. Public POST operasyon yüzeyi `dashboard_direct_access_read_only` 403 cevabıyla kapalı kalır; dashboard direct access production deploy veya kritik operasyon yetkisi vermez. Deploy ve VM smoke workflow'ları login sayfası yerine dashboard/status doğrudan erişimini doğrular. Panel auth module/settings/action kayıtları disabled/direct access sözleşmesine hizalandı.
+
+Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapmadı.
+
 ## 2026-06-04 Dashboard Pipeline Expand State Apply
 
 Pipeline Flow ana gorev expand/collapse state'i polling datasindan ayrildi. `web_panel/static/index.html` stable main task key ile `pipelineMainTaskExpanded` map'i tutar; polling refresh yalniz server snapshot'ini yeniler ve kullanicinin actigi/kapattigi ana gorev durumunu resetlemez.

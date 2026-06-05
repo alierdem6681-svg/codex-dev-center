@@ -75,7 +75,7 @@ Bu komutlar production'a doğrudan terminalden deploy etme yolu olarak kullanıl
 9. Runtime içinde compile, JSON validation ve non-secret policy sync çalışır.
 10. Kurulu systemd servisleri varsa restart edilir.
 11. Production health check `127.0.0.1:8080/health` üzerinden geçer.
-12. Production smoke check `/login` ekranını doğrular.
+12. Production smoke check dashboard ana sayfasını ve `/api/status` cevabını doğrudan erişimle doğrular.
 13. GitHub Actions step summary deploy, backup ve smoke sonucunu kaydeder.
 
 ## Rollback
@@ -91,11 +91,11 @@ Rollback mekanizması güvenli ve mantıksaldır. Otomatik `git reset`, veri sil
 - `reports/production_deploy_last_report.md`
 - `reports/production_readiness_last_report.md`
 
-## Panel Girişi
+## Panel Erişimi
 
-Tokenlı URL kullanılmaz. Panel `/login` üzerinden kullanıcı adı ve şifre ister. İlk kullanıcı runtime içinde oluşturulur; parola hash'i `state/panel_auth.json`, session secret ise `state/panel_session_secret.txt` altında tutulur. Bu dosyalar repo'ya yazılmaz.
+Tokenlı URL, kullanıcı adı/şifre login kapısı ve ilk kullanıcı bootstrap zorunluluğu kullanılmaz. Panel `http://<host>:8080/` adresinde doğrudan açılır; `/api/status` oturum cookie'si olmadan salt okunur dashboard payload'u döndürür. Eski `/login` bağlantısı dashboard'a yönlenir. Public POST operasyon yüzeyi `dashboard_direct_access_read_only` ile kapalı kalır.
 
-Uzak sunucuda ilk kullanıcı kurulumu güvenlik gereği varsayılan olarak kapalıdır. Uzak ilk kurulum gerekirse VM içinde `CODEX_PANEL_USERNAME` ve `CODEX_PANEL_PASSWORD` verilerek servis başlatılır veya `CODEX_PANEL_ALLOW_REMOTE_SETUP=1` bilinçli olarak açılır.
+Panel erişimini değiştiren ilerideki işler production deploy, secret/env/token/private key, IAM, billing, DNS/firewall veya destructive database yetkisi vermez; bu alanlar aynı kritik risk kapılarında kalır.
 
 ## Durdurulacak Riskler
 

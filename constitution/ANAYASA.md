@@ -158,3 +158,7 @@ Ana dashboard arayüzü doğa/manzara bitmap arka planı kullanmaz. Panel kabuğ
 ## 17. Dashboard Güncel Görev Listesi Kuralı
 
 Ana dashboard görev listesi varsayılan olarak geçmiş/canlı/kapalı kayıtları veri silmeden UI katmanında gizlemeli ve yalnızca güncel görev bağlamını göstermelidir. Kullanıcı `Geçmiş/canlı kayıtları göster` seçeneğiyle bu kayıtları geçici olarak dahil edebilir. Güncel görev yoksa boş durum açıkça `Güncel görev yok.` olarak görünmelidir.
+
+## 18. Dashboard Doğrudan Erişim Kuralı
+
+Ana dashboard üyelik/login kapısı kullanmadan doğrudan açılmalıdır. `/`, `/index.html`, `/api/status`, `/api/pipeline-flow` ve dashboard read-only API'leri oturum cookie'si istemeden çalışır; eski `/login` bağlantısı dashboard'a yönlenir. Public POST operasyon yüzeyi `dashboard_direct_access_read_only` ile kapalı kalır. Bu kural production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

@@ -135,7 +135,10 @@ def automation_headers() -> dict[str, str]:
             sys.path.insert(0, str(ROOT))
         from web_panel import auth as panel_auth
 
-        return {"Cookie": panel_auth.automation_cookie_header()}
+        if panel_auth.public_auth_state().get("auth_mode") == "disabled":
+            return {}
+        cookie = panel_auth.automation_cookie_header()
+        return {"Cookie": cookie} if cookie else {}
     except Exception:
         return {}
 
@@ -564,7 +567,7 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
         "Pipeline Flow",
         "Görevler",
         "Geçmiş/canlı kayıtları göster",
-        "Çıkış",
+        "Dashboard",
     ]
     checks = {
         "health_pass": bool(health.get("ok")),
