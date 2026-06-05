@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -145,6 +145,34 @@
     "reject_unknown_manifest_fields": true,
     "reject_unknown_asset_fields": true,
     "dashboard_snapshot_raw_payload_included": false
+  },
+  "memory_os_runtime": {
+    "enabled": true,
+    "contract_ready": true,
+    "runtime_state_file": "state/memory_os_runtime.json",
+    "test_command": "{python} -m unittest tests.test_memory_os_runtime",
+    "state_schema_version": "memory_os_runtime_state_v1",
+    "record_schema_version": "memory_os_record_v1",
+    "summary_schema_version": "memory_os_summary_v1",
+    "raw_payload_storage_allowed": false,
+    "credential_value_storage_allowed": false,
+    "environment_value_storage_allowed": false,
+    "private_material_storage_allowed": false,
+    "recall_raw_content_included": false,
+    "audit_raw_content_logged": false,
+    "safe_metadata_allowlist": [
+      "actor",
+      "intent_domain",
+      "module",
+      "parent_task_id",
+      "pipeline_lane",
+      "risk",
+      "root_task_id",
+      "source",
+      "status",
+      "task_id",
+      "worker_id"
+    ]
   },
   "test_scratch_standard": {
     "enabled": true,

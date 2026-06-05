@@ -411,3 +411,11 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Memory OS Runtime Module Apply
+
+Memory OS icin guvenli runtime state sozlesmesi eklendi. `supervisor/memory_os_runtime.py` kayitlari `state/memory_os_runtime.json` formatina yazar, redaction uygular, allowlist metadata tutar, ozet ve recall snapshot'i uretir.
+
+Kayit/recall kontrati ham payload, secret/env/token/private key degeri, private material, terminal dump, diff veya log dump saklamaz/gostermez. Audit kaydi sadece record id, task id, tag sayisi ve redaction durumunu tasir.
+
+`modules/memory_os_runtime/`, `tests/test_memory_os_runtime.py` ve state template registry/settings/action catalog kayitlari eklendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

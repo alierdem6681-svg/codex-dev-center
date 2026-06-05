@@ -1,0 +1,10 @@
+{
+  "id": "memory_os_runtime",
+  "name": "Memory OS Runtime",
+  "status": "contract_ready",
+  "risk": "medium",
+  "description": "Safe runtime state, record format, summarization and recall contract for Memory OS.",
+  "enabled": true,
+  "dashboard_visible": true,
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

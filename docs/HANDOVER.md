@@ -1095,3 +1095,23 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Memory OS Runtime Module Apply
+
+Tarih: 2026-06-05
+Görev: CTO-ACTION-20260605-052521-02-MEMORY-OS-RUNTIME-MODULE
+Worker: worker-3
+
+Eklenenler:
+- `supervisor/memory_os_runtime.py` Memory OS runtime state, kayıt formatı, güvenli özet ve recall helper'i olarak eklendi.
+- `modules/memory_os_runtime/` modül README, module/settings/actions kayıtları eklendi.
+- `tests/test_memory_os_runtime.py` redaction, runtime state yazımı, audit içeriği, recall özeti ve contract validation davranışını geçici runtime root üzerinde doğrular.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` Memory OS Runtime görünürlüğüne hizalandı.
+
+Güvenlik:
+- Runtime kayıtları ham payload, secret/env/token/private key değeri, private material, terminal dump, diff veya log dump saklamaz.
+- Recall çıktısı raw content veya credential değeri döndürmez.
+- Bu apply adımı production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.

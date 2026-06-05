@@ -249,3 +249,11 @@ Her test icin `{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}` formatinda 
 - `scripts/staging_smoke_test.sh`
 
 Bu wrapperlar `production_environment_manager.py health-check --scope staging` ve `smoke-test --scope staging` çağrılarını yapar; `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek argüman passtrough desteğini korur. Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
+## MEMORY OS RUNTIME CONTRACT V1
+
+`supervisor/memory_os_runtime.py` Memory OS için güvenli runtime kayıt sözleşmesini sağlar. Runtime kayıtları `state/memory_os_runtime.json` altında schema version, özet, güvenli içerik, tag, recall key ve allowlist metadata formatıyla tutulur.
+
+Ham payload, uzun terminal çıktısı, diff/log dump, secret/env/token/private key değeri, private material veya credential-like metadata değeri kaydedilemez ya da recall/dashboard özetinde gösterilemez. Unsafe metadata alanları düşürülür; içerik redaction sonrası yazılır. Audit kaydı içerik değil sadece record id, task id, tag sayısı ve redaction durumunu taşır.
+
+`recall_memory_os_context` salt okunur özet döndürür; raw content ve credential değerleri içermez. Bu sözleşme production deploy, staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.

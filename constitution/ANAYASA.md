@@ -140,3 +140,9 @@ Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 
 Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 15. Memory OS Runtime Kuralı
+
+Memory OS kayıtları güvenli runtime state sözleşmesiyle tutulur. Kayıt formatı schema version, özet, güvenli içerik, tag, recall key ve allowlist metadata alanlarından oluşur.
+
+Ham payload, secret/env/token/private key değeri, private material, terminal dump, diff veya log dump Memory OS kaydına, audit loguna, dashboard/recall özetine yazılamaz. Recall çıktısı salt okunur özet olmalı ve raw content ya da credential değeri göstermemelidir.

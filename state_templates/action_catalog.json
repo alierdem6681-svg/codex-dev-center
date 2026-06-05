@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -331,6 +331,34 @@
       "non_mutating": true,
       "real_telegram_api": false,
       "command": "{python} -m unittest tests.test_telegram_asset_safety"
+    },
+    {
+      "id": "validate_memory_os_runtime_contract",
+      "label": "Memory OS Runtime Sözleşmesini Doğrula",
+      "module": "memory_os_runtime",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_memory_os_runtime",
+      "raw_payload_storage_allowed": false,
+      "credential_value_storage_allowed": false,
+      "environment_value_storage_allowed": false,
+      "private_material_storage_allowed": false
+    },
+    {
+      "id": "recall_memory_os_context",
+      "label": "Memory OS Bağlamını Geri Çağır",
+      "module": "memory_os_runtime",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} supervisor/memory_os_runtime.py recall --query {query}",
+      "raw_content_included": false,
+      "credential_values_included": false,
+      "environment_values_included": false,
+      "private_material_included": false
     },
     {
       "id": "validate_test_scratch_standard",

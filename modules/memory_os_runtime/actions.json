@@ -1,0 +1,25 @@
+{
+  "actions": [
+    {
+      "id": "validate_memory_os_runtime_contract",
+      "label": "Validate Memory OS Runtime Contract",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_memory_os_runtime"
+    },
+    {
+      "id": "recall_memory_os_context",
+      "label": "Recall Memory OS Context",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} supervisor/memory_os_runtime.py recall --query {query}",
+      "raw_content_included": false,
+      "credential_values_included": false
+    }
+  ],
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

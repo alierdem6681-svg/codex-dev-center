@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:25:23+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -76,6 +76,20 @@
         "view_worker_logs",
         "repo_apply_validation",
         "validate_worker_state_transaction"
+      ]
+    },
+    {
+      "id": "memory_os_runtime",
+      "name": "Memory OS Runtime",
+      "status": "contract_ready",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Safe runtime state, record format, summarization and recall contract for Memory OS without raw payload or credential value persistence.",
+      "actions": [
+        "validate_memory_os_runtime_contract",
+        "recall_memory_os_context"
       ]
     },
     {

@@ -93,6 +93,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
+- supervisor/memory_os_runtime.py Memory OS için güvenli runtime kayıt, özet ve recall helper'ıdır; ham payload, secret/env/token/private key değeri, private material, terminal dump, diff veya log dump saklamaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
 - supervisor/cto_autonomous_delivery.py içindeki `root-cause-report` komutu `PIPELINE_FAILED` apply child tasklari icin yeni kok task acmadan `root_cause`, `last_error`, `retryable` ve `recommended_fix` alanlarini dondurur
@@ -170,6 +171,13 @@ Telegram asset intake notu:
 - Raw `file_id`, raw payload, token, secret veya header bilgisi intake event/task mesajına yazılmaz.
 - Dosya indirme, kalıcı saklama, checksum ve malware scan bu backend sınıflandırıcıda yapılmaz; sonraki asset processing aşamasına bırakılır.
 - Desteklenmeyen medya ve limit/allowlist dışı dokümanlar controlled reject olarak işaretlenir.
+
+Memory OS runtime notu:
+- `modules/memory_os_runtime/` modülü Memory OS runtime state sözleşmesini tanımlar.
+- Runtime state dosyası `state/memory_os_runtime.json` olup repo apply sırasında oluşturulmamalıdır.
+- Kayıt formatı schema version, title, summary, redacted content, tags, recall keys ve allowlist metadata taşır.
+- Unsafe metadata alanları düşürülür; recall çıktısı raw content yerine dashboard-safe summary döndürür.
+- `tests/test_memory_os_runtime.py` redaction, append, audit ve recall sözleşmesini repo dışı geçici root ile doğrular.
 
 Read-only / dry-run write policy notu:
 - `CHECK_MODE` veya `CODEX_CHECK_MODE` `read_only` ya da `dry_run` ise readiness, drift ve smoke write adapter'lari state/report dosyasi olusturmaz.

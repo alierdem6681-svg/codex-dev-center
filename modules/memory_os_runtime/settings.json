@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "runtime_state_file": "state/memory_os_runtime.json",
+  "test_command": "{python} -m unittest tests.test_memory_os_runtime",
+  "contract": {
+    "state_schema_version": "memory_os_runtime_state_v1",
+    "record_schema_version": "memory_os_record_v1",
+    "summary_schema_version": "memory_os_summary_v1",
+    "runtime_state_file": "state/memory_os_runtime.json",
+    "max_records": 200,
+    "max_title_chars": 160,
+    "max_content_chars": 4000,
+    "max_summary_chars": 500,
+    "max_tag_count": 12,
+    "max_recall_key_count": 24,
+    "safe_metadata_keys": [
+      "actor",
+      "intent_domain",
+      "module",
+      "parent_task_id",
+      "pipeline_lane",
+      "risk",
+      "root_task_id",
+      "source",
+      "status",
+      "task_id",
+      "worker_id"
+    ],
+    "raw_payload_storage_allowed": false,
+    "credential_value_storage_allowed": false,
+    "environment_value_storage_allowed": false,
+    "private_material_storage_allowed": false
+  },
+  "updated_at": "2026-06-05T05:25:23+00:00"
+}

@@ -53,6 +53,7 @@ workers/
 supervisor/
 - CTO/Supervisor sistemi
 - Telegram asset intake sınıflandırıcısı dosya indirmeden medya metadata event'i üretir
+- Memory OS runtime güvenli kayıt, özet ve recall sözleşmesini sağlar; secret/env/token/private key değeri saklamaz
 
 projects/
 - Geliştirilecek projeler
