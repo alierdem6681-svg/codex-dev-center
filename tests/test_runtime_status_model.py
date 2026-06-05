@@ -3731,6 +3731,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertIn("DEPLOY_REF_SHA", workflow_text)
         self.assertIn("uses: actions/checkout@v5", workflow_text)
         self.assertNotIn("ref: ${{ inputs.ref }}", workflow_text)
+        self.assertNotIn('--exclude ".github/"', workflow_text)
 
     def test_cto_dispatch_deploy_uses_branch_ref_input(self):
         original_main_head = cto_autonomous_delivery.main_head
