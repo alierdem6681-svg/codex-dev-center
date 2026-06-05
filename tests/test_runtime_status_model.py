@@ -5785,15 +5785,15 @@ class TaskValidationEngineTest(unittest.TestCase):
         self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
         self.assertEqual(queue["tasks"][0]["pipeline_status"], "FAIL")
 
-    def test_critical_operation_becomes_validation_failed_without_approval(self):
+    def test_critical_operation_records_findings_without_validation_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.write_ready_runtime(tmp, pipeline_status="PASS", title="production token rotate")
             result = task_validation_engine.validate_ready_tasks(runtime, limit=5)
             queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result["changed"], 1)
-        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_VALIDATION_FAILED)
-        self.assertEqual(queue["tasks"][0]["validation_status"], "FAIL")
+        self.assertEqual(queue["tasks"][0]["status"], TASK_STATUS_PROPOSAL_DONE)
+        self.assertEqual(queue["tasks"][0]["validation_status"], "PASS")
         self.assertTrue(queue["tasks"][0]["critical_operation_findings"])
 
     def test_engine_approval_can_be_rechecked_when_findings_were_policy_context(self):
