@@ -340,6 +340,16 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(meta["name"], "Infrastructure Access Readiness")
         self.assertNotEqual(meta["name"], "Dashboard Alan Temizliği")
 
+    def test_short_proposal_prepare_is_not_action_command(self):
+        self.assertFalse(
+            telegram_direct_cto.is_action_command("Bana sistem mimarisi için kısa bir öneri hazırla.")
+        )
+        self.assertTrue(
+            telegram_direct_cto.is_action_command(
+                "Kapsamlı şekilde memory os görevini incele, modül hazırla ve canlıya al."
+            )
+        )
+
     def test_critical_policy_ignores_explicit_safety_boundaries(self):
         safe_text = "\n".join(
             [

@@ -502,7 +502,9 @@ def is_action_command(text):
         "geliştirmeye başla", "gelistirmeye basla", "geliştirmeye başlayalım",
         "gelistirmeye baslayalim", "düzeltelim", "duzeltelim", "bunu düzelt",
         "bunu duzelt", "bunu çözelim", "bunu cozelim", "çözelim", "cozelim",
-        "hazırla", "hazirla", "tamamla", "canlıya al", "canliya al",
+        "modül hazırla", "modul hazirla", "uygulama paketi hazırla",
+        "uygulama paketi hazirla", "repo değişikliği hazırla",
+        "repo degisikligi hazirla", "tamamla", "canlıya al", "canliya al",
         "production'a al", "productiona al", "deploy et"
     ]
     return any(w in lowered for w in action_words)
