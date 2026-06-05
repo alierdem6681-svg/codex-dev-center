@@ -1114,3 +1114,21 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Dashboard Neutral Background Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-122316 / CTO-TASK-20260605-075403-232757-KISA-ANALIZ
+Worker: worker-3
+
+Eklenenler:
+- `web_panel/static/index.html` içindeki doğa/manzara bitmap arka plan referansı kaldırıldı.
+- Kullanılmayan `web_panel/static/assets/dashboard-landscape.png` asset'i silindi.
+- Dashboard shell nötr uygulama zeminiyle çalışacak şekilde sadeleştirildi.
+- `tests/test_dashboard_account_menu_markup.py` yeni nötr arka plan kontratını doğrular.
+- AGENTS, Anayasa, onboarding, roadmap, memory ve state template kayıtları güncellendi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

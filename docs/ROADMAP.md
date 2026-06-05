@@ -318,6 +318,11 @@ Faz 19B-10A Model Policy
 
 - [x] Repo apply control report stage plan satirlari eklendi.
 - [x] Quality gate retry simulation dry-run safety alanlari eklendi.
+
+## Faz 51 - Dashboard Neutral Background
+
+- [x] Dashboard doğa/manzara bitmap arka planı kaldırıldı.
+- [x] Nötr panel zemini ve shell görünümü markup regresyon testiyle sabitlendi.
 - [x] Stale dispatch claim repair ayni task uzerinde retry/timeout statüsüyle sabitlendi.
 - [x] PR #103, #104 ve #105 conflict nedeniyle current main uzerine elle entegre edildi.
 

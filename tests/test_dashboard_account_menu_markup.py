@@ -57,10 +57,12 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
         self.assertIn("Pipeline Flow", html)
         self.assertIn("Görevler", html)
 
-    def test_dashboard_uses_scenic_shell_design(self):
+    def test_dashboard_uses_neutral_shell_without_scenic_background(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
 
-        self.assertIn("/assets/dashboard-landscape.png", html)
+        self.assertNotIn("/assets/dashboard-landscape.png", html)
+        self.assertNotIn("url('/assets/dashboard-landscape.png')", html)
+        self.assertFalse((ROOT / "web_panel" / "static" / "assets" / "dashboard-landscape.png").exists())
         self.assertIn('class="dashboard-shell"', html)
         self.assertIn('class="sidebar"', html)
         self.assertIn('id="metricActiveQueue"', html)

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:27:05+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -16,6 +16,8 @@
     "language": "tr",
     "compact_mode": true,
     "theme": "soft_neutral",
+    "background_image_enabled": false,
+    "scenic_background_asset_removed": true,
     "auth_mode": "username_password",
     "token_login_enabled": false,
     "show_runner_status": true,
