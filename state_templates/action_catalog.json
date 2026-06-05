@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:55:20+00:00",
+  "updated_at": "2026-06-05T13:32:16+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -26,7 +26,10 @@
       "requires_approval": false,
       "non_mutating": true,
       "background_style": "solid_neutral",
-      "background_image_enabled": false
+      "background_image_enabled": false,
+      "task_list_hides_history_by_default": true,
+      "task_list_history_toggle_enabled": true,
+      "task_list_empty_state": "Güncel görev yok."
     },
     {
       "id": "view_pipeline_flow",

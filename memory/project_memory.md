@@ -441,3 +441,9 @@ Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sa
 Dashboard ana shell arka planındaki doğa/manzara bitmap görseli kaldırıldı. `web_panel/static/index.html` artık nötr solid arka plan kullanır ve `web_panel/static/assets/dashboard-landscape.png` repo içinden silindi.
 
 Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regresyon testiyle sabitlendi; test scenic background referansının ve asset dosyasının geri eklenmemesini doğrular. Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.
+
+## 2026-06-05 Dashboard Current Task List Apply
+
+Dashboard Görevler listesi geçmiş görev kalabalığını veri silmeden UI filtre katmanında temizleyecek şekilde güncellendi. Varsayılan görünüm canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change ve tamamlanmış kayıtları gizler; `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak dahil eder.
+
+Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` boş durumu görünür. Davranış `tests/test_dashboard_account_menu_markup.py` markup regresyon testiyle sabitlendi ve dashboard state template kayıtları yeni sözleşmeye hizalandı. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

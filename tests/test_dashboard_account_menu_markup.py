@@ -68,16 +68,21 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
         self.assertIn('id="metricActiveQueue"', html)
         self.assertIn('id="metricWorkers"', html)
 
-    def test_dashboard_task_list_filters_live_tasks_and_keeps_running_first(self):
+    def test_dashboard_task_list_filters_history_tasks_and_keeps_running_first(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
 
         self.assertIn('id="showLiveTasks"', html)
-        self.assertIn("Canlıya alınanları göster", html)
+        self.assertIn("Geçmiş/canlı kayıtları göster", html)
         self.assertIn("function taskIsLive(t)", html)
         self.assertIn("t.deployment_status || t.deploymentStatus || t.delivery_level", html)
+        self.assertIn("function taskIsHistorical(t){ return taskIsLive(t) || taskIsClosed(t); }", html)
         self.assertIn("function taskIsRunning(t){ return taskStatus(t) === 'RUNNING'; }", html)
         self.assertIn("if (taskIsRunning(a) !== taskIsRunning(b))", html)
-        self.assertIn("list = list.filter(t => !taskIsLive(t));", html)
+        self.assertIn("list = list.filter(t => !taskIsHistorical(t));", html)
+        self.assertIn("const visibleBeforeFilters = showLiveTasks.checked ? tasks() : tasks().filter(t => !taskIsHistorical(t));", html)
+        self.assertIn("Güncel görev yok.", html)
+        self.assertIn("Filtreye uyan görev yok.", html)
+        self.assertIn('class="empty-state"', html)
         self.assertIn("list.sort(compareTasks);", html)
         self.assertIn("function setFilterOptions(selectEl, defaultLabel, values)", html)
         self.assertIn("selectEl.dataset.optionsHtml !== html", html)

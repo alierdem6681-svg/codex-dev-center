@@ -154,3 +154,7 @@ Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz
 ## 16. Dashboard Nötr Arka Plan Kuralı
 
 Ana dashboard arayüzü doğa/manzara bitmap arka planı kullanmaz. Panel kabuğu nötr solid arka planla kalmalı, scenic asset referansı regression test ile engellenmelidir.
+
+## 17. Dashboard Güncel Görev Listesi Kuralı
+
+Ana dashboard görev listesi varsayılan olarak geçmiş/canlı/kapalı kayıtları veri silmeden UI katmanında gizlemeli ve yalnızca güncel görev bağlamını göstermelidir. Kullanıcı `Geçmiş/canlı kayıtları göster` seçeneğiyle bu kayıtları geçici olarak dahil edebilir. Güncel görev yoksa boş durum açıkça `Güncel görev yok.` olarak görünmelidir.

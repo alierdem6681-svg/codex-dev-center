@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:55:20+00:00",
+  "updated_at": "2026-06-05T13:32:16+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
@@ -8,7 +8,10 @@
     "background_style": "solid_neutral",
     "background_image_enabled": false,
     "background_image_asset": null,
-    "auth_mode": "username_password"
+    "auth_mode": "username_password",
+    "task_list_hides_history_by_default": true,
+    "task_list_history_toggle_enabled": true,
+    "task_list_empty_state": "Güncel görev yok."
   },
   "panel_auth": {
     "mode": "username_password",

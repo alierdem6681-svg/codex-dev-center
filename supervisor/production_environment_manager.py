@@ -563,7 +563,7 @@ def smoke_test(scope: str = "production") -> dict[str, Any]:
     labels = [
         "Pipeline Flow",
         "Görevler",
-        "Canlıya alınanları göster",
+        "Geçmiş/canlı kayıtları göster",
         "Çıkış",
     ]
     checks = {
