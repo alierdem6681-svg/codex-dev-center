@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:05:40+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -154,7 +154,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Ön canlı, test kapıları, GitHub Actions manuel canlı yayına alma ve geri alma denetleyicisi.",
+      "description": "Ön canlı, wrapper kaynaklı staging health/smoke, test kapıları, GitHub Actions manuel canlı yayına alma ve geri alma denetleyicisi.",
       "actions": [
         "production_readiness_suite",
         "staging_deploy",

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:05:40+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -159,7 +159,7 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/production_environment_manager.py health-check --scope staging",
+      "command": "scripts/staging_health_check.sh",
       "wrapper": "scripts/staging_health_check.sh",
       "supports_check_modes": [
         "read_only",
@@ -175,7 +175,7 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false,
-      "command": "{python} supervisor/production_environment_manager.py smoke-test --scope staging",
+      "command": "scripts/staging_smoke_test.sh",
       "wrapper": "scripts/staging_smoke_test.sh",
       "supports_check_modes": [
         "read_only",

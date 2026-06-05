@@ -38,8 +38,8 @@ DEFAULT_COMMANDS = {
     "CODEX_STAGING_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py staging-deploy",
     "CODEX_PRODUCTION_DEPLOY_COMMAND": "{python} supervisor/production_environment_manager.py production-deploy",
     "CODEX_ROLLBACK_COMMAND": "{python} supervisor/production_environment_manager.py rollback",
-    "CODEX_STAGING_HEALTH_CHECK_COMMAND": "{python} supervisor/production_environment_manager.py health-check --scope staging",
-    "CODEX_STAGING_SMOKE_TEST_COMMAND": "{python} supervisor/production_environment_manager.py smoke-test --scope staging",
+    "CODEX_STAGING_HEALTH_CHECK_COMMAND": "scripts/staging_health_check.sh",
+    "CODEX_STAGING_SMOKE_TEST_COMMAND": "scripts/staging_smoke_test.sh",
 }
 
 
