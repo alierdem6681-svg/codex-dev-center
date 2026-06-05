@@ -411,3 +411,13 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Direct CTO Background ACK Idempotency Apply
+
+Production readiness analizi devamında Direct CTO async ACK akışı idempotent hale getirildi. `supervisor/telegram_direct_cto.py` Telegram `update_id` değerinden `telegram_update:{id}` correlation id üretir ve ACK metadata'sını `state/direct_cto_ack_index.json` altında tutar.
+
+Aynı update tekrar işlenirse ikinci async job veya ikinci ACK bildirimi üretilmez. ACK kaydı raw mesaj içermez; `chat_id_hash`, `raw_message_sha256`, `worker_id=direct-cto`, task/job id, route, `ack_created_at`, `ack_sent_at`, `send_count` ve `content_logged=false` alanlarıyla sınırlıdır.
+
+Davranış `tests/test_runtime_status_model.py` içinde `TelegramAsyncRoutingTest.test_handle_message_async_ack_is_idempotent_by_update_id` ile sabitlendi. Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapılmadı.
+
+Commit/PR bu sandbox içinde tamamlanamadı: lokal `.git/index.lock` read-only filesystem nedeniyle yazılamadı ve GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` döndürdü.

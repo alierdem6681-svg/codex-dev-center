@@ -21,7 +21,7 @@ try:
         is_memory_os_followup_text,
         is_memory_os_request as memory_os_request,
     )
-    from .task_status_constants import read_json as read_state_json, redact_sensitive_text
+    from .task_status_constants import atomic_write_json, read_json as read_state_json, redact_sensitive_text
     from .telegram_asset_intake import (
         asset_event_to_task_message,
         classify_telegram_message,
@@ -38,7 +38,7 @@ except ImportError:
             is_memory_os_followup_text,
             is_memory_os_request as memory_os_request,
         )
-        from task_status_constants import read_json as read_state_json, redact_sensitive_text
+        from task_status_constants import atomic_write_json, read_json as read_state_json, redact_sensitive_text
         from telegram_asset_intake import (
             asset_event_to_task_message,
             classify_telegram_message,
@@ -56,6 +56,9 @@ except ImportError:
             except Exception:
                 return default
             return default
+        def atomic_write_json(path, data):
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         def redact_sensitive_text(value):
             return str(value or "")
         def memory_os_conversation_key(source="", requested_by="", conversation_id=""):
@@ -83,6 +86,8 @@ OFFSET_FILE = STATE / "telegram_direct_cto_offset.txt"
 PASSTHROUGH_AUDIT = LOGS / "direct_cto_passthrough.ndjson"
 FAILURE_LOG = LOGS / "direct_cto_failures.log"
 CONTINUATION_STATE = STATE / "direct_cto_continuations.json"
+ACK_INDEX = STATE / "direct_cto_ack_index.json"
+ACK_WORKER_ID = "direct-cto"
 ARCHIVE_REVIEW_JOB_ID = "CTO-ARCHIVE-REVIEW-20260604-0753"
 ARCHIVE_REVIEW_CONTINUATION_KEY = "archive_review_20260604_0753"
 ARCHIVE_REVIEW_TASKS = [
@@ -209,6 +214,92 @@ def audit_passthrough(chat_id, from_user, raw_text, cto_input_text, route):
     }
     with PASSTHROUGH_AUDIT.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    return record
+
+def ack_correlation_id(update_id):
+    if update_id is None:
+        return ""
+    text = str(update_id).strip()
+    return f"telegram_update:{text}" if text else ""
+
+def read_ack_index():
+    payload = read_state_json(ACK_INDEX, {"schema_version": 1, "acks": {}})
+    if not isinstance(payload, dict):
+        return {"schema_version": 1, "acks": {}}
+    acks = payload.get("acks")
+    if not isinstance(acks, dict):
+        payload["acks"] = {}
+    payload.setdefault("schema_version", 1)
+    return payload
+
+def write_ack_index(payload):
+    payload = dict(payload or {})
+    payload.setdefault("schema_version", 1)
+    acks = payload.get("acks")
+    if not isinstance(acks, dict):
+        acks = {}
+    # Keep the runtime index bounded; values contain hashes/metadata only.
+    if len(acks) > 500:
+        ordered = sorted(
+            acks.items(),
+            key=lambda item: str(item[1].get("ack_sent_at") or item[1].get("ack_created_at") or ""),
+        )
+        acks = dict(ordered[-500:])
+    payload["acks"] = acks
+    atomic_write_json(ACK_INDEX, payload)
+
+def reserve_background_ack(update_id, chat_id, text, route, task_id=None):
+    correlation_id = ack_correlation_id(update_id)
+    if not correlation_id:
+        return {"duplicate": False, "correlation_id": "", "record": {}}
+
+    payload = read_ack_index()
+    existing = payload["acks"].get(correlation_id)
+    if isinstance(existing, dict) and existing.get("ack_sent_at"):
+        return {"duplicate": True, "correlation_id": correlation_id, "record": existing}
+
+    record = {
+        "schema_version": 1,
+        "correlation_id": correlation_id,
+        "worker_id": ACK_WORKER_ID,
+        "task_id": str(task_id or ""),
+        "job_id": "",
+        "route": str(route or ""),
+        "ack_status": "reserved",
+        "ack_created_at": now(),
+        "ack_sent_at": None,
+        "send_count": 0,
+        "chat_id_hash": sha256_text(chat_id)[:16],
+        "raw_message_sha256": sha256_text(text),
+        "content_logged": False,
+    }
+    payload["acks"][correlation_id] = record
+    write_ack_index(payload)
+    return {"duplicate": False, "correlation_id": correlation_id, "record": record}
+
+def mark_background_ack_sent(correlation_id, job_id, route, task_id=None):
+    if not correlation_id:
+        return {}
+    payload = read_ack_index()
+    record = payload["acks"].get(correlation_id)
+    if not isinstance(record, dict):
+        record = {"schema_version": 1, "correlation_id": correlation_id, "worker_id": ACK_WORKER_ID}
+    if record.get("ack_sent_at"):
+        return record
+    record.update(
+        {
+            "worker_id": ACK_WORKER_ID,
+            "task_id": str(task_id or job_id or record.get("task_id") or ""),
+            "job_id": str(job_id or record.get("job_id") or ""),
+            "route": str(route or record.get("route") or ""),
+            "ack_status": "sent",
+            "ack_sent_at": now(),
+            "send_count": int(record.get("send_count") or 0) + 1,
+            "content_logged": False,
+        }
+    )
+    payload["acks"][correlation_id] = record
+    write_ack_index(payload)
     return record
 
 def log_failure(run_id, returncode, raw_err, raw_out=""):
@@ -1112,12 +1203,16 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
 
     if wants_summary_before_new_tasks(safe_text):
         audit_passthrough(chat_id, from_user, text, safe_text, "summary_before_task_creation")
+        ack = reserve_background_ack(update_id, chat_id, safe_text, "summary_before_task_creation")
+        if ack["duplicate"]:
+            return
         job_id = start_async_job(chat_id, safe_text)
         send_message(
             token,
             chat_id,
             f"Önce kısa özeti hazırlıyorum; yeni görev açmayacağım. Job: {job_id}.",
         )
+        mark_background_ack_sent(ack["correlation_id"], job_id, "summary_before_task_creation")
         return
 
     if is_non_task_information_or_preference(safe_text):
@@ -1145,6 +1240,10 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
     # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
     if followup_action_text or is_action_command(text):
         action_text = followup_action_text or safe_text
+        audit_route = "followup_action_context" if followup_action_text else "action_command"
+        ack = reserve_background_ack(update_id, chat_id, action_text, audit_route)
+        if ack["duplicate"]:
+            return
         router_task_id = None
         if submit_task is not None:
             routed = submit_task(
@@ -1159,14 +1258,17 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
                 worker_eligible=False,
             )
             router_task_id = routed.get("task", {}).get("id")
-        audit_route = "followup_action_context" if followup_action_text else "action_command"
         audit_passthrough(chat_id, from_user, text, action_text, audit_route)
         job_id = start_async_job(chat_id, action_text, router_task_id=router_task_id, action_command=True)
         send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")
+        mark_background_ack_sent(ack["correlation_id"], job_id, audit_route, task_id=router_task_id)
         return
 
     # Uzun görevlerde Telegram yanıtını bloklama; CTO işi arka planda sürdürür.
     if is_long_task_message(text):
+        ack = reserve_background_ack(update_id, chat_id, safe_text, "long_task_async")
+        if ack["duplicate"]:
+            return
         router_task_id = None
         if submit_task is not None:
             routed = submit_task(
@@ -1185,6 +1287,7 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
                 trigger_lifecycle(APP)
         job_id = start_async_job(chat_id, safe_text, router_task_id=router_task_id)
         send_message(token, chat_id, f"Başladım. Kısa bir ilk kontrol yapıp arkada sürdürüyorum. Job: {job_id}.")
+        mark_background_ack_sent(ack["correlation_id"], job_id, "long_task_async", task_id=router_task_id)
         return
 
     local_reply = local_natural_reply(safe_text)
@@ -1194,8 +1297,12 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
         return
 
     # Lokal/deterministik cevap gerektirmeyen her CTO/Codex işi async yürür.
+    ack = reserve_background_ack(update_id, chat_id, safe_text, "async_job")
+    if ack["duplicate"]:
+        return
     job_id = start_async_job(chat_id, safe_text)
     send_message(token, chat_id, f"Aldım. CTO işi arkada çalışıyor; hazır olunca güvenli özet göndereceğim. Job: {job_id}.")
+    mark_background_ack_sent(ack["correlation_id"], job_id, "async_job")
 
 def main():
     STATE.mkdir(parents=True, exist_ok=True)

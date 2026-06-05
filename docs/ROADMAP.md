@@ -358,3 +358,10 @@ Faz 19B-10A Model Policy
 - [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
+
+## Faz 56 - Direct CTO Background ACK Idempotency
+
+- [x] Direct CTO async ACK kaydi Telegram `update_id` correlation id ile tutulur.
+- [x] Aynı update tekrar işlenirse ikinci background job ve ikinci ACK bildirimi üretilmez.
+- [x] ACK kaydı raw mesaj yerine hash/metadata, worker id, task/job id ve timestamp alanlarını taşır.
+- [x] Davranış `TelegramAsyncRoutingTest.test_handle_message_async_ack_is_idempotent_by_update_id` ile sabitlendi.

@@ -166,6 +166,10 @@ Telegram CTO hattına gelen fotoğraf ve doküman mesajları backend tarafında 
 
 Raw `file_id`, raw payload, token, secret, env, header veya private key bilgisi Telegram'a, task mesajına, log'a veya rapora yazılmaz. Dosya indirme, kalıcı saklama, checksum ve malware scan ayrı asset processing aşamasına bırakılır.
 
+## DIRECT CTO BACKGROUND ACK IDEMPOTENCY V1
+
+Direct CTO async job ACK akışı Telegram `update_id` korelasyonunu hash/metadata olarak kaydeder. Aynı update tekrar işlenirse ikinci arka plan job veya ikinci ACK bildirimi üretilmez; raw mesaj, token, secret/env/private key veya teknik çıktı ACK kaydına yazılmaz.
+
 ## WORKER DISPATCH CONTRACT V1
 
 Queue task normalizasyonu dispatch izlenebilirligi icin `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarini tamamlar. Worker claim akisi task'i RUNNING yaparken `worker_id` ve `claimed_at` yazar. Terminal statuslar yeniden worker-eligible sayilmaz.

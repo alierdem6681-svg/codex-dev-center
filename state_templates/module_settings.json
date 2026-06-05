@@ -111,6 +111,11 @@
     "asset_intake_raw_payload_logged": false,
     "asset_intake_max_file_bytes": 20971520,
     "asset_intake_caption_max_chars": 1024,
+    "direct_cto_async_ack_idempotency": true,
+    "direct_cto_ack_index": "state/direct_cto_ack_index.json",
+    "direct_cto_ack_correlation_source": "telegram_update_id",
+    "direct_cto_ack_duplicate_notification_allowed": false,
+    "direct_cto_ack_content_logged": false,
     "asset_intake_allowed_document_mime_types": [
       "application/pdf",
       "image/jpeg",

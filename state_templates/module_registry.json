@@ -99,11 +99,12 @@
       "settings_enabled": true,
       "actions_enabled": false,
       "dashboard_visible": true,
-      "description": "Raw input passthrough, non-mutating output guard ve dosya indirmeden güvenli asset intake metadata sınıflandırması ile Telegram bağlantısı.",
+      "description": "Raw input passthrough, non-mutating output guard, async ACK idempotency ve dosya indirmeden güvenli asset intake metadata sınıflandırması ile Telegram bağlantısı.",
       "actions": [
         "connect_telegram",
         "test_telegram",
         "classify_telegram_asset_intake",
+        "validate_direct_cto_ack_idempotency",
         "toggle_telegram_notifications"
       ]
     },

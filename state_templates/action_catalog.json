@@ -271,6 +271,20 @@
       ]
     },
     {
+      "id": "validate_direct_cto_ack_idempotency",
+      "label": "Direct CTO Async ACK Idempotency Doğrula",
+      "module": "telegram",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.TelegramAsyncRoutingTest.test_handle_message_async_ack_is_idempotent_by_update_id",
+      "correlation_source": "telegram_update_id",
+      "raw_message_logged": false,
+      "duplicate_ack_notification_allowed": false,
+      "production_deploy_allowed": false
+    },
+    {
       "id": "queue_owner_cleanup",
       "label": "Owner Kuyruk Temizliği",
       "module": "backup_recovery",

@@ -111,13 +111,17 @@ Her geliştirme sonunda HANDOVER.md, ROADMAP.md ve memory/project_memory.md gün
 
 Telegram asset sözleşmeleri gerçek Telegram API'ye fallback yapmadan, secret/env/token/private key değeri okumadan ve runtime state mutasyonu yapmadan test edilir. Asset manifest, limit, checksum, MIME/uzantı ve dashboard hata görünürlüğü redaction kurallarına bağlı kalmalıdır.
 
-## 11. Test Scratch Standardı
+## 11. Direct CTO ACK Idempotency
+
+Direct CTO arka plan işlerinde ACK korelasyonu Telegram `update_id` ile yapılır. Aynı update tekrar işlenirse çift arka plan job veya çift ACK bildirimi üretilmemelidir; ACK kaydı sadece correlation id, worker id, task/job id, timestamp ve hash metadata içerebilir.
+
+## 12. Test Scratch Standardı
 
 Testler ana repo dizinine runtime state, cache, config, log veya output dosyası yazmamalıdır. Test scratch root önceliği `TEST_SCRATCH_ROOT`, `$RUNNER_TEMP/test-scratch`, `$TMPDIR/test-scratch` şeklindedir ve repo içine çözülen scratch root reddedilir.
 
 Her test benzersiz scratch dizini kullanmalı, temp/home/cache/config/output değişkenlerini scratch alanına yönlendirmeli ve allowlist dışı repo mutasyonlarını repo write guard ile fail etmelidir.
 
-## 12. Kontrol Görevleri, Retry ve State Güvenliği
+## 13. Kontrol Görevleri, Retry ve State Güvenliği
 
 Readiness, audit, risk review, test plan ve proposal-only işler feature delivery gibi canlıya alma işi sayılamaz; `Controls / Readiness` hattında izlenir ve repo apply/canlı mutasyon yetkisi varsayılan olarak kapalıdır.
 
@@ -125,7 +129,7 @@ Repo apply boş diff ürettiğinde hedef zaten sağlanmışsa terminal başarıd
 
 State JSON yazımları atomik tmp+fsync+rename akışıyla yapılmalı, kalan tmp dosyaları otomatik doğru state kabul edilmemeli ve audit çıktısı secret değerleri loglamamalıdır.
 
-## 13. Apply, Retry ve Claim Onarımı
+## 14. Apply, Retry ve Claim Onarımı
 
 Repo apply raporları stage plan, diff review, secret scan, local test, rollback note ve production deploy yapılmadı kanıtını ayrı ayrı göstermelidir.
 
@@ -135,7 +139,7 @@ Worker aktif sahipliği olmayan stale dispatch claim'leri yeni kök görev açma
 
 Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı worker state transaction lock altında tutarlı güncellenmelidir. Bir worker aynı anda yalnızca bir aktif `current_task` taşıyabilir; aktif `current_task` varken ikinci task claim edilemez.
 
-## 14. Ön Canlı Readiness Wrapper Kuralı
+## 15. Ön Canlı Readiness Wrapper Kuralı
 
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 

@@ -1880,6 +1880,71 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("JOB-ACK", calls[1][2])
 
+    def test_handle_message_async_ack_is_idempotent_by_update_id(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False):
+            calls.append(("start_async_job", chat_id, router_task_id, action_command))
+            return "JOB-IDEMPOTENT"
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        originals = (
+            telegram_direct_cto.STATE,
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.PASSTHROUGH_AUDIT,
+            telegram_direct_cto.ACK_INDEX,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.run_codex,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            telegram_direct_cto.STATE = root / "state"
+            telegram_direct_cto.LOGS = root / "logs"
+            telegram_direct_cto.PASSTHROUGH_AUDIT = telegram_direct_cto.LOGS / "direct_cto_passthrough.ndjson"
+            telegram_direct_cto.ACK_INDEX = telegram_direct_cto.STATE / "direct_cto_ack_index.json"
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.run_codex = lambda _text: (_ for _ in ()).throw(AssertionError("sync codex not expected"))
+            try:
+                msg = {
+                    "chat": {"id": "123"},
+                    "from": {"username": "tester"},
+                    "text": "Bana sistem mimarisi için kısa bir öneri hazırla.",
+                }
+                telegram_direct_cto.handle_message("TOKEN", "123", msg, update_id=777)
+                telegram_direct_cto.handle_message("TOKEN", "123", msg, update_id=777)
+                ack_payload = json.loads(telegram_direct_cto.ACK_INDEX.read_text(encoding="utf-8"))
+            finally:
+                (
+                    telegram_direct_cto.STATE,
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.PASSTHROUGH_AUDIT,
+                    telegram_direct_cto.ACK_INDEX,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.run_codex,
+                ) = originals
+
+        self.assertEqual([call[0] for call in calls], ["start_async_job", "send_message"])
+        record = ack_payload["acks"]["telegram_update:777"]
+        self.assertEqual(record["worker_id"], "direct-cto")
+        self.assertEqual(record["task_id"], "JOB-IDEMPOTENT")
+        self.assertEqual(record["job_id"], "JOB-IDEMPOTENT")
+        self.assertEqual(record["correlation_id"], "telegram_update:777")
+        self.assertEqual(record["ack_status"], "sent")
+        self.assertEqual(record["send_count"], 1)
+        self.assertIn("ack_created_at", record)
+        self.assertIn("ack_sent_at", record)
+        self.assertFalse(record["content_logged"])
+        self.assertNotIn("text", record)
+
     def test_handle_message_defers_router_when_summary_is_requested_before_new_tasks(self):
         calls = []
 

@@ -99,6 +99,7 @@ Ajan şu klasörleri inceler:
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
 - supervisor/telegram_asset_intake.py Telegram `photo`, `document`, caption ve unsupported medya payload'larını ham dosya indirmeden güvenli metadata event'ine sınıflandırır
 - supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
+- supervisor/telegram_direct_cto.py async arka plan ACK akışında Telegram `update_id` korelasyonunu `state/direct_cto_ack_index.json` altında hash/metadata olarak tutar; aynı update tekrar işlenirse ikinci job veya ikinci ACK bildirimi üretilmez
 - tests/safe_test_scratch.py test runtime dosyalarını repo dışı scratch alanına yönlendirir; `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` önceliği, atomik per-test dizin ve repo write guard sözleşmesini tutar
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py

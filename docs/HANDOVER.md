@@ -1095,3 +1095,27 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Direct CTO Background ACK Idempotency Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-115547 / CTO-TASK-20260605-075359-082238-PRODUCTION-READINESS-ANALIZI
+Worker: worker-1
+
+Eklenenler:
+- `supervisor/telegram_direct_cto.py` async ACK akışı için Telegram `update_id` tabanlı correlation id ve `state/direct_cto_ack_index.json` metadata kaydı ekledi.
+- Aynı update tekrar işlenirse ikinci async job veya ikinci ACK bildirimi üretilmez.
+- ACK kaydı raw mesaj yerine hash, worker id, task/job id, route ve timestamp taşır; `content_logged=false` kalır.
+- `tests/test_runtime_status_model.py` ACK idempotency regresyon testiyle genişletildi.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m py_compile supervisor/telegram_direct_cto.py supervisor/telegram_direct_cto_simulator.py supervisor/progress_aware_runner.py supervisor/retry_policy.py tests/test_runtime_status_model.py` PASS.
+- `python3 -m unittest tests.test_runtime_status_model.TelegramAsyncRoutingTest.test_handle_message_starts_async_job_and_sends_ack_without_sync_codex tests.test_runtime_status_model.TelegramAsyncRoutingTest.test_handle_message_async_ack_is_idempotent_by_update_id tests.test_runtime_status_model.ProgressAwareRunnerTest tests.test_runtime_status_model.WorkerStatusModelTest.test_retry_policy_schedules_same_task_with_idempotency_key` PASS, 7 test.
+
+Not:
+- Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+- Commit/PR tamamlanamadı: lokal `.git/index.lock` yazımı read-only filesystem nedeniyle başarısız oldu; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` döndürdü.
