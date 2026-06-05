@@ -212,6 +212,12 @@ Repo apply no-change sonucu terminal basaridir. `supervisor/repo_apply_outcome.p
 
 Readiness, audit, risk review, test plan ve proposal-only isler `Controls / Readiness` lane'ine gider. Worker workspace preflight tanisi secret degeri loglamadan `bootstrap_diagnostics.json` uretir. Timeout ve usage-limit retry kararlari ayni task uzerinde idempotency key ile raporlanir. Atomic JSON state audit tmp dosyalarini otomatik guvenilir saymadan state parse edilebilirligini raporlar.
 
+## WORKER BOOTSTRAP PREFLIGHT CONTRACT V1
+
+`supervisor/worker_bootstrap.py` workspace yazilabilirligi ve `.codex/config` tanisina ek olarak repo checkout, local `.git/` metadata, test yuzeyi ve `rg`/`find` arac fallback durumunu structured `bootstrap_diagnostics.json` icinde raporlar.
+
+Repo apply akisi izole clone olusturduktan sonra `require_git_repo=True`, `require_local_git_metadata=True` ve `require_test_surface=True` preflight kapisindan gecmelidir. Eksik veya gecersiz repo checkout `repo_checkout_missing` / `repo_checkout_invalid`; test yuzeyi yoklugu `no_test_surface` olarak fail olur. Bu sozlesme secret/env/token/private key degeri okumaz, production deploy yapmaz ve runtime state mutate etmez.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.

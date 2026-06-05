@@ -256,6 +256,14 @@ Fixture setleri `tests/fixtures/telegram_asset_manifest/` altinda tutulur ve `te
 
 Bu paket production deploy, staging deploy, canli Telegram API cagrisi, runtime storage mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi. Repo worktree icinde runtime `state/` dizini yoktu ve olusturulmadi.
 
+## 2026-06-05 Worker Bootstrap Pipeline Preflight Apply
+
+Pipeline eksik analizi apply paketi worker bootstrap readiness sinyalini sertlestirdi. `worker_bootstrap.bootstrap_preflight()` artik workspace yazilabilirligi ve config tanisina ek olarak repo checkout, local `.git/` metadata, test yuzeyi ve `rg`/`find` fallback durumunu structured check olarak raporlar.
+
+Repo apply clone akisi izole clone sonrasinda `require_git_repo=True`, `require_local_git_metadata=True` ve `require_test_surface=True` preflight kapisindan gecer. Eksik repo checkout `repo_checkout_missing`, eksik test yuzeyi `no_test_surface` reason code'u ile fail olur. Davranis hedefli runtime status unit testleriyle sabitlendi.
+
+Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
 ## 2026-06-04 Dashboard Pipeline Expand State Tests Apply
 
 Dashboard Pipeline Flow ana gorevleri artik expand/collapse tercihini `main_task_code` / `root_task_id` anahtariyla ayni sayfa oturumunda korur. Polling, stage refresh veya `renderPipelineFlow()` yeniden cizimi kullanicinin kapattigi aktif ana gorevi otomatik tekrar acmaz.

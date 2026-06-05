@@ -258,7 +258,26 @@ Test:
 Not:
 - Production deploy calistirilmadi.
 - Bu sandbox'ta git worktree metadata yolu read-only oldugu icin commit/PR olusturma adimi calistirilamadi.
-- Runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+---
+
+## 2026-06-05 Worker Bootstrap Pipeline Preflight Apply
+
+Görev: CTO-APPLY-20260605-115547 / CTO-TASK-20260605-075405-769907-PIPELINE-EKSIK-ANALIZI
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/worker_bootstrap.py` repo checkout, local `.git/` metadata, test yüzeyi ve `rg`/`find` fallback durumunu structured `bootstrap_diagnostics.json` check alanlarında raporlar.
+- Repo apply clone akışı izole clone sonrası `require_git_repo=True`, `require_local_git_metadata=True` ve `require_test_surface=True` preflight kapısından geçer.
+- Eksik repo checkout `repo_checkout_missing`, eksik test yüzeyi `no_test_surface` reason code'u ile fail olur.
+- Worker module registry/settings/action template kayıtları ve onboarding/anayasa/AGENTS/roadmap/memory dokümantasyonu güncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_required_missing_config tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_repo_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_test_surface_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Local commit/PR adımı tamamlanamadı; bu izole clone’da `.git/index.lock` oluşturma işlemi read-only filesystem hatası verdi.
 
 ---
 

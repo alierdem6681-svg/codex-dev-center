@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T12:02:10+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -99,6 +99,12 @@
     "stale_claim_timeout_seconds": 1800,
     "stale_claim_requires_no_active_worker_ownership": true,
     "bootstrap_preflight_enabled": true,
+    "bootstrap_preflight_reports_tool_fallback": true,
+    "bootstrap_preflight_repo_checkout_check": true,
+    "bootstrap_preflight_test_surface_check": true,
+    "repo_apply_requires_bootstrap_preflight": true,
+    "repo_apply_requires_local_git_metadata": true,
+    "repo_apply_requires_test_surface": true,
     "repo_apply_no_change_terminal_outcome": true
   },
   "telegram": {

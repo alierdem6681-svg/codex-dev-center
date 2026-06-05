@@ -358,3 +358,11 @@ Faz 19B-10A Model Policy
 - [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
+
+## Faz 56 - Worker Bootstrap Pipeline Preflight
+
+- [x] `worker_bootstrap.bootstrap_preflight()` repo checkout, local `.git/` metadata, test yüzeyi ve `rg`/`find` fallback durumunu structured checks olarak raporlar.
+- [x] Repo apply clone akışı `require_git_repo`, `require_local_git_metadata` ve `require_test_surface` sıkı preflight kapısına bağlandı.
+- [x] Eksik repo checkout `repo_checkout_missing`, eksik test yüzeyi `no_test_surface` reason code'u ile fail olur.
+- [x] Davranış `tests/test_runtime_status_model.py` içindeki hedefli worker bootstrap unit testleriyle sabitlendi.
+- [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

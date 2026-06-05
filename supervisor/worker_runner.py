@@ -892,6 +892,35 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
         )
         return TASK_STATUS_FAILED_RETRYABLE, "git_repo_clone_create_failed", str(report_path), metadata
 
+    control_dir.mkdir(parents=True, exist_ok=True)
+    bootstrap = bootstrap_preflight(
+        worktree,
+        require_git_repo=True,
+        require_local_git_metadata=True,
+        require_test_surface=True,
+    )
+    bootstrap_report = write_bootstrap_diagnostics(control_dir, bootstrap)
+    if not bootstrap["ok"] and not bootstrap.get("diagnostic_only"):
+        metadata = {
+            "git_fetch": fetch,
+            "git_clone": clone_result,
+            "bootstrap_preflight": bootstrap,
+            "bootstrap_diagnostics": str(bootstrap_report),
+            "production_deployed": False,
+            "repo_applied": False,
+            "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
+            "validation_status": "NOT_READY",
+            "pipeline_status": "NOT_RUN",
+        }
+        report_path.write_text(
+            "# WORKER REPO APPLY REPORT\n\n"
+            f"Tarih: {now()}\nWorker: {worker_id}\nTask: {task_id}\nSonuç: FAILED_RETRYABLE\n"
+            f"Neden: repo apply bootstrap preflight başarısız: {bootstrap['status']}\n"
+            f"Diagnostics: {bootstrap_report}\n",
+            encoding="utf-8",
+        )
+        return TASK_STATUS_FAILED_RETRYABLE, "repo_apply_bootstrap_preflight_failed", str(report_path), metadata
+
     evidence = proposal_evidence_excerpt(task)
     prompt = f"""
 Sen Codex Dev Center apply worker'ısın.
@@ -929,7 +958,6 @@ Beklenen çıktı:
 - Final yanıtta değişen dosyaları, testleri ve riski kısa Türkçe özetle.
 """.strip()
 
-    control_dir.mkdir(parents=True, exist_ok=True)
     prompt_file = control_dir / "WORKER_APPLY_PROMPT.txt"
     out_file = control_dir / "codex.apply.out"
     err_file = control_dir / "codex.apply.err"
@@ -1096,6 +1124,8 @@ Beklenen çıktı:
         "unsafe_files": unsafe_files,
         "git_fetch": fetch,
         "git_clone": clone_result,
+        "bootstrap_preflight": bootstrap,
+        "bootstrap_diagnostics": str(bootstrap_report),
         "repo_git_metadata_local": repo_apply_git_metadata_is_local(worktree),
         "secret_scan_findings": secret_findings,
         "codex_return_code": returncode,
