@@ -1158,7 +1158,32 @@ Test:
 Not:
 - Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
-- Commit/PR tamamlanamadı: `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector mevcut, ancak yerel commit/tree üretilemediği ve büyük dosya değişiklikleri tam içerik/blob akışı gerektirdiği için güvenli PR açılamadı.
+
+---
+
+## Dashboard Current Task List Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-132818 / CTO-TASK-20260605-075400-123336-DASHBOARD-GÖREV-LISTESI-DÜZENI
+Worker: worker-2
+
+Eklenenler:
+- `web_panel/static/index.html` Görevler listesini varsayılan olarak güncel görev bağlamına indirdi; canlı, kapalı, arşivlenmiş, iptal edilmiş, no-change ve tamamlanmış geçmiş kayıtlar UI filtre katmanında gizlenir.
+- `Geçmiş/canlı kayıtları göster` checkbox'ı gizlenen geçmiş/canlı kayıtları geçici olarak listeye dahil eder; veri silme yapılmaz.
+- Hiç güncel görev yoksa masaüstü tablo ve mobil kart görünümünde `Güncel görev yok.` boş durumu gösterilir.
+- Dashboard markup regresyon testi ve dashboard module/action/settings template kayıtları yeni sözleşmeye hizalandı.
+
+Test:
+- `python3 -m unittest tests.test_dashboard_account_menu_markup tests.test_runtime_status_model.ProductionReadinessSuiteScanTest.test_dashboard_route_api_accepts_current_dashboard_shell tests.test_runtime_status_model.ProductionReadinessSuiteScanTest.test_smoke_test_writes_are_skipped_in_dry_run_check_mode tests.test_runtime_status_model.SystemRepairControlsTest.test_environment_manager_smoke_accepts_current_dashboard_labels` PASS.
+- `python3 -m compileall -q supervisor web_panel tests` PASS.
+- JSON validation (`state_templates/dashboard_settings.json`, `module_registry.json`, `module_settings.json`, `action_catalog.json`) PASS.
+- `git diff --check` PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazımları read-only modda `write-skipped`.
+- `python3 -m unittest discover -s tests` bu sandbox'ta default `/opt/codex-dev-center/state/task_queue.json.lock` read-only hatasına takıldı; `/tmp` runtime root denemesi ise mevcut runtime-fixture bağımlı testlerde kapsam dışı fail verdi.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 
 ---
 

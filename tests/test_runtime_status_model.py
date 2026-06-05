@@ -2361,7 +2361,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                   <span>Aktif Kuyruk</span>
                   <span>Canlı İşler</span>
                   <span>Kapalı Kayıt</span>
-                  <button>Canlıya alınanları göster</button>
+                  <button>Geçmiş/canlı kayıtları göster</button>
                   <script>
                     const stages = {
                       intake: 'Alım',
@@ -2634,7 +2634,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 return {
                     "ok": True,
                     "status": 200,
-                    "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
+                    "body": "Pipeline Flow Görevler Geçmiş/canlı kayıtları göster Çıkış",
                 }
 
             with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}), \
@@ -6209,7 +6209,7 @@ class SystemRepairControlsTest(unittest.TestCase):
             }
             production_environment_manager.http_text = lambda port, path: {
                 "ok": True,
-                "body": "Pipeline Flow Görevler Canlıya alınanları göster Çıkış",
+                "body": "Pipeline Flow Görevler Geçmiş/canlı kayıtları göster Çıkış",
             }
             try:
                 payload = production_environment_manager.smoke_test("production")

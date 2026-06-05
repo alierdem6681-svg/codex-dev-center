@@ -160,6 +160,10 @@ Ana ve legacy panel `/api/pipeline-flow` payload'u task statuslarini pipeline st
 
 Ana dashboard shell doğa/manzara bitmap arka planı kullanmaz. `web_panel/static/index.html` nötr solid arka plan kullanmalı; `/assets/dashboard-landscape.png` veya benzeri scenic background referansı geri eklenirse markup regresyon testi fail olmalıdır.
 
+## DASHBOARD CURRENT TASK LIST V1
+
+Ana dashboard `Görevler` listesi varsayılan olarak yalnızca güncel/aktif görev bağlamını göstermelidir. Canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change veya tamamlanmış geçmiş kayıtlar UI filtre katmanında gizlenir; veri silinmez. `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak listeye dahil eder. Hiç güncel görev yoksa boş durum `Güncel görev yok.` olarak gösterilir.
+
 ## TELEGRAM ASSET SAFETY CONTRACT V1
 
 `supervisor/telegram_asset_safety.py` Telegram asset kabulu icin manifest, limit, checksum, MIME/uzanti, secret redaction, simulator ve dashboard-safe snapshot sozlesmesini test eder. Bu kontrat gercek Telegram API'ye fallback yapmaz, asset indirmez, runtime state/log/report mutate etmez ve production deploy yetkisi vermez.

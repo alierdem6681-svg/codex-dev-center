@@ -270,7 +270,7 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Pipeline Flow",
         "Görevler",
         "Workers",
-        "Canlıya alınanları göster",
+        "Geçmiş/canlı kayıtları göster",
         "Alım",
         "Kuyruk",
         "Worker",

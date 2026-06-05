@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:55:20+00:00",
+  "updated_at": "2026-06-05T13:32:16+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -30,7 +30,10 @@
     "quality_gate_view_contract_version": 1,
     "show_controlled_execution_status": true,
     "show_pipeline_flow": true,
-    "show_memory_os_status": true
+    "show_memory_os_status": true,
+    "task_list_hides_history_by_default": true,
+    "task_list_history_toggle_enabled": true,
+    "task_list_empty_state": "Güncel görev yok."
   },
   "quality_gate_view": {
     "enabled": true,

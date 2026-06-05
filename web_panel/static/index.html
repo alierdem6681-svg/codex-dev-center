@@ -428,6 +428,11 @@
         padding: 18px;
       }
       .desktop-table { overflow-x: auto; }
+      .empty-state {
+        color: var(--muted);
+        text-align: center;
+      }
+      td.empty-state { padding: 18px 8px; }
       .dashboard-grid { display: grid; gap: 16px; }
       @media (max-width: 1220px) {
         .dashboard-shell { grid-template-columns: 206px minmax(0, 1fr); }
@@ -599,7 +604,7 @@
                   </select>
                   <label class="control-check" for="showLiveTasks">
                     <input id="showLiveTasks" type="checkbox">
-                    Canlıya alınanları göster
+                    Geçmiş/canlı kayıtları göster
                   </label>
                 </div>
                 <div id="tasksTable" class="desktop-table"></div>
@@ -750,9 +755,10 @@
       function workers(){ return ((latest.workers || {}).workers || []).slice(); }
       function taskIsClosed(t){
         const status = taskStatus(t);
-        return ['DONE','FINAL_REPORTED','CANCELLED','CANCELED','ARCHIVED','CLOSED'].includes(status)
+        return ['DONE','COMPLETED','FINAL_REPORTED','FINAL_RECONCILED','CANCELLED','CANCELED','CANCELLED_BY_OWNER_CLEANUP','CANCELED_BY_OWNER_CLEANUP','ARCHIVED','ARCHIVED_STALE','CLOSED','NO_CHANGE','SKIPPED','SUPERSEDED'].includes(status)
           || ['CLOSED','CANCELLED','CANCELED','ARCHIVED'].includes(foldedText(t.pipeline_status || t.lifecycle_status));
       }
+      function taskIsHistorical(t){ return taskIsLive(t) || taskIsClosed(t); }
       function workerIsAvailable(w){
         const status = foldedText(w.status || w.state || w.active);
         const serviceActive = foldedText(w.service_active || w.active);
@@ -843,7 +849,7 @@
       }
       function filteredTasks(){
         let list = tasks();
-        if (!showLiveTasks.checked) list = list.filter(t => !taskIsLive(t));
+        if (!showLiveTasks.checked) list = list.filter(t => !taskIsHistorical(t));
         const q = search.value.toLowerCase();
         list = list.filter(t => {
           const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
@@ -855,12 +861,21 @@
         list.sort(compareTasks);
         return list;
       }
+      function taskEmptyMessage(){
+        const visibleBeforeFilters = showLiveTasks.checked ? tasks() : tasks().filter(t => !taskIsHistorical(t));
+        return visibleBeforeFilters.length ? 'Filtreye uyan görev yok.' : 'Güncel görev yok.';
+      }
       function renderTasks(){
         const list = filteredTasks();
+        const emptyMessage = taskEmptyMessage();
         tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody>${
-          list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
+          list.length
+            ? list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
+            : `<tr><td class="empty-state" colspan="4">${esc(emptyMessage)}</td></tr>`
         }</tbody></table>`;
-        tasksCards.innerHTML = list.map(t => `<div class="item"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('');
+        tasksCards.innerHTML = list.length
+          ? list.map(t => `<div class="item"><strong>${esc(t.title || t.id)}</strong><br>${badge(t.status)} ${badge(t.risk || t.risk_level || '-')}<br><span class="muted">${esc(t.assigned_worker || 'Çalışan yok')}</span></div>`).join('')
+          : `<div class="item empty-state">${esc(emptyMessage)}</div>`;
       }
       function renderMemoryOs(data){
         const memory = data?.memory_os || {};

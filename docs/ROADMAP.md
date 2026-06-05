@@ -197,7 +197,9 @@ Faz 19B-10A Model Policy
 - [x] Gorevler listesi deterministik comparator ile siralanir.
 - [x] `RUNNING` / `Calisiyor` gorevleri listenin ustunde kalir.
 - [x] Canliya alinmis gorevler varsayilan ana listeden gizlenir.
-- [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
+- [x] `Gecmis/canli kayitlari goster` checkbox'i gecmis ve canli gorevleri listeye dahil eder.
+- [x] Kapali/tamamlanmis/iptal/arsiv/no-change gecmis gorevler varsayilan listeden UI katmaninda gizlenir.
+- [x] Guncel gorev yoksa `Guncel gorev yok.` bos durumu gosterilir.
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
 
