@@ -193,6 +193,19 @@
     ],
     "telegram_parent_tasks_worker_eligible": false,
     "worker_subtasks_source": "cto",
+    "memory_os_domain_intent_enabled": true,
+    "memory_os_pipeline_lane": "Memory OS Delivery",
+    "memory_os_followup_context_preserved": true,
+    "memory_os_reference_pattern": "CTO-MEMORY-OS-*",
+    "memory_os_followup_commands": [
+      "devam",
+      "baslat",
+      "onay",
+      "canliya_al"
+    ],
+    "memory_os_routes_to_production_readiness": false,
+    "memory_os_routes_to_general_dispatch": false,
+    "memory_os_root_task_chain_required": true,
     "audit_log": "logs/cto_audit.ndjson",
     "doctor_status_file": "state/cto_doctor_status.json",
     "router_state_file": "state/cto_router_state.json"

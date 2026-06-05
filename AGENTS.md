@@ -212,6 +212,12 @@ Repo apply no-change sonucu terminal basaridir. `supervisor/repo_apply_outcome.p
 
 Readiness, audit, risk review, test plan ve proposal-only isler `Controls / Readiness` lane'ine gider. Worker workspace preflight tanisi secret degeri loglamadan `bootstrap_diagnostics.json` uretir. Timeout ve usage-limit retry kararlari ayni task uzerinde idempotency key ile raporlanir. Atomic JSON state audit tmp dosyalarini otomatik guvenilir saymadan state parse edilebilirligini raporlar.
 
+## MEMORY OS INTENT CONTRACT V1
+
+Memory OS istekleri `intent_domain=memory_os` ve `pipeline_lane=Memory OS Delivery` olarak siniflandirilir; Production Readiness veya genel görev dağıtımı fallback'ine düşmemelidir.
+
+`CTO-MEMORY-OS-*` referansları, `devam`, `başlat/baslat`, `onay` ve `canlıya al/canliya al` takip mesajları aynı Memory OS root task zincirinde korunur. Bu sözleşme production deploy başlatmaz; canlıya alma hedefi sadece pipeline/finalizer gate'lerine aktarılır.
+
 ## CONTROLLED APPLY PIPELINE V1
 
 Validated proposal apply worker'lari sadece izole git worktree ve worker branch uzerinde calisir. Repo apply degisiklikleri PR oncesi exact path allowlist, blocked runtime/secret path kontrolu, secret scan ve local pipeline kapilarindan gecmelidir.

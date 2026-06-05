@@ -291,6 +291,36 @@ class WorkerStatusModelTest(unittest.TestCase):
             )
         )
 
+    def test_memory_os_router_followup_keeps_reference_root_chain(self):
+        message = (
+            "Önceki Memory OS bağlamı:\n"
+            "CTO-MEMORY-OS-20260603-RO için Memory OS modülünü hazırla.\n\n"
+            "Kullanıcı takip komutu:\n"
+            "onaylıyorum devam, canlıya al"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            result = cto_task_router.submit_task(
+                root=Path(tmp),
+                source="telegram",
+                title="Memory OS Modülü",
+                message=message,
+                risk="medium",
+                requested_by="tester",
+                split=None,
+            )
+            router_state = json.loads((Path(tmp) / "state" / "cto_router_state.json").read_text())
+
+        task = result["task"]
+        self.assertEqual(task["task_class"], "feature_task")
+        self.assertEqual(task["delivery_mode"], "feature_delivery")
+        self.assertEqual(task["pipeline_lane"], "Memory OS Delivery")
+        self.assertEqual(task["intent_domain"], "memory_os")
+        self.assertEqual(task["root_task_id"], "CTO-MEMORY-OS-20260603-RO")
+        self.assertEqual(task["memory_os_reference"], "CTO-MEMORY-OS-20260603-RO")
+        self.assertTrue(task["context_chain_preserved"])
+        self.assertTrue(task["production_deploy_target_preserved"])
+        self.assertEqual(router_state["last_memory_os_root_task_id"], "CTO-MEMORY-OS-20260603-RO")
+
     def test_infrastructure_access_router_is_control_lane_not_dashboard_cleanup(self):
         message = "Dashboard SSL/HTTPS erişimini düzeltelim, domain ve sertifika kontrolü gerekebilir."
         route = cto_task_router.classify_task_route(message)
@@ -1704,6 +1734,21 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertTrue(all(task.get("execution_mode") == "repo_apply" for task in tasks))
         self.assertTrue(all(task.get("delivery_level") == "REPO_APPLY_QUEUED" for task in tasks))
 
+    def test_action_mode_memory_os_tasks_share_root_chain_and_reference(self):
+        tasks = direct_cto_action_mode.build_backlog(
+            "CTO-MEMORY-OS-20260603-RO için onaylıyorum devam, canlıya al.",
+            "20260605-TEST",
+        )
+
+        root_ids = {task.get("root_task_id") for task in tasks}
+        self.assertEqual(root_ids, {tasks[0]["id"]})
+        self.assertTrue(all(task.get("intent_domain") == "memory_os" for task in tasks))
+        self.assertTrue(all(task.get("pipeline_lane") == "Memory OS Delivery" for task in tasks))
+        self.assertTrue(all(task.get("context_chain_preserved") is True for task in tasks))
+        self.assertTrue(all(task.get("memory_os_reference") == "CTO-MEMORY-OS-20260603-RO" for task in tasks))
+        self.assertTrue(all(task.get("production_deploy_target_preserved") is True for task in tasks))
+        self.assertEqual(tasks[1]["parent_task_id"], tasks[0]["id"])
+
     def test_action_mode_pure_deploy_command_still_waits_for_gates(self):
         reply = direct_cto_action_mode.run_action_mode("canlıya al")
 
@@ -1922,6 +1967,117 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertIn("Önceki Telegram geliştirme talebi", started[2])
         self.assertEqual(started[3], "TASK-FOLLOWUP")
         self.assertTrue(started[4])
+
+    def test_handle_message_uses_previous_memory_os_context_for_deploy_followup(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False):
+            calls.append(("start_async_job", chat_id, text, router_task_id, action_command))
+            return "JOB-MEMORY"
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        def fake_submit_task(root, source, title, message, **kwargs):
+            calls.append(("submit_task", source, title, message, kwargs))
+            return {"task": {"id": "TASK-MEMORY"}}
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+            telegram_direct_cto.submit_task,
+            telegram_direct_cto.latest_archive_review_summary_available,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            log_dir = Path(tmp)
+            telegram_direct_cto.LOGS = log_dir
+            (log_dir / "direct_cto_inbox.ndjson").write_text(
+                json.dumps(
+                    {
+                        "received_at": "2026-06-05T05:13:14+00:00",
+                        "chat_id": "123",
+                        "from_user": "tester",
+                        "text": "CTO-MEMORY-OS-20260603-RO Memory OS modülünü hazırla ve CTO'ya bağla.",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            telegram_direct_cto.submit_task = fake_submit_task
+            telegram_direct_cto.latest_archive_review_summary_available = lambda: True
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "onaylıyorum devam, canlıya al",
+                    },
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                    telegram_direct_cto.submit_task,
+                    telegram_direct_cto.latest_archive_review_summary_available,
+                ) = originals
+
+        submit = next(call for call in calls if call[0] == "submit_task")
+        started = next(call for call in calls if call[0] == "start_async_job")
+        self.assertEqual(submit[2], "Memory OS Modülü")
+        self.assertIn("Önceki Memory OS bağlamı", submit[3])
+        self.assertIn("CTO-MEMORY-OS-20260603-RO", submit[3])
+        self.assertIn("Domain intent: memory_os", submit[3])
+        self.assertIn("Memory OS Delivery", submit[3])
+        self.assertEqual(started[3], "TASK-MEMORY")
+        self.assertTrue(started[4])
+        self.assertIn("onaylıyorum devam", started[2])
+
+    def test_memory_os_followup_does_not_cross_newer_non_memory_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log_dir = Path(tmp)
+            (log_dir / "direct_cto_inbox.ndjson").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "received_at": "2026-06-05T05:10:00+00:00",
+                                "chat_id": "123",
+                                "text": "CTO-MEMORY-OS-20260603-RO Memory OS modülünü hazırla.",
+                            },
+                            ensure_ascii=False,
+                        ),
+                        json.dumps(
+                            {
+                                "received_at": "2026-06-05T05:11:00+00:00",
+                                "chat_id": "123",
+                                "text": "Dashboard pipeline flow görünümünü düzeltelim.",
+                            },
+                            ensure_ascii=False,
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            resolved = telegram_direct_cto.resolve_memory_os_followup_action_text(
+                "123",
+                "canlıya al",
+                log_dir=log_dir,
+            )
+
+        self.assertEqual(resolved, "")
 
     def test_archive_review_continuation_is_idempotent(self):
         calls = []

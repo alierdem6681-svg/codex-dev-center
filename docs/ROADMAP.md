@@ -358,3 +358,10 @@ Faz 19B-10A Model Policy
 - [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
+
+## Faz 56 - Memory OS Intent Contract
+
+- [x] Memory OS istekleri `intent_domain=memory_os` ve `Memory OS Delivery` lane'i ile Production Readiness/genel dispatch fallback'inden ayrildi.
+- [x] `CTO-MEMORY-OS-*` referansi, devam/baslat/onay takip mesajlari ve canliya alma hedefi ayni root task zincirinde korunacak sekilde router/action mode metadata'sina eklendi.
+- [x] Telegram Direct CTO takip mesajlari son Memory OS baglamini onceleyerek action async job'a ayni domain intent ile aktarir.
+- [x] Regresyon testleri router, action mode ve Telegram handler davranisini sabitledi.

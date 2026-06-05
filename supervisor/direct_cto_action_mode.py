@@ -7,8 +7,24 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 try:
+    from .memory_os_intent import (
+        MEMORY_OS_INTENT_DOMAIN,
+        MEMORY_OS_PIPELINE_LANE,
+        extract_memory_os_reference,
+        find_memory_os_root_task_id,
+        is_memory_os_deploy_target,
+        is_memory_os_request as memory_os_intent_request,
+    )
     from .task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
 except ImportError:
+    from memory_os_intent import (
+        MEMORY_OS_INTENT_DOMAIN,
+        MEMORY_OS_PIPELINE_LANE,
+        extract_memory_os_reference,
+        find_memory_os_root_task_id,
+        is_memory_os_deploy_target,
+        is_memory_os_request as memory_os_intent_request,
+    )
     from task_status_constants import TASK_STATUS_PENDING, normalize_queue_payload
 
 APP = Path("/opt/codex-dev-center")
@@ -110,20 +126,7 @@ def normalize_turkish(value):
 
 
 def wants_memory_os(text):
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return memory_os_intent_request(text)
 
 
 def is_pure_deploy_command(text):
@@ -273,6 +276,39 @@ def observed_issue_backlog(run_id, implementation=False):
         for idx, (slug, title, description, worker) in enumerate(items, 1)
     ]
 
+
+def apply_memory_os_intent_metadata(tasks, raw_text, existing_tasks=None):
+    if not tasks:
+        return tasks
+    reference = extract_memory_os_reference(raw_text)
+    existing_root = find_memory_os_root_task_id(existing_tasks or [], reference)
+    root_task_id = existing_root or str(tasks[0].get("id") or "").strip()
+    deploy_target = is_memory_os_deploy_target(raw_text)
+    for index, task in enumerate(tasks):
+        task.update(
+            {
+                "root_task_id": root_task_id,
+                "intent_domain": MEMORY_OS_INTENT_DOMAIN,
+                "pipeline_lane": MEMORY_OS_PIPELINE_LANE,
+                "task_class": "feature_task",
+                "delivery_mode": "feature_delivery",
+                "memory_os_reference": reference,
+                "intent_reference": reference,
+                "context_chain_preserved": True,
+                "production_deploy_target_preserved": deploy_target,
+                "followup_intent_supported": [
+                    "devam",
+                    "baslat",
+                    "onay",
+                    "canliya_al",
+                ],
+            }
+        )
+        if index > 0:
+            task["parent_task_id"] = root_task_id
+    return tasks
+
+
 def build_backlog(raw_text, run_id):
     text = (raw_text or "").lower()
     tasks = []
@@ -316,7 +352,7 @@ def build_backlog(raw_text, run_id):
                 implementation=implementation,
             ),
         ]
-        return tasks
+        return apply_memory_os_intent_metadata(tasks, raw_text)
 
     telegram_asset_requested = "telegram" in text and any(x in text for x in [
         "asset", "dosya", "resim", "fotoğraf", "fotograf", "doküman", "dokuman",
@@ -497,6 +533,8 @@ def run_action_mode(raw_text):
     tasks = queue.setdefault("tasks", [])
 
     backlog = build_backlog(raw_text, run_id)
+    if wants_memory_os(raw_text):
+        backlog = apply_memory_os_intent_metadata(backlog, raw_text, existing_tasks=tasks)
 
     for task in backlog:
         tasks.append(task)

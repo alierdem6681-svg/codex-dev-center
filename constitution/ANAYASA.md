@@ -125,7 +125,13 @@ Repo apply boş diff ürettiğinde hedef zaten sağlanmışsa terminal başarıd
 
 State JSON yazımları atomik tmp+fsync+rename akışıyla yapılmalı, kalan tmp dosyaları otomatik doğru state kabul edilmemeli ve audit çıktısı secret değerleri loglamamalıdır.
 
-## 13. Apply, Retry ve Claim Onarımı
+## 13. Memory OS Intent Kuralı
+
+Memory OS kapsamındaki istekler `memory_os` domain intent olarak sınıflandırılır ve `Memory OS Delivery` hattında tutulur. `CTO-MEMORY-OS-*` referansı taşıyan işler, devam/başlat/onay takip mesajları ve canlıya alma hedefi Production Readiness veya genel görev dağıtımı fallback'ine düşmeden aynı root task zincirinde korunmalıdır.
+
+Bu kural production deploy izni vermez; canlıya alma hedefi yalnızca PR/merge/pipeline/finalizer kapıları tamamlandığında GitHub Actions manuel production gate akışına taşınabilir.
+
+## 14. Apply, Retry ve Claim Onarımı
 
 Repo apply raporları stage plan, diff review, secret scan, local test, rollback note ve production deploy yapılmadı kanıtını ayrı ayrı göstermelidir.
 
@@ -135,7 +141,7 @@ Worker aktif sahipliği olmayan stale dispatch claim'leri yeni kök görev açma
 
 Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı worker state transaction lock altında tutarlı güncellenmelidir. Bir worker aynı anda yalnızca bir aktif `current_task` taşıyabilir; aktif `current_task` varken ikinci task claim edilemez.
 
-## 14. Ön Canlı Readiness Wrapper Kuralı
+## 15. Ön Canlı Readiness Wrapper Kuralı
 
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 

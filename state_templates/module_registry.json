@@ -350,10 +350,11 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini ve dispatch contract metadata alanlarini normalize eder.",
+      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini, dispatch contract metadata alanlarini ve Memory OS domain intent/root-chain sozlesmesini normalize eder.",
       "actions": [
         "cto_doctor_check",
-        "cto_doctor_fix"
+        "cto_doctor_fix",
+        "classify_memory_os_intent"
       ]
     },
     {

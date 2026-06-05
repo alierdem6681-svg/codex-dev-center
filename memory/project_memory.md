@@ -408,6 +408,10 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 
 `web_panel/quality_gate_view.py` rapordaki `Generated at` tarihini production readiness policy `updated_at` tarihiyle karsilastirir ve policy `required_gates` listesini rapor gate satirlariyla eslestirir. Eski rapor `UNKNOWN` ve `freshness=stale` olur; eksik gate'ler `missing_required_gate` reason code'u ve `missing_required_gates` listesiyle gorunur.
 
-Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
+## 2026-06-05 Memory OS Intent Contract Apply
 
-Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+Memory OS isteklerinin Production Readiness veya genel görev dağıtımına düşmemesi için domain intent kontratı eklendi. `supervisor/memory_os_intent.py` ortak helper olarak `CTO-MEMORY-OS-*` referansını, Memory OS marker'larını, takip komutlarını ve canlıya alma hedefini sınıflandırır.
+
+`cto_task_router`, `direct_cto_action_mode` ve `telegram_direct_cto` artık Memory OS kapsamını `intent_domain=memory_os`, `pipeline_lane=Memory OS Delivery` ve aynı root task zinciri metadata'sı ile taşır. Son Memory OS bağlamı varsa `devam`, `başlat/baslat`, `onay` ve `canlıya al/canliya al` takip mesajları yeni root çoğaltmadan Memory OS action context'ine bağlanır. Production deploy yapılmadı; canlıya alma hedefi sadece pipeline/finalizer kapılarına aktarılır.
+
+Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.

@@ -14,6 +14,11 @@ from pathlib import Path
 try:
     from .critical_operation_policy import critical_operation_findings
     from .cto_task_router import submit_task, trigger_lifecycle
+    from .memory_os_intent import (
+        build_memory_os_followup_text,
+        is_memory_os_followup_command,
+        is_memory_os_request as memory_os_intent_request,
+    )
     from .task_status_constants import read_json as read_state_json, redact_sensitive_text
     from .telegram_asset_intake import (
         asset_event_to_task_message,
@@ -24,6 +29,11 @@ except ImportError:
     try:
         from critical_operation_policy import critical_operation_findings
         from cto_task_router import submit_task, trigger_lifecycle
+        from memory_os_intent import (
+            build_memory_os_followup_text,
+            is_memory_os_followup_command,
+            is_memory_os_request as memory_os_intent_request,
+        )
         from task_status_constants import read_json as read_state_json, redact_sensitive_text
         from telegram_asset_intake import (
             asset_event_to_task_message,
@@ -35,6 +45,12 @@ except ImportError:
             return []
         submit_task = None
         trigger_lifecycle = None
+        def memory_os_intent_request(value):
+            return "memory os" in str(value or "").lower() or "cto-memory-os" in str(value or "").lower()
+        def is_memory_os_followup_command(value):
+            return str(value or "").strip().lower() in {"devam", "basla", "başla", "baslat", "başlat"}
+        def build_memory_os_followup_text(context, followup):
+            return (str(context or "") + "\n" + str(followup or "")).strip()
         def read_state_json(path, default):
             try:
                 if Path(path).exists():
@@ -455,20 +471,7 @@ def normalize_turkish(value):
 
 
 def is_memory_os_request(text):
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return memory_os_intent_request(text)
 
 
 def is_infrastructure_access_request(text):
@@ -492,6 +495,8 @@ def is_infrastructure_access_request(text):
 
 def is_action_command(text):
     lowered = (text or "").lower()
+    if is_memory_os_followup_command(text) and is_memory_os_request(text):
+        return True
     action_words = [
         "başlat", "baslat", "uygula", "workerlara dağıt", "workerlara dagit",
         "pipeline kur", "pipeline'ı kur", "pipeline’i kur", "pipeline başlat",
@@ -564,6 +569,41 @@ def latest_actionable_context(chat_id, current_text, log_dir=None):
             continue
         if is_actionable_context_candidate(candidate):
             return candidate
+    return ""
+
+
+def latest_memory_os_context(chat_id, current_text, log_dir=None):
+    log_dir = Path(log_dir) if log_dir is not None else LOGS
+    inbox = log_dir / "direct_cto_inbox.ndjson"
+    try:
+        lines = inbox.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return ""
+    for line in reversed(lines[-160:]):
+        try:
+            payload = json.loads(line)
+        except Exception:
+            continue
+        if str(payload.get("chat_id", "")) != str(chat_id):
+            continue
+        candidate = redact_sensitive_text(payload.get("text", ""))
+        if not candidate.strip() or candidate.strip() == (current_text or "").strip():
+            continue
+        if is_memory_os_request(candidate):
+            return candidate
+        if is_actionable_context_candidate(candidate):
+            return ""
+    return ""
+
+
+def resolve_memory_os_followup_action_text(chat_id, text, log_dir=None):
+    if not is_memory_os_followup_command(text):
+        return ""
+    context = latest_memory_os_context(chat_id, text, log_dir=log_dir)
+    if context:
+        return build_memory_os_followup_text(context, text)
+    if is_memory_os_request(text):
+        return build_memory_os_followup_text("", text)
     return ""
 
 
@@ -974,7 +1014,10 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
         )
         return
 
-    if is_continue_command(safe_text) and latest_archive_review_summary_available():
+    memory_followup_action_text = resolve_memory_os_followup_action_text(chat_id, safe_text)
+    memory_os_followup = bool(memory_followup_action_text)
+
+    if not memory_os_followup and is_continue_command(safe_text) and latest_archive_review_summary_available():
         result = queue_archive_review_continuation(from_user)
         audit_passthrough(chat_id, from_user, text, safe_text, "archive_review_continuation")
         if result.get("ok"):
@@ -988,7 +1031,7 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
             send_message(token, chat_id, "Devam komutunu aldım ama router şu an hazır değil; teknik hata olarak ele alıyorum.")
         return
 
-    followup_action_text = resolve_followup_action_text(chat_id, safe_text)
+    followup_action_text = memory_followup_action_text or resolve_followup_action_text(chat_id, safe_text)
 
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
     # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
@@ -1007,7 +1050,12 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
                 worker_eligible=False,
             )
             router_task_id = routed.get("task", {}).get("id")
-        audit_route = "followup_action_context" if followup_action_text else "action_command"
+        if memory_os_followup:
+            audit_route = "memory_os_followup_action_context"
+        elif followup_action_text:
+            audit_route = "followup_action_context"
+        else:
+            audit_route = "action_command"
         audit_passthrough(chat_id, from_user, text, action_text, audit_route)
         job_id = start_async_job(chat_id, action_text, router_task_id=router_task_id, action_command=True)
         send_message(token, chat_id, f"Başladım. İşi kuyruğa aldım ve arkada sürdürüyorum. Job: {job_id}. İlk ilerleme birazdan gelecek.")

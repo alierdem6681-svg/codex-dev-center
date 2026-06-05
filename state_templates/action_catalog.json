@@ -254,6 +254,26 @@
       "stale_claim_terminal_status": "FAILED_TIMEOUT"
     },
     {
+      "id": "classify_memory_os_intent",
+      "label": "Memory OS Intent Sınıflandır",
+      "module": "cto_router",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "intent_domain": "memory_os",
+      "pipeline_lane": "Memory OS Delivery",
+      "preserves_root_task_chain": true,
+      "preserves_followup_commands": [
+        "devam",
+        "baslat",
+        "onay",
+        "canliya_al"
+      ],
+      "routes_to_production_readiness": false,
+      "routes_to_general_dispatch": false
+    },
+    {
       "id": "classify_telegram_asset_intake",
       "label": "Telegram Asset Intake Sınıflandır",
       "module": "telegram",

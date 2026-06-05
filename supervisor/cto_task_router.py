@@ -10,6 +10,14 @@ from typing import Any
 
 try:
     from .critical_operation_policy import critical_operation_findings
+    from .memory_os_intent import (
+        MEMORY_OS_INTENT_DOMAIN,
+        MEMORY_OS_PIPELINE_LANE,
+        extract_memory_os_reference,
+        find_memory_os_root_task_id,
+        is_memory_os_deploy_target,
+        is_memory_os_request as memory_os_intent_request,
+    )
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_DONE,
@@ -28,6 +36,14 @@ try:
     )
 except ImportError:
     from critical_operation_policy import critical_operation_findings
+    from memory_os_intent import (
+        MEMORY_OS_INTENT_DOMAIN,
+        MEMORY_OS_PIPELINE_LANE,
+        extract_memory_os_reference,
+        find_memory_os_root_task_id,
+        is_memory_os_deploy_target,
+        is_memory_os_request as memory_os_intent_request,
+    )
     from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_DONE,
@@ -103,20 +119,7 @@ def normalize_turkish(value: str) -> str:
 
 
 def is_memory_os_request(text: str) -> bool:
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return memory_os_intent_request(text)
 
 
 def is_infrastructure_access_change(text: str) -> bool:
@@ -181,9 +184,9 @@ def classify_task_route(text: str) -> dict[str, Any]:
             "task_class": "feature_task",
             "control_type": "",
             "delivery_mode": "feature_delivery",
-            "pipeline_lane": "Memory OS Delivery",
+            "pipeline_lane": MEMORY_OS_PIPELINE_LANE,
             "explicit_delivery_signal": True,
-            "intent_domain": "memory_os",
+            "intent_domain": MEMORY_OS_INTENT_DOMAIN,
         }
     if is_infrastructure_access_change(text):
         return {
@@ -343,6 +346,8 @@ def submit_task(
     effective_risk = classify_risk(f"{title}\n{message}", risk)
     stored_message = redact_sensitive_text(message)
     route = classify_task_route(f"{title}\n{message}")
+    parent_id = next_id("CTO-TASK", title)
+    memory_reference = extract_memory_os_reference(f"{title}\n{message}")
     if worker_eligible is None:
         worker_eligible = source != "telegram" and effective_risk not in {"high", "critical"}
     if effective_risk in {"high", "critical"}:
@@ -351,10 +356,17 @@ def submit_task(
     with state_file_lock(qpath):
         queue = read_json(qpath, {"tasks": []})
         tasks = queue.setdefault("tasks", [])
+        memory_root_task_id = ""
+        if route.get("intent_domain") == MEMORY_OS_INTENT_DOMAIN:
+            memory_root_task_id = (
+                find_memory_os_root_task_id(tasks, memory_reference)
+                or memory_reference
+                or parent_id
+            )
 
         parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
         parent = {
-            "id": next_id("CTO-TASK", title),
+            "id": parent_id,
             "title": title,
             "description": stored_message,
             "raw_message": stored_message,
@@ -378,6 +390,24 @@ def submit_task(
             "pipeline_lane": route["pipeline_lane"],
             "intent_domain": route.get("intent_domain", ""),
         }
+        if route.get("intent_domain") == MEMORY_OS_INTENT_DOMAIN:
+            parent.update(
+                {
+                    "root_task_id": memory_root_task_id,
+                    "memory_os_reference": memory_reference,
+                    "intent_reference": memory_reference,
+                    "context_chain_preserved": True,
+                    "followup_intent_supported": [
+                        "devam",
+                        "baslat",
+                        "onay",
+                        "canliya_al",
+                    ],
+                    "production_deploy_target_preserved": is_memory_os_deploy_target(
+                        f"{title}\n{message}"
+                    ),
+                }
+            )
         if route["task_class"] == "control_task":
             parent["repo_apply_allowed"] = False
             parent["production_deployed"] = False
@@ -405,10 +435,20 @@ def submit_task(
             "last_subtask_count": len(created_subtasks),
             "last_task_class": route["task_class"],
             "last_control_type": route["control_type"],
+            "last_intent_domain": route.get("intent_domain", ""),
             "queue_normalization_changes": len(changes),
             "updated_at": utc_now(),
         }
     )
+    if route.get("intent_domain") == MEMORY_OS_INTENT_DOMAIN:
+        state.update(
+            {
+                "last_memory_os_task_id": parent["id"],
+                "last_memory_os_root_task_id": parent.get("root_task_id"),
+                "last_memory_os_reference": memory_reference,
+                "last_memory_os_context_chain_preserved": True,
+            }
+        )
     atomic_write_json(router_state_path(root), state)
     append_audit(
         root,

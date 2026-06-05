@@ -99,6 +99,7 @@ Ajan şu klasörleri inceler:
 - supervisor/telegram_asset_manifest.py Telegram asset manifest v1 kontratını network kullanmadan doğrular; 20 MB limit, SHA-256, MIME/storage metadata ve forbidden raw/file URL/sensitive field kontrollerini sabitler
 - supervisor/telegram_asset_intake.py Telegram `photo`, `document`, caption ve unsupported medya payload'larını ham dosya indirmeden güvenli metadata event'ine sınıflandırır
 - supervisor/telegram_direct_cto.py yetkili chat'ten gelen asset medya mesajlarını `Telegram Asset Intake` routed task'ına çevirir; raw `file_id` veya raw payload loglamaz
+- supervisor/memory_os_intent.py Memory OS domain intent sözleşmesini tutar; `CTO-MEMORY-OS-*` referansı ve devam/başlat/onay/canlıya al takip mesajları `Memory OS Delivery` root task zincirinde korunmalı, Production Readiness veya genel görev dağıtımı fallback'ine düşmemelidir
 - tests/safe_test_scratch.py test runtime dosyalarını repo dışı scratch alanına yönlendirir; `TEST_SCRATCH_ROOT`, `RUNNER_TEMP/test-scratch`, `TMPDIR/test-scratch` önceliği, atomik per-test dizin ve repo write guard sözleşmesini tutar
 - supervisor/production_deploy_controller.py
 - supervisor/github_safe_flow.py
@@ -192,6 +193,11 @@ Observed issue completion notu:
 - `worker_runner.repo_apply_stage_plan_lines()` apply control report icinde stage plan, diff review, secret scan, local test, rollback ve production deploy kapisini gorunur yapar.
 - `codex_quality_gate` retry simulation raporu `safety_status`, `safety_reasons` ve `required_false_flags` dry-run safety alanlarini uretir.
 - `supervisor_cli.reconcile_stale_dispatch_claims()` aktif worker sahipligi olmayan stale claim'leri yeni kok gorev acmadan ayni task uzerinde retry/timeout statüsüne taşır.
+
+Memory OS intent notu:
+- `cto_task_router.classify_task_route()` Memory OS isteklerini `intent_domain=memory_os`, `pipeline_lane=Memory OS Delivery` olarak sınıflandırır.
+- Direct CTO takip mesajlarında son Memory OS bağlamı bulunursa `devam`, `başlat/baslat`, `onay` ve `canlıya al/canliya al` komutları aynı root task zincirine bağlanır.
+- Bu görünürlük production deploy başlatmaz; canlıya alma hedefi PR/pipeline/finalizer kapılarına bırakılır.
 
 ## Servis Keşfi
 

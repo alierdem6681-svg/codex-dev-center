@@ -1095,3 +1095,25 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Memory OS Intent Contract Apply
+
+Tarih: 2026-06-05
+Görev: CTO-ACTION-20260605-052521-01-MEMORY-OS-INTENT-CONTRACT
+Worker: worker-1
+
+Eklenenler:
+- `supervisor/memory_os_intent.py` Memory OS domain intent helper'i eklendi.
+- `supervisor/cto_task_router.py` Memory OS isteklerini `intent_domain=memory_os`, `pipeline_lane=Memory OS Delivery` ve root task chain metadata'siyle sınıflandırır.
+- `supervisor/direct_cto_action_mode.py` Memory OS backlog/apply task'larını aynı root task zincirinde tutar ve `CTO-MEMORY-OS-*` referansını metadata olarak taşır.
+- `supervisor/telegram_direct_cto.py` son Memory OS bağlamı varsa devam/başlat/onay/canlıya al takip mesajlarını Production Readiness veya genel dispatch yerine Memory OS action context'ine bağlar.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json`, `state_templates/action_catalog.json`, onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- Router/action mode/Telegram handler regresyonları `tests/test_runtime_status_model.py` içine eklendi.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları güncellendi.
