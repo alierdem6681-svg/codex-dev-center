@@ -20,6 +20,7 @@ SESSION_SECRET_FILE = STATE / "panel_session_secret.txt"
 COOKIE_NAME = "codex_panel_session"
 PBKDF2_ITERATIONS = 260000
 SESSION_TTL_SECONDS = int(os.environ.get("CODEX_PANEL_SESSION_TTL_SECONDS", str(12 * 60 * 60)))
+AUTH_MODE = "disabled"
 
 
 def now() -> str:
@@ -88,13 +89,11 @@ def verify_password(password: str, password_record: dict[str, Any]) -> bool:
 
 
 def auth_config() -> dict[str, Any]:
-    ensure_env_user()
-    return read_json(AUTH_FILE, {})
+    return {}
 
 
 def auth_configured() -> bool:
-    config = auth_config()
-    return bool(config.get("username") and config.get("password"))
+    return False
 
 
 def safe_username(value: str) -> str:
@@ -116,50 +115,15 @@ def validate_password(value: str) -> str:
 
 
 def setup_user(username: str, password: str) -> dict[str, Any]:
-    if AUTH_FILE.exists():
-        raise ValueError("auth_already_configured")
-    username = safe_username(username)
-    password = validate_password(password)
-    payload = {
-        "auth_mode": "username_password",
-        "username": username,
-        "password": hash_password(password),
-        "created_at": now(),
-        "password_source": "setup",
-    }
-    atomic_write_json(AUTH_FILE, payload)
-    return public_auth_state(username=username)
+    return public_auth_state()
 
 
 def ensure_env_user() -> None:
-    if AUTH_FILE.exists():
-        return
-    username = os.environ.get("CODEX_PANEL_USERNAME", "").strip()
-    password = os.environ.get("CODEX_PANEL_PASSWORD", "")
-    if not username or not password:
-        return
-    username = safe_username(username)
-    password = validate_password(password)
-    atomic_write_json(
-        AUTH_FILE,
-        {
-            "auth_mode": "username_password",
-            "username": username,
-            "password": hash_password(password),
-            "created_at": now(),
-            "password_source": "environment",
-        },
-    )
+    return None
 
 
 def verify_credentials(username: str, password: str) -> bool:
-    config = auth_config()
-    expected_user = str(config.get("username", ""))
-    if not expected_user:
-        return False
-    if not hmac.compare_digest(username.strip(), expected_user):
-        return False
-    return verify_password(password, config.get("password", {}))
+    return False
 
 
 def sign_payload(payload: dict[str, Any]) -> str:
@@ -169,6 +133,8 @@ def sign_payload(payload: dict[str, Any]) -> str:
 
 
 def verify_session(value: str) -> dict[str, Any] | None:
+    if AUTH_MODE == "disabled":
+        return None
     if not value or "." not in value:
         return None
     body, sig = value.rsplit(".", 1)
@@ -197,6 +163,8 @@ def make_session(username: str) -> str:
 
 
 def automation_cookie_header() -> str:
+    if AUTH_MODE == "disabled":
+        return ""
     return f"{COOKIE_NAME}={make_session('__automation__')}"
 
 
@@ -210,6 +178,8 @@ def parse_cookie(header: str) -> dict[str, str]:
 
 
 def user_from_cookie(header: str) -> str | None:
+    if AUTH_MODE == "disabled":
+        return "__public_dashboard__"
     value = parse_cookie(header).get(COOKIE_NAME, "")
     session = verify_session(value)
     if not session:
@@ -218,6 +188,8 @@ def user_from_cookie(header: str) -> str | None:
 
 
 def session_cookie_header(username: str) -> str:
+    if AUTH_MODE == "disabled":
+        return clear_cookie_header()
     return f"{COOKIE_NAME}={make_session(username)}; Path=/; HttpOnly; SameSite=Lax"
 
 
@@ -226,11 +198,12 @@ def clear_cookie_header() -> str:
 
 
 def public_auth_state(username: str | None = None) -> dict[str, Any]:
-    config = read_json(AUTH_FILE, {})
     return {
-        "auth_mode": "username_password",
-        "configured": bool((username or config.get("username")) and config.get("password", True)),
-        "username": username or config.get("username"),
+        "auth_mode": AUTH_MODE,
+        "configured": False,
+        "username": None,
         "token_login_enabled": False,
+        "direct_access_enabled": True,
+        "user_setup_required": False,
         "remote_setup_allowed": os.environ.get("CODEX_PANEL_ALLOW_REMOTE_SETUP", "") == "1",
     }

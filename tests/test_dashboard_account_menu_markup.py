@@ -6,17 +6,45 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DashboardAccountMenuMarkupTest(unittest.TestCase):
-    def test_dashboard_account_menu_uses_auth_state_and_logout_endpoint(self):
+    def test_dashboard_direct_access_has_no_account_menu_or_logout(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
 
-        self.assertIn('id="accountMenuButton"', html)
-        self.assertIn('aria-haspopup="true"', html)
-        self.assertIn('aria-controls="accountMenuPanel"', html)
-        self.assertIn('role="menu"', html)
-        self.assertGreaterEqual(html.count('role="menuitem"'), 1)
-        self.assertIn("data?.auth?.username", html)
-        self.assertIn("'/api/auth/logout'", html)
-        self.assertIn("event.key === 'Escape'", html)
+        self.assertNotIn('id="accountMenu"', html)
+        self.assertNotIn('id="accountMenuButton"', html)
+        self.assertNotIn('aria-controls="accountMenuPanel"', html)
+        self.assertNotIn("data?.auth?.username", html)
+        self.assertNotIn("'/api/auth/logout'", html)
+        self.assertNotIn("location.href = '/login'", html)
+        self.assertNotIn("Çıkış", html)
+
+    def test_dashboard_login_compat_page_redirects_without_credentials(self):
+        html = (ROOT / "web_panel" / "static" / "login.html").read_text(encoding="utf-8")
+
+        self.assertIn("Dashboard açılıyor", html)
+        self.assertIn("Panel doğrudan açılır", html)
+        self.assertIn("location.replace('/')", html)
+        self.assertNotIn("Kullanıcı adı", html)
+        self.assertNotIn("Şifre", html)
+        self.assertNotIn("/api/auth/login", html)
+
+    def test_panel_server_direct_access_does_not_require_session_cookie(self):
+        server = (ROOT / "web_panel" / "panel_server.py").read_text(encoding="utf-8")
+
+        self.assertIn("def authorized", server)
+        self.assertIn("return True", server)
+        self.assertIn('{"Location": "/"}', server)
+        self.assertNotIn('"error": "unauthorized"', server)
+        self.assertNotIn('{"Location": "/login"}', server)
+
+    def test_panel_server_public_post_surface_is_read_only(self):
+        server = (ROOT / "web_panel" / "panel_server.py").read_text(encoding="utf-8")
+
+        self.assertIn('"error": "dashboard_direct_access_read_only"', server)
+        self.assertIn('"production_deploy_allowed": False', server)
+        self.assertIn('"critical_operations_allowed": False', server)
+        self.assertNotIn('action == "production_deploy_start"', server)
+        self.assertNotIn('action == "cto_doctor_fix"', server)
+        self.assertNotIn('action == "staging_deploy"', server)
 
     def test_dashboard_cleanup_removes_operational_sections(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")

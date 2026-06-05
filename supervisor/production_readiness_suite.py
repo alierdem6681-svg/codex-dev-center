@@ -280,13 +280,24 @@ def dashboard_test(results: dict[str, Any]) -> None:
         "Hata",
         "Kapalı",
         "Canlı",
-        "Çıkış",
     ]
     missing = [item for item in required_text if item not in index]
     login = (ROOT / "web_panel/static/login.html").read_text(encoding="utf-8", errors="replace")
-    login_required = ["Kullanıcı adı", "Şifre", "Giriş Yap", "İlk kullanıcıyı oluştur"]
+    login_required = ["Dashboard açılıyor", "Panel doğrudan açılır"]
     login_missing = [item for item in login_required if item not in login]
-    record(results, "dashboard_route_api_test", not missing and not login_missing, {"missing_text": missing, "login_missing_text": login_missing})
+    server = (ROOT / "web_panel/panel_server.py").read_text(encoding="utf-8", errors="replace")
+    server_required = [
+        "dashboard_direct_access_read_only",
+        '"production_deploy_allowed": False',
+        '"critical_operations_allowed": False',
+    ]
+    server_missing = [item for item in server_required if item not in server]
+    record(
+        results,
+        "dashboard_route_api_test",
+        not missing and not login_missing and not server_missing,
+        {"missing_text": missing, "login_missing_text": login_missing, "server_missing_text": server_missing},
+    )
 
 
 def memory_os_dashboard_contract(results: dict[str, Any]) -> None:

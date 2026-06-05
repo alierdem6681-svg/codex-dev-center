@@ -8,18 +8,20 @@
     "background_style": "solid_neutral",
     "background_image_enabled": false,
     "background_image_asset": null,
-    "auth_mode": "username_password",
+    "auth_mode": "disabled",
+    "direct_access_enabled": true,
     "task_list_hides_history_by_default": true,
     "task_list_history_toggle_enabled": true,
     "task_list_empty_state": "Güncel görev yok."
   },
   "panel_auth": {
-    "mode": "username_password",
+    "mode": "disabled",
+    "enabled": false,
     "token_login_enabled": false,
     "session_cookie_name": "codex_panel_session",
-    "password_hash": "pbkdf2_sha256",
+    "password_hash": null,
     "remote_first_setup_enabled": false,
-    "runtime_state_file": "state/panel_auth.json"
+    "runtime_state_file": null
   },
   "production": {
     "automatic_production_enabled": true,

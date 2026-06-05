@@ -2382,7 +2382,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 """
                 <title>Codex Dev Center Yönetim Paneli</title>
                 <div>Görevler, pipeline flow ve güvenli panel yönetimi</div>
-                <nav>Pipeline Flow Görevler Workers Çıkış</nav>
+                <nav>Pipeline Flow Görevler Workers</nav>
                 <main>
                   <span>Aktif Kuyruk</span>
                   <span>Canlı İşler</span>
@@ -2406,7 +2406,19 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (static / "login.html").write_text(
-                "Kullanıcı adı Şifre Giriş Yap İlk kullanıcıyı oluştur",
+                "Dashboard açılıyor Panel doğrudan açılır",
+                encoding="utf-8",
+            )
+            panel_server = root / "web_panel" / "panel_server.py"
+            panel_server.write_text(
+                """
+                def do_POST(self):
+                    return {
+                        "error": "dashboard_direct_access_read_only",
+                        "production_deploy_allowed": False,
+                        "critical_operations_allowed": False,
+                    }
+                """,
                 encoding="utf-8",
             )
 
@@ -2660,7 +2672,7 @@ class ProductionReadinessSuiteScanTest(unittest.TestCase):
                 return {
                     "ok": True,
                     "status": 200,
-                    "body": "Pipeline Flow Görevler Geçmiş/canlı kayıtları göster Çıkış",
+                    "body": "Dashboard Pipeline Flow Görevler Geçmiş/canlı kayıtları göster",
                 }
 
             with mock.patch.dict(os.environ, {"CHECK_MODE": "dry_run"}), \
@@ -6157,7 +6169,7 @@ class SystemRepairControlsTest(unittest.TestCase):
         self.assertEqual(updated["github_origin_main_commit"], "new-head")
         self.assertTrue(updated["production_github_sync"])
 
-    def test_environment_manager_health_accepts_auth_required_status_api(self):
+    def test_environment_manager_health_accepts_direct_status_api(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)
             state = runtime / "state"
@@ -6178,7 +6190,7 @@ class SystemRepairControlsTest(unittest.TestCase):
                 if path == "/health":
                     return {"ok": True, "status": 200, "body": {"ok": True}}
                 if path == "/api/status":
-                    return {"ok": False, "status": 401, "body": {"ok": False, "login": "/login"}}
+                    return {"ok": True, "status": 200, "body": {"ok": True, "production_environment": {}, "deploy_commands": {}}}
                 return {"ok": False, "status": 404, "body": {}}
 
             originals = (
@@ -6206,7 +6218,7 @@ class SystemRepairControlsTest(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertTrue(payload["status_api"]["ok"])
-        self.assertTrue(payload["status_api"]["auth_required"])
+        self.assertFalse(payload["status_api"]["auth_required"])
 
     def test_environment_manager_smoke_accepts_current_dashboard_labels(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -6235,7 +6247,7 @@ class SystemRepairControlsTest(unittest.TestCase):
             }
             production_environment_manager.http_text = lambda port, path: {
                 "ok": True,
-                "body": "Pipeline Flow Görevler Geçmiş/canlı kayıtları göster Çıkış",
+                "body": "Dashboard Pipeline Flow Görevler Geçmiş/canlı kayıtları göster",
             }
             try:
                 payload = production_environment_manager.smoke_test("production")

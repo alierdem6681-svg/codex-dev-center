@@ -134,7 +134,7 @@ def setup_allowed(handler: BaseHTTPRequestHandler) -> bool:
 
 
 def authorized(handler: BaseHTTPRequestHandler) -> bool:
-    return bool(panel_auth.user_from_cookie(handler.headers.get("Cookie", "")))
+    return True
 
 
 def run_cmd(cmd: list[str], timeout: int = 180):
@@ -441,7 +441,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_raw(target.read_bytes(), content_type)
 
     def redirect_login(self):
-        self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/login"})
+        self.send_raw(b"", "text/plain; charset=utf-8", 302, {"Location": "/"})
 
     def send_login(self):
         self.send_raw((STATIC_DIR / "login.html").read_bytes(), "text/html; charset=utf-8")
@@ -491,16 +491,10 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         if parsed.path in ("/login", "/login.html"):
-            self.send_login()
+            self.redirect_login()
             return
         if parsed.path == "/api/auth/state":
             self.send_json(panel_auth.public_auth_state())
-            return
-        if not authorized(self):
-            if parsed.path in ("/", "/index.html"):
-                self.redirect_login()
-            else:
-                self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
             return
         if parsed.path == "/api/status":
             self.send_json(status_payload())
@@ -528,67 +522,27 @@ class Handler(BaseHTTPRequestHandler):
         data = self.body()
         parsed = urlparse(self.path)
         if parsed.path == "/api/auth/setup":
-            if panel_auth.auth_configured():
-                self.send_json({"ok": False, "error": "auth_already_configured", "message": "Kullanıcı zaten oluşturuldu."}, 409)
-                return
-            if not setup_allowed(self):
-                self.send_json({"ok": False, "error": "remote_setup_disabled", "message": "İlk kullanıcı yalnızca yerel erişimden oluşturulabilir."}, 403)
-                return
-            try:
-                panel_auth.setup_user(str(data.get("username", "")), str(data.get("password", "")))
-                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, str(data.get("username", "")).strip())
-            except ValueError as exc:
-                self.send_json({"ok": False, "error": str(exc), "message": "Kullanıcı adı veya şifre geçersiz."}, 400)
+            self.send_json({"ok": True, "auth": panel_auth.public_auth_state(), "dashboard": "/"})
             return
         if parsed.path == "/api/auth/login":
-            username = str(data.get("username", "")).strip()
-            password = str(data.get("password", ""))
-            if panel_auth.verify_credentials(username, password):
-                self.send_with_session({"ok": True, "auth": panel_auth.public_auth_state()}, username)
-            else:
-                self.send_json({"ok": False, "error": "invalid_credentials", "message": "Kullanıcı adı veya şifre hatalı."}, 401)
+            self.send_json({"ok": True, "auth": panel_auth.public_auth_state(), "dashboard": "/"})
             return
         if parsed.path == "/api/auth/logout":
             self.send_logout()
             return
-        if not authorized(self):
-            self.send_json({"ok": False, "error": "unauthorized", "login": "/login"}, 401)
-            return
         if parsed.path.startswith("/api/dashboard/telegram-assets"):
             self.send_json({"ok": False, "error": "method_not_allowed", "read_only": True}, 405)
             return
-        action = data.get("action")
-        if action == "production_readiness_suite":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_readiness_suite.py", "--json"], 240))
-            return
-        if action == "production_deploy_start":
-            self.send_json(run_cmd([sys.executable, "supervisor/cto_autonomous_delivery.py", "deploy-latest", "--execute", "--wait"], 1200))
-            return
-        if action == "cto_delivery_status":
-            self.send_json(run_cmd([sys.executable, "supervisor/cto_autonomous_delivery.py", "status"], 120))
-            return
-        if action == "staging_deploy":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "staging-deploy"], 420))
-            return
-        if action == "health_check":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "health-check", "--scope", "production"], 120))
-            return
-        if action == "smoke_test":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "smoke-test", "--scope", "production"], 120))
-            return
-        if action == "github_safe_flow_dry_run":
-            self.send_json(run_cmd([sys.executable, "supervisor/github_safe_flow.py", "dry-run"], 180))
-            return
-        if action == "cto_doctor_check":
-            self.send_json(run_cmd([sys.executable, "supervisor/cto_doctor.py", "--json"], 120))
-            return
-        if action == "cto_doctor_fix":
-            self.send_json(run_cmd([sys.executable, "supervisor/cto_doctor.py", "--fix", "--json"], 120))
-            return
-        if action == "rollback_simulation":
-            self.send_json(run_cmd([sys.executable, "supervisor/production_environment_manager.py", "rollback", "--dry-run"], 120))
-            return
-        self.send_json({"ok": False, "error": "unknown_action"}, 400)
+        self.send_json(
+            {
+                "ok": False,
+                "error": "dashboard_direct_access_read_only",
+                "read_only": True,
+                "production_deploy_allowed": False,
+                "critical_operations_allowed": False,
+            },
+            403,
+        )
 
 
 def main():

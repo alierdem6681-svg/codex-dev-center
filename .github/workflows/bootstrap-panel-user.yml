@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type BOOTSTRAP-PANEL-USER to create the first panel user"
+        description: "Type BOOTSTRAP-PANEL-USER to verify retired panel auth compatibility"
         required: true
         type: string
 
@@ -23,8 +23,6 @@ jobs:
       VM_TARGET: codex-dev-center-01
       RUNTIME_DIR: /opt/codex-dev-center
       DASHBOARD_URL: http://127.0.0.1:8080
-      PANEL_USERNAME: ${{ secrets.CODEX_PANEL_BOOTSTRAP_USERNAME }}
-      PANEL_PASSWORD: ${{ secrets.CODEX_PANEL_BOOTSTRAP_PASSWORD }}
 
     steps:
       - name: Confirm bootstrap
@@ -48,41 +46,28 @@ jobs:
             exit 1
           fi
 
-      - name: Validate bootstrap secrets
+      - name: Confirm direct access mode
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$PANEL_USERNAME"
-          test -n "$PANEL_PASSWORD"
-          if [ "${#PANEL_PASSWORD}" -lt 8 ]; then
-            echo "Bootstrap password is too short."
-            exit 1
-          fi
+          echo "panel_auth=disabled"
 
-      - name: Create first user
+      - name: Verify auth compatibility module
         shell: bash
         run: |
           set -euo pipefail
           cd "$RUNTIME_DIR"
           python3 - <<'PY'
-          import os
           import sys
           from pathlib import Path
 
-          root = Path(os.environ["RUNTIME_DIR"]).resolve()
-          sys.path.insert(0, str(root / "web_panel"))
+          sys.path.insert(0, str(Path("web_panel").resolve()))
           import auth  # noqa: E402
 
-          expected_username = os.environ["PANEL_USERNAME"].strip()
-          if auth.AUTH_FILE.exists():
-              state = auth.public_auth_state()
-              if state.get("username") == expected_username:
-                  print("panel_user=already_configured")
-                  raise SystemExit(0)
-              raise SystemExit("auth_already_configured_with_different_username")
-
-          auth.setup_user(expected_username, os.environ["PANEL_PASSWORD"])
-          print("panel_user=created")
+          state = auth.public_auth_state()
+          if state.get("auth_mode") != "disabled" or not state.get("direct_access_enabled"):
+              raise SystemExit("panel_auth_not_disabled")
+          print("panel_auth_compatibility=PASS")
           PY
 
       - name: Restart panel service
@@ -106,7 +91,7 @@ jobs:
           echo "Panel health did not become ready in time."
           exit 1
 
-      - name: Login smoke check
+      - name: Direct dashboard smoke check
         shell: bash
         run: |
           set -euo pipefail
@@ -115,26 +100,18 @@ jobs:
           import os
           import urllib.request
 
-          payload = json.dumps(
-              {
-                  "username": os.environ["PANEL_USERNAME"],
-                  "password": os.environ["PANEL_PASSWORD"],
-              }
-          ).encode("utf-8")
           request = urllib.request.Request(
-              os.environ["DASHBOARD_URL"] + "/api/auth/login",
-              data=payload,
-              headers={"Content-Type": "application/json"},
-              method="POST",
+              os.environ["DASHBOARD_URL"] + "/api/status",
+              method="GET",
           )
           with urllib.request.urlopen(request, timeout=10) as response:
               body = response.read().decode("utf-8", errors="replace")
               if response.status != 200:
-                  raise SystemExit(f"login_status={response.status}")
+                  raise SystemExit(f"status_api={response.status}")
               data = json.loads(body)
               if not data.get("ok"):
-                  raise SystemExit("login_not_ok")
-          print("login_smoke=PASS")
+                  raise SystemExit("status_not_ok")
+          print("direct_dashboard_smoke=PASS")
           PY
 
       - name: Health check
