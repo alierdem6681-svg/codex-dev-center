@@ -3723,6 +3723,56 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertEqual(updated["smoke_run_url"], "https://example.invalid/runs/201")
         self.assertEqual(updated["smoke_commit"], "origin-main-sha")
 
+    def test_deploy_workflow_rejects_raw_commit_sha_ref(self):
+        workflow_text = (ROOT / ".github" / "workflows" / "deploy-vm.yml").read_text(encoding="utf-8")
+
+        self.assertIn("Raw commit SHA deploy refs are not accepted", workflow_text)
+        self.assertIn("steps.deploy_ref.outputs.ref", workflow_text)
+        self.assertIn("DEPLOY_REF_SHA", workflow_text)
+        self.assertIn("uses: actions/checkout@v5", workflow_text)
+        self.assertNotIn("ref: ${{ inputs.ref }}", workflow_text)
+
+    def test_cto_dispatch_deploy_uses_branch_ref_input(self):
+        original_main_head = cto_autonomous_delivery.main_head
+        original_successful_run = cto_autonomous_delivery.successful_run
+        original_active_run = cto_autonomous_delivery.active_run
+        original_latest_run = cto_autonomous_delivery.latest_run
+        original_run = cto_autonomous_delivery.run
+        original_sleep = cto_autonomous_delivery.time.sleep
+        calls: list[list[str]] = []
+
+        def fake_run(args, cwd=None, timeout=300):
+            calls.append(args)
+            return {"ok": True, "returncode": 0, "stdout": "", "stderr": "", "cmd": " ".join(args)}
+
+        cto_autonomous_delivery.main_head = lambda: "origin-main-sha"
+        cto_autonomous_delivery.successful_run = lambda _workflow, _head: {"ok": False}
+        cto_autonomous_delivery.active_run = lambda _workflow, _head: {"ok": False}
+        cto_autonomous_delivery.latest_run = lambda _workflow, _head="": {
+            "ok": True,
+            "run": {
+                "databaseId": "400",
+                "url": "https://example.invalid/runs/400",
+                "headSha": _head,
+                "status": "queued",
+                "conclusion": "",
+            },
+        }
+        cto_autonomous_delivery.run = fake_run
+        cto_autonomous_delivery.time.sleep = lambda _seconds: None
+        try:
+            result = cto_autonomous_delivery.dispatch_workflow(cto_autonomous_delivery.DEPLOY_WORKFLOW, wait=False)
+        finally:
+            cto_autonomous_delivery.main_head = original_main_head
+            cto_autonomous_delivery.successful_run = original_successful_run
+            cto_autonomous_delivery.active_run = original_active_run
+            cto_autonomous_delivery.latest_run = original_latest_run
+            cto_autonomous_delivery.run = original_run
+            cto_autonomous_delivery.time.sleep = original_sleep
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(calls, [["gh", "workflow", "run", cto_autonomous_delivery.DEPLOY_WORKFLOW, "--ref", "main", "-f", "confirm=DEPLOY-CODEX-VM", "-f", "ref=main"]])
+
     def test_mark_task_deployed_propagates_to_parent_chain(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = {

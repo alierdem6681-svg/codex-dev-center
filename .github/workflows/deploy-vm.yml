@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       ref:
-        description: "Branch or commit to deploy"
+        description: "Branch or tag to deploy; raw commit SHA values are rejected"
         required: true
         default: "main"
         type: string
@@ -53,11 +53,68 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout requested ref
-        uses: actions/checkout@v4
+      - name: Resolve deploy ref
+        id: deploy_ref
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          requested="$(printf '%s' "${REQUESTED_REF:-main}" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ -z "$requested" ]; then
+            requested="main"
+          fi
+
+          if [[ "$requested" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            echo "Raw commit SHA deploy refs are not accepted for production deploy: $requested"
+            echo "Use a branch or tag that keeps the target commit reachable, for example ref=main."
+            exit 1
+          fi
+
+          repo_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git_auth=(-c "http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic $auth")
+          remote_ref_file="${RUNNER_TEMP:-/tmp}/codex-deploy-ref.$$"
+
+          if [[ "$requested" == refs/heads/* || "$requested" == refs/tags/* ]]; then
+            if ! git "${git_auth[@]}" ls-remote --exit-code "$repo_url" "$requested" >"$remote_ref_file"; then
+              echo "Requested deploy ref does not exist on GitHub remote: $requested"
+              exit 1
+            fi
+            resolved="$requested"
+          elif [[ "$requested" == refs/* ]]; then
+            echo "Only branch and tag refs are accepted for production deploy: $requested"
+            exit 1
+          elif git "${git_auth[@]}" ls-remote --exit-code --heads "$repo_url" "$requested" >"$remote_ref_file"; then
+            resolved="$requested"
+          elif git "${git_auth[@]}" ls-remote --exit-code --tags "$repo_url" "$requested" >"$remote_ref_file"; then
+            resolved="$requested"
+          else
+            echo "Requested deploy ref does not exist as a GitHub branch or tag: $requested"
+            exit 1
+          fi
+
+          remote_sha="$(awk 'NR == 1 {print $1}' "$remote_ref_file")"
+          echo "ref=$resolved" >> "$GITHUB_OUTPUT"
+          echo "remote_sha=$remote_sha" >> "$GITHUB_OUTPUT"
+          echo "deploy_ref=$resolved" >> "$GITHUB_STEP_SUMMARY"
+          echo "deploy_ref_remote_sha=$remote_sha" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout deploy ref
+        uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ steps.deploy_ref.outputs.ref }}
           fetch-depth: 1
+
+      - name: Record checked out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployed_sha="$(git rev-parse HEAD)"
+          echo "DEPLOY_REF=${{ steps.deploy_ref.outputs.ref }}" >> "$GITHUB_ENV"
+          echo "DEPLOY_REF_SHA=$deployed_sha" >> "$GITHUB_ENV"
+          echo "checked_out_sha=$deployed_sha" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preflight checks
         shell: bash
@@ -318,8 +375,8 @@ jobs:
               "last_deploy_status": "PASS",
               "last_deploy_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "last_deploy_run_url": f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}",
-              "last_deploy_commit": os.environ.get("GITHUB_SHA", ""),
-              "last_deploy_ref": os.environ.get("GITHUB_REF_NAME", ""),
+              "last_deploy_commit": os.environ.get("DEPLOY_REF_SHA") or os.environ.get("GITHUB_SHA", ""),
+              "last_deploy_ref": os.environ.get("DEPLOY_REF") or os.environ.get("GITHUB_REF_NAME", ""),
               "last_deploy_at": now,
               "last_smoke_status": "PASS",
               "last_backup_path": os.environ.get("LAST_BACKUP_PATH", ""),
@@ -330,7 +387,7 @@ jobs:
               "task_to_deploy_test": "PASS",
               "source": "github_actions_deploy_workflow",
               "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
-              "commit": os.environ.get("GITHUB_SHA", ""),
+              "commit": os.environ.get("DEPLOY_REF_SHA") or os.environ.get("GITHUB_SHA", ""),
               "runner": os.environ.get("RUNNER_NAME", ""),
           }
           production_deploy = {
@@ -339,8 +396,8 @@ jobs:
               "source": "github_actions_deploy_workflow",
               "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "workflow_run_url": github_actions["last_deploy_run_url"],
-              "commit": os.environ.get("GITHUB_SHA", ""),
-              "ref": os.environ.get("GITHUB_REF_NAME", ""),
+              "commit": os.environ.get("DEPLOY_REF_SHA") or os.environ.get("GITHUB_SHA", ""),
+              "ref": os.environ.get("DEPLOY_REF") or os.environ.get("GITHUB_REF_NAME", ""),
               "backup_path": os.environ.get("LAST_BACKUP_PATH", ""),
               "staging_deploy_performed": True,
               "production_deploy_performed": True,
@@ -352,7 +409,7 @@ jobs:
               "status": "PASS",
               "source": "github_actions_deploy_workflow",
               "workflow_run_id": os.environ.get("GITHUB_RUN_ID", ""),
-              "commit": os.environ.get("GITHUB_SHA", ""),
+              "commit": os.environ.get("DEPLOY_REF_SHA") or os.environ.get("GITHUB_SHA", ""),
               "runtime_dir": os.environ.get("RUNTIME_DIR", ""),
               "dashboard_url": os.environ.get("DASHBOARD_URL", ""),
               "public_dashboard_url": os.environ.get("PUBLIC_DASHBOARD_URL", ""),
@@ -372,6 +429,7 @@ jobs:
             echo "deployment=PASS"
             echo "target=$VM_TARGET"
             echo "runtime=$RUNTIME_DIR"
-            echo "ref=${{ inputs.ref }}"
+            echo "ref=$DEPLOY_REF"
+            echo "commit=$DEPLOY_REF_SHA"
             echo "completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_STEP_SUMMARY"
