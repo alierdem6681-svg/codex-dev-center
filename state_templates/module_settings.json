@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:02:10+00:00",
+  "updated_at": "2026-06-05T12:30:29+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -102,6 +102,7 @@
     "bootstrap_preflight_reports_tool_fallback": true,
     "bootstrap_preflight_repo_checkout_check": true,
     "bootstrap_preflight_test_surface_check": true,
+    "bootstrap_preflight_pipeline_evidence_check": true,
     "repo_apply_requires_bootstrap_preflight": true,
     "repo_apply_requires_local_git_metadata": true,
     "repo_apply_requires_test_surface": true,

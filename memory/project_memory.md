@@ -264,6 +264,12 @@ Repo apply clone akisi izole clone sonrasinda `require_git_repo=True`, `require_
 
 Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
 
+## 2026-06-05 Pipeline Evidence Preflight Apply
+
+Pipeline eksik analizi retry paketi worker bootstrap tanısına opsiyonel `require_pipeline_evidence` kapısı ekledi. CI/pipeline kanıtı yoksa `pipeline_evidence_missing` issue ve `blocked_no_pipeline_evidence` status üretilir; marker varsa `checks.pipeline_evidence.status=ready` olur.
+
+Kontrol log içeriği okumaz, stdout/stderr dump üretmez ve yalnızca güvenli artefakt adları/marker yollarını raporlar. Davranış hedefli unit testlerle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate işlemi yapılmadı.
+
 ## 2026-06-04 Dashboard Pipeline Expand State Tests Apply
 
 Dashboard Pipeline Flow ana gorevleri artik expand/collapse tercihini `main_task_code` / `root_task_id` anahtariyla ayni sayfa oturumunda korur. Polling, stage refresh veya `renderPipelineFlow()` yeniden cizimi kullanicinin kapattigi aktif ana gorevi otomatik tekrar acmaz.

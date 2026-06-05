@@ -366,3 +366,11 @@ Faz 19B-10A Model Policy
 - [x] Eksik repo checkout `repo_checkout_missing`, eksik test yüzeyi `no_test_surface` reason code'u ile fail olur.
 - [x] Davranış `tests/test_runtime_status_model.py` içindeki hedefli worker bootstrap unit testleriyle sabitlendi.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 57 - Pipeline Evidence Preflight
+
+- [x] Worker bootstrap opsiyonel `require_pipeline_evidence` kapısı ile CI/pipeline kanıtı yokluğunu structured olarak raporlar.
+- [x] Eksik pipeline kanıtı `pipeline_evidence_missing` issue ve `blocked_no_pipeline_evidence` status değerleriyle ayrışır.
+- [x] Pipeline evidence tanısı log içeriği okumadan sadece güvenli artefakt adı/marker yollarını raporlar.
+- [x] Davranış hedefli `tests.test_runtime_status_model.WorkerStatusModelTest` unit testleriyle sabitlendi.
+- [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

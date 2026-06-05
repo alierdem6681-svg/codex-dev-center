@@ -281,6 +281,25 @@ Not:
 
 ---
 
+## 2026-06-05 Pipeline Evidence Preflight Apply
+
+Görev: CTO-APPLY-20260605-122316 / CTO-TASK-20260605-075407-054330-PIPELINE-EKSIK-ANALIZI
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/worker_bootstrap.py` opsiyonel `require_pipeline_evidence` parametresiyle CI/pipeline kanıtı yüzeyini structured check olarak raporlar.
+- Eksik pipeline kanıtı `pipeline_evidence_missing` issue ve `blocked_no_pipeline_evidence` status değerleriyle ayrışır.
+- Tanı sadece artefakt adlarını/marker yollarını kullanır; log içeriği, stdout/stderr dump veya secret/env/token/private key değeri okumaz.
+- Worker module registry/settings/action template kayıtları ve onboarding/anayasa/AGENTS/roadmap/memory dokümantasyonu güncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_pipeline_evidence_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_pipeline_metadata_surface tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_blocks_missing_repo_when_required tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_bootstrap_preflight_accepts_local_repo_with_unittest_surface` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+---
+
 ## Dashboard Pipeline Tracking Validation
 
 Tarih: 2026-06-03

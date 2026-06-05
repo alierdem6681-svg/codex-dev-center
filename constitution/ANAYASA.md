@@ -145,4 +145,6 @@ Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, bil
 
 Worker bootstrap tanısı repo checkout, local `.git/` metadata ve test yüzeyi gereksinimleri açıkça istenmişse bunları hazır saymadan önce doğrulamalıdır. Repo apply akışı izole clone üzerinde bu sıkı preflight kapısını kullanır; eksik repo veya test yüzeyi `bootstrap_diagnostics.json` içinde açık reason code ile fail olur.
 
+Pipeline analizi ve kalite tanısı gibi işlerde CI/pipeline kanıtı ayrıca istenirse preflight `pipeline_evidence_missing` reason code'u üretmelidir. Bu tanı sadece güvenli marker/dosya adlarını raporlar; log dump veya secret/env/token/private key değeri okumaz.
+
 Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz ve IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

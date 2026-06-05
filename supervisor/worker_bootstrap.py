@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,33 @@ TEST_FILE_PATTERNS = (
     "*.test.ts",
     "*.spec.ts",
 )
+PIPELINE_EVIDENCE_FILE_NAMES = (
+    "github_actions_status.json",
+    "pipeline_status.json",
+    "production_readiness_status.json",
+    "last_health_check_status.json",
+    "quality-gate-report.json",
+    "quality-gate-summary.md",
+    "production_readiness_last_report.md",
+    "junit.xml",
+    "pytest.xml",
+    "test-results.xml",
+    "coverage.xml",
+    "ci.log",
+    "pipeline.log",
+    "build.log",
+    "test.log",
+)
+PIPELINE_EVIDENCE_PATTERNS = (
+    "*.junit.xml",
+    "*.trx",
+    "*.sarif",
+    "*test-results*.xml",
+    "*pipeline*.log",
+    "*ci*.log",
+)
+PIPELINE_EVIDENCE_DIR_NAMES = ("artifacts", "test-results", "test-reports", "coverage")
+PIPELINE_EVIDENCE_SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
 
 
 def _is_writable_dir(path: Path) -> bool:
@@ -146,6 +174,55 @@ def _test_surface_status(workspace_path: Path) -> tuple[str, dict[str, Any], lis
     return "ready", checks, []
 
 
+def _pipeline_evidence_status(workspace_path: Path) -> tuple[str, dict[str, Any], list[str]]:
+    markers: list[str] = []
+    evidence_names = {name.lower() for name in PIPELINE_EVIDENCE_FILE_NAMES}
+
+    for root, dirnames, filenames in os.walk(workspace_path):
+        root_path = Path(root)
+        rel_root = root_path.relative_to(workspace_path)
+        depth = len(rel_root.parts)
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in PIPELINE_EVIDENCE_SKIP_DIRS and depth < 4
+        ]
+
+        for dirname in sorted(dirnames):
+            if dirname in PIPELINE_EVIDENCE_DIR_NAMES:
+                candidate = root_path / dirname
+                try:
+                    has_files = any(child.is_file() for child in candidate.iterdir())
+                except OSError:
+                    has_files = False
+                if has_files:
+                    markers.append(candidate.relative_to(workspace_path).as_posix())
+                    if len(markers) >= 20:
+                        break
+        if len(markers) >= 20:
+            break
+
+        for filename in sorted(filenames):
+            lowered = filename.lower()
+            if lowered in evidence_names or any(fnmatch(lowered, pattern) for pattern in PIPELINE_EVIDENCE_PATTERNS):
+                markers.append((root_path / filename).relative_to(workspace_path).as_posix())
+                if len(markers) >= 20:
+                    break
+        if len(markers) >= 20:
+            break
+
+    checks = {
+        "found": bool(markers),
+        "markers": markers,
+        "file_names": list(PIPELINE_EVIDENCE_FILE_NAMES),
+        "file_patterns": list(PIPELINE_EVIDENCE_PATTERNS),
+        "directory_names": list(PIPELINE_EVIDENCE_DIR_NAMES),
+    }
+    if not markers:
+        return "missing", checks, ["pipeline_evidence_missing"]
+    return "ready", checks, []
+
+
 def _tool_status() -> dict[str, Any]:
     ripgrep_available = shutil.which("rg") is not None
     return {
@@ -161,6 +238,7 @@ def bootstrap_preflight(
     require_git_repo: bool = False,
     require_local_git_metadata: bool = False,
     require_test_surface: bool = False,
+    require_pipeline_evidence: bool = False,
 ) -> dict[str, Any]:
     workspace_path = Path(workspace)
     checks: dict[str, Any] = {
@@ -172,6 +250,7 @@ def bootstrap_preflight(
         "git_repo_required": require_git_repo,
         "local_git_metadata_required": require_local_git_metadata,
         "test_surface_required": require_test_surface,
+        "pipeline_evidence_required": require_pipeline_evidence,
         "tools": _tool_status(),
     }
     issues: list[str] = []
@@ -208,6 +287,14 @@ def bootstrap_preflight(
                 issues.extend(test_issues)
                 if status in {"ready", "degraded_diagnostic"}:
                     status = "blocked_no_test_surface"
+
+            evidence_status, evidence_checks, evidence_issues = _pipeline_evidence_status(workspace_path)
+            checks["pipeline_evidence"] = evidence_checks
+            checks["pipeline_evidence"]["status"] = evidence_status
+            if require_pipeline_evidence and evidence_status != "ready":
+                issues.extend(evidence_issues)
+                if status in {"ready", "degraded_diagnostic"}:
+                    status = "blocked_no_pipeline_evidence"
 
     ready = status == "ready"
     return {
