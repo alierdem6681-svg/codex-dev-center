@@ -435,3 +435,9 @@ Production readiness analizi devaminda arka plan ACK, progress-aware watchdog ve
 `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'ini ekledi. Gate gercek Telegram API cagrisi veya production deploy yapmadan simulator/static/helper sozlesmeleriyle sunlari dogrular: async ACK 3 saniye beklentisi, duplicate ACK suppression markerlari, stdout gürültüsünü anlamli progress saymayan watchdog ayrimi, timeout/usage-limit/gecici worker failure retryable karari, proposal uretmeden tamamlanan veya kritik destructive isteklerin non-retryable/approval kapsaminda kalmasi.
 
 Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sabitlendi. Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS ve anayasa kayitlari yeni gate'e hizalandi. Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+
+## 2026-06-05 Dashboard Neutral Background Apply
+
+Dashboard ana shell arka planındaki doğa/manzara bitmap görseli kaldırıldı. `web_panel/static/index.html` artık nötr solid arka plan kullanır ve `web_panel/static/assets/dashboard-landscape.png` repo içinden silindi.
+
+Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regresyon testiyle sabitlendi; test scenic background referansının ve asset dosyasının geri eklenmemesini doğrular. Bu paket production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.

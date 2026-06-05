@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:30:29+00:00",
+  "updated_at": "2026-06-05T12:55:20+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -16,6 +16,17 @@
       "risk": "low",
       "enabled": true,
       "requires_approval": false
+    },
+    {
+      "id": "view_dashboard_shell",
+      "label": "Dashboard Kabuk Görünümü",
+      "module": "dashboard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "background_style": "solid_neutral",
+      "background_image_enabled": false
     },
     {
       "id": "view_pipeline_flow",

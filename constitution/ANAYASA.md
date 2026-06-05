@@ -150,3 +150,7 @@ Worker bootstrap tanısı repo checkout, local `.git/` metadata ve test yüzeyi 
 Pipeline analizi ve kalite tanısı gibi işlerde CI/pipeline kanıtı ayrıca istenirse preflight `pipeline_evidence_missing` reason code'u üretmelidir. Bu tanı sadece güvenli marker/dosya adlarını raporlar; log dump veya secret/env/token/private key değeri okumaz.
 
 Bu kontrol secret/env/token/private key değeri okumaz, production deploy yapmaz ve IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 16. Dashboard Nötr Arka Plan Kuralı
+
+Ana dashboard arayüzü doğa/manzara bitmap arka planı kullanmaz. Panel kabuğu nötr solid arka planla kalmalı, scenic asset referansı regression test ile engellenmelidir.

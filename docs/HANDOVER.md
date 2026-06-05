@@ -1159,3 +1159,30 @@ Not:
 - Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector mevcut, ancak yerel commit/tree üretilemediği ve büyük dosya değişiklikleri tam içerik/blob akışı gerektirdiği için güvenli PR açılamadı.
+
+---
+
+## Dashboard Neutral Background Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-125306 / CTO-TASK-20260605-075403-232757-KISA-ANALIZ
+Worker: worker-1
+
+Eklenenler:
+- Dashboard shell doğa/manzara bitmap arka planından nötr solid arka plana alındı.
+- `web_panel/static/assets/dashboard-landscape.png` kaldırıldı.
+- `tests/test_dashboard_account_menu_markup.py` scenic background referansının geri eklenmemesini kontrol eder.
+- Dashboard registry/settings/action template, onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+- `python3 -m json.tool state_templates/module_registry.json state_templates/module_settings.json state_templates/dashboard_settings.json state_templates/action_catalog.json` her dosya için PASS.
+- `python3 -m compileall -q web_panel tests` PASS.
+- `git diff --check` PASS.
+- `python3 -m unittest tests.test_dashboard_account_menu_markup tests.test_runtime_status_model` PASS, 231 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazımları read-only modda `write-skipped`.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+- Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
