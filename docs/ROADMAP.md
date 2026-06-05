@@ -351,3 +351,11 @@ Faz 19B-10A Model Policy
 - [x] Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur.
 - [x] Statik wrapper kontrati `tests/test_staging_readiness_wrappers.py` ile sabitlendi.
 - [x] Deploy policy, module registry/settings/action catalog ve onboarding dokumanlari staging wrapper sozlesmesine hizalandi.
+
+## Faz 55 - Dashboard Cleanup Contract v2
+
+- [x] Dashboard sidebar nav allowlist `Dashboard`, `Pipeline Flow`, `Görevler`, `Workers` olarak regresyon testine baglandi.
+- [x] Ana dashboard section kontrati metrics summary, `pipeline` ve `tasks` ile sabitlendi.
+- [x] SSL/HTTPS/panel erisim mesajlari `Dashboard Alan Temizliği` yerine production readiness hattina yonlendirilir.
+- [x] Dashboard alan kaldirma mesajlari yine `Dashboard Alan Temizliği` olarak korunur.
+- [ ] PR review ve staging UI smoke sonraki kontrollu entegrasyon adiminda yapilacak.

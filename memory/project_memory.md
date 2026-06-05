@@ -403,3 +403,11 @@ Production readiness analizi backlog devaminda staging health/smoke kontrollerin
 `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` mevcut wrapper kalibini korur, `CODEX_DEV_CENTER_HOME` ve `CODEX_PYTHON` destekler, ek argumanlari iletir ve manager komutlarini `--scope staging` ile cagirir. Wrapper sozlesmesi `tests/test_staging_readiness_wrappers.py` ile statik olarak sabitlendi; deploy policy ve module/action template kayitlari staging health/smoke komutlarini gorunur hale getirir.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Dashboard Cleanup Contract v2 Apply
+
+Dashboard Alan Temizliği backlog continuation icin mevcut sade dashboard tekrar degistirilmedi; bunun yerine regresyon kontrati guclendirildi. Sidebar nav artik testte yalnizca `Dashboard`, `Pipeline Flow`, `Görevler`, `Workers` olarak kabul edilir. Ana dashboard section kontrati metrics summary, `pipeline` ve `tasks` ile sabitlendi.
+
+Telegram/direct CTO metadata ve router tarafinda SSL/HTTPS/DNS/sertifika gibi panel erisim altyapi mesajlari `Dashboard Alan Temizliği` olarak siniflandirilmaz; `Production Readiness Analizi` / `Controls / Readiness` hattina gider. Dashboard alan kaldirma mesajlari ise cleanup olarak kalir.
+
+Bu paket production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

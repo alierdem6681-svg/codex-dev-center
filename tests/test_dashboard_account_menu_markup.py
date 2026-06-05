@@ -1,8 +1,44 @@
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class DashboardMarkupParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.nav_items = []
+        self.sections = []
+        self._active_nav = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = attrs.get("class", "").split()
+        if tag == "a" and "nav-item" in classes:
+            self._active_nav = {
+                "href": attrs.get("href", ""),
+                "label": "",
+            }
+        if tag == "section":
+            self.sections.append(
+                {
+                    "id": attrs.get("id", ""),
+                    "class": attrs.get("class", ""),
+                    "aria-label": attrs.get("aria-label", ""),
+                }
+            )
+
+    def handle_data(self, data):
+        if self._active_nav is not None:
+            self._active_nav["label"] += data
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._active_nav is not None:
+            self._active_nav["label"] = " ".join(self._active_nav["label"].split())
+            self.nav_items.append(self._active_nav)
+            self._active_nav = None
 
 
 class DashboardAccountMenuMarkupTest(unittest.TestCase):
@@ -56,6 +92,32 @@ class DashboardAccountMenuMarkupTest(unittest.TestCase):
 
         self.assertIn("Pipeline Flow", html)
         self.assertIn("Görevler", html)
+
+    def test_dashboard_cleanup_keeps_only_expected_navigation_and_main_sections(self):
+        html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")
+        parser = DashboardMarkupParser()
+        parser.feed(html)
+
+        self.assertEqual(
+            parser.nav_items,
+            [
+                {"href": "#dashboard", "label": "Dashboard"},
+                {"href": "#pipeline", "label": "Pipeline Flow"},
+                {"href": "#tasks", "label": "Görevler"},
+                {"href": "#workers", "label": "Workers"},
+            ],
+        )
+
+        section_ids = [section["id"] for section in parser.sections if section["id"]]
+        self.assertEqual(section_ids, ["pipeline", "tasks"])
+        self.assertTrue(
+            any(
+                "metrics-grid" in section["class"].split()
+                and section["aria-label"] == "Dashboard özetleri"
+                and section["id"] == ""
+                for section in parser.sections
+            )
+        )
 
     def test_dashboard_uses_scenic_shell_design(self):
         html = (ROOT / "web_panel" / "static" / "index.html").read_text(encoding="utf-8")

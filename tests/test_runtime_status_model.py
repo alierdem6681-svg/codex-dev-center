@@ -276,6 +276,19 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         self.assertEqual(result["subtasks"], [])
 
+    def test_dashboard_ssl_https_request_routes_to_readiness_not_cleanup(self):
+        message = (
+            "Dashboard SSL/HTTPS erişimini düzeltelim, paneli https üzerinden açalım "
+            "ve http güvenlik uyarısını kaldıralım."
+        )
+
+        route = cto_task_router.classify_task_route(message)
+
+        self.assertFalse(cto_task_router.is_dashboard_cleanup_request(message))
+        self.assertEqual(route["task_class"], "control_task")
+        self.assertEqual(route["control_type"], "production_readiness")
+        self.assertEqual(route["pipeline_lane"], "Controls / Readiness")
+
     def test_telegram_dashboard_cleanup_metadata_uses_dashboard_title(self):
         message = (
             "dashboarddaki Raporlar, Son Hata ve Çözüm Önerisi, GitHub Senkronizasyonu, "
@@ -286,6 +299,17 @@ class WorkerStatusModelTest(unittest.TestCase):
 
         self.assertEqual(meta["name"], "Dashboard Alan Temizliği")
         self.assertNotEqual(meta["name"], "Production Readiness Analizi")
+
+    def test_telegram_dashboard_ssl_https_metadata_is_not_dashboard_cleanup(self):
+        message = (
+            "Dashboard SSL/HTTPS erişimini düzeltelim, paneli https üzerinden açalım "
+            "ve http güvenlik uyarısını kaldıralım."
+        )
+
+        meta = telegram_direct_cto.classify_job_metadata(message)
+
+        self.assertEqual(meta["name"], "Production Readiness Analizi")
+        self.assertNotEqual(meta["name"], "Dashboard Alan Temizliği")
 
     def test_telegram_task_list_ui_metadata_is_not_production_readiness(self):
         message = (

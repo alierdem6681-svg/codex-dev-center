@@ -365,16 +365,39 @@ def classify_job_metadata(text):
     lowered = (text or "").lower()
     length = len(text or "")
 
+    infrastructure_access_change = any(
+        x in lowered
+        for x in [
+            "ssl",
+            "https",
+            "tls",
+            "sertifika",
+            "certificate",
+            "domain",
+            "dns",
+            "firewall",
+            "load balancer",
+            "yük dengeleyici",
+            "yuk dengeleyici",
+        ]
+    )
     dashboard_cleanup = (
         any(x in lowered for x in ["dashboard", "navbar", "panel", "menü", "menu", "ui"])
         and any(x in lowered for x in ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"])
+        and not infrastructure_access_change
     )
     task_list_ui = (
         any(x in lowered for x in ["görevler menüsü", "gorevler menusu", "görev list", "gorev list", "görev kuyruğu", "gorev kuyrugu"])
         or ("filtre" in lowered and "checkbox" in lowered)
     )
 
-    if dashboard_cleanup:
+    if infrastructure_access_change and any(x in lowered for x in ["dashboard", "panel", "production", "canlı", "canli", "deploy"]):
+        name = "Production Readiness Analizi"
+        eta = "10-20 dakika"
+        first_update = "yaklaşık 2 dakika içinde"
+        interval = 600
+        risk = "orta/yüksek; normal app deploy gate PASS ise otomatik, kritik altyapı işlemi varsa onay gerekli"
+    elif dashboard_cleanup:
         name = "Dashboard Alan Temizliği"
         eta = "5-10 dakika"
         first_update = "yaklaşık 1 dakika içinde"

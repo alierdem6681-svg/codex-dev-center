@@ -1076,3 +1076,33 @@ Not:
 - Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `.git/index.lock` yazımı read-only filesystem nedeniyle başarısız oldu; GitHub MCP branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## Dashboard Cleanup Contract v2 Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-045316 / CTO-BACKLOG-20260605-044856-615462-DASHBOARD-ALAN-TEMIZLI-I
+Worker: worker-2
+
+Eklenenler:
+- `tests/test_dashboard_account_menu_markup.py` dashboard sidebar nav allowlist ve ana section kontratini sabitler.
+- `supervisor/telegram_direct_cto.py` SSL/HTTPS/DNS/sertifika gibi panel erisim altyapi mesajlarini `Dashboard Alan Temizliği` olarak siniflandirmaz; production readiness ozeti kullanir.
+- `supervisor/cto_task_router.py` ayni SSL/HTTPS guard'i ile bu mesajlari dashboard cleanup split/route istisnasindan cikarir.
+- `tests/test_runtime_status_model.py` hem dashboard alan kaldirma mesajinin cleanup kalmasini hem SSL/HTTPS mesajinin readiness hattina gitmesini dogrular.
+
+Test:
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+- Dar runtime routing regresyon testleri PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 197 test.
+- `python3 -m unittest discover -s tests` PASS, 227 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazimlari `write-skipped`.
+- `git diff --check` PASS.
+- Changed-file secret pattern scan yalnizca test enum literalini yakaladi; secret degeri yok.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari okundu.
+- Lokal `.git` read-only mount oldugu icin dogrudan commit atilamadi; `/tmp/codex-dashboard-cleanup-git` metadata kopyasi ile commit `df71d833583dfe463702b0fff97e93e8125d8a1b` olusturuldu.
+- Direct git push DNS hatasiyla, GitHub connector branch olusturma cagrisi `user cancelled MCP tool call` sonucu durdugu icin PR acilamadi.

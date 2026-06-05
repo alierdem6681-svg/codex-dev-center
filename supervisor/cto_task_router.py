@@ -90,11 +90,35 @@ def classify_risk(text: str, requested: str | None = None) -> str:
     return "low"
 
 
+def is_infrastructure_access_change(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(
+        term in lowered
+        for term in [
+            "ssl",
+            "https",
+            "tls",
+            "sertifika",
+            "certificate",
+            "domain",
+            "dns",
+            "firewall",
+            "load balancer",
+            "yük dengeleyici",
+            "yuk dengeleyici",
+        ]
+    )
+
+
 def is_dashboard_cleanup_request(text: str) -> bool:
     lowered = (text or "").lower()
     dashboard_terms = ["dashboard", "navbar", "panel", "menü", "menu", "ui"]
     cleanup_terms = ["kaldır", "kaldiralim", "kaldıralım", "gizle", "çıkar", "cikar", "temizle"]
-    return any(term in lowered for term in dashboard_terms) and any(term in lowered for term in cleanup_terms)
+    return (
+        any(term in lowered for term in dashboard_terms)
+        and any(term in lowered for term in cleanup_terms)
+        and not is_infrastructure_access_change(text)
+    )
 
 
 CONTROL_SIGNAL_MAP = [
@@ -121,6 +145,16 @@ DELIVERY_SIGNALS = [
 
 def classify_task_route(text: str) -> dict[str, Any]:
     lowered = (text or "").lower()
+    if is_infrastructure_access_change(text) and any(
+        signal in lowered for signal in ["dashboard", "panel", "production", "canlı", "canli", "deploy"]
+    ):
+        return {
+            "task_class": "control_task",
+            "control_type": "production_readiness",
+            "delivery_mode": "proposal_only",
+            "pipeline_lane": "Controls / Readiness",
+            "explicit_delivery_signal": any(signal in lowered for signal in DELIVERY_SIGNALS),
+        }
     control_type = ""
     for candidate, signals in CONTROL_SIGNAL_MAP:
         if any(signal in lowered for signal in signals):
