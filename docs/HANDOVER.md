@@ -1114,3 +1114,25 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Dashboard Gorev Listesi Gecmis Temizligi Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-122316 / CTO-TASK-20260605-075400-123336-DASHBOARD-GÖREV-LISTESI-DÜZENI
+Worker: worker-2
+
+Eklenenler:
+- `web_panel/static/index.html` Gorevler listesinde kapali/gecmis gorevleri varsayilan gorunumden gizler.
+- `Geçmiş görevleri göster` checkbox'i kapali/gecmis gorevleri geri alinabilir sekilde listeye dahil eder.
+- Canli ve gecmis gorunurluk kapsami filtre option'larina da uygulanir; gizli tarihce status/risk dropdown'larini kalabaliklastirmaz.
+- Liste tamamen bos kaldiginda `Güncel görev yok.` bos durum metni gosterilir.
+- `tests/test_dashboard_account_menu_markup.py` dashboard markup sozlesmesini gecmis filtre ve bos durum icin genisletti.
+
+Test:
+- `python3 -m unittest tests.test_dashboard_account_menu_markup` PASS.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.

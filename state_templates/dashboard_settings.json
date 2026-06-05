@@ -1,11 +1,14 @@
 {
-  "updated_at": "2026-06-04T06:08:03+00:00",
+  "updated_at": "2026-06-05T12:28:11+00:00",
   "dashboard": {
     "refresh_seconds": 5,
     "language": "tr",
     "compact_mode": true,
     "theme": "soft_neutral",
-    "auth_mode": "username_password"
+    "auth_mode": "username_password",
+    "hide_live_tasks_by_default": true,
+    "hide_closed_tasks_by_default": true,
+    "show_closed_tasks_toggle": true
   },
   "panel_auth": {
     "mode": "username_password",

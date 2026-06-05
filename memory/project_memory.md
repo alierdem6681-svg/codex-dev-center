@@ -419,3 +419,9 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Dashboard Gorev Listesi Gecmis Temizligi Apply
+
+Dashboard Gorevler listesi artik varsayilan gorunumde kapali/gecmis gorevleri de saklar. Canli gorevler icin mevcut `Canlıya alınanları göster` checkbox'i korunur; kapali/gecmis gorevler `Geçmiş görevleri göster` checkbox'i ile geri alinabilir sekilde gorunur.
+
+Filtre option'lari aktif gorunurluk kapsamindan uretilir, bu nedenle gizli tarihce status/risk dropdown'larini kalabaliklastirmaz. Guncel liste bos ise dashboard `Güncel görev yok.` bos durumunu gosterir. Bu paket production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.

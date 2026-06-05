@@ -608,6 +608,10 @@
                     <input id="showLiveTasks" type="checkbox">
                     Canlıya alınanları göster
                   </label>
+                  <label class="control-check" for="showClosedTasks">
+                    <input id="showClosedTasks" type="checkbox">
+                    Geçmiş görevleri göster
+                  </label>
                 </div>
                 <div id="tasksTable" class="desktop-table"></div>
                 <div id="tasksCards" class="mobile-list"></div>
@@ -838,8 +842,14 @@
         }
         selectEl.value = current === '' || values.includes(current) ? current : '';
       }
+      function taskListScope(list){
+        let scoped = list;
+        if (!showLiveTasks.checked) scoped = scoped.filter(t => !taskIsLive(t));
+        if (!showClosedTasks.checked) scoped = scoped.filter(t => !taskIsClosed(t));
+        return scoped;
+      }
       function fillFilters(){
-        const allTasks = tasks();
+        const allTasks = taskListScope(tasks());
         const allWorkers = workers();
         const statuses = [...new Set(allTasks.map(t => t.status).filter(Boolean))].sort();
         const risks = [...new Set(allTasks.map(t => t.risk || t.risk_level).filter(Boolean))].sort();
@@ -849,8 +859,7 @@
         setFilterOptions(workerFilter, 'Tüm çalışanlar', workerIds);
       }
       function filteredTasks(){
-        let list = tasks();
-        if (!showLiveTasks.checked) list = list.filter(t => !taskIsLive(t));
+        let list = taskListScope(tasks());
         const q = search.value.toLowerCase();
         list = list.filter(t => {
           const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
@@ -864,6 +873,11 @@
       }
       function renderTasks(){
         const list = filteredTasks();
+        if (!list.length) {
+          tasksTable.innerHTML = '<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody><tr><td colspan="4"><span class="muted">Güncel görev yok.</span></td></tr></tbody></table>';
+          tasksCards.innerHTML = '<div class="item muted">Güncel görev yok.</div>';
+          return;
+        }
         tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody>${
           list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
         }</tbody></table>`;
@@ -1120,9 +1134,10 @@
         search.value = event.target.value;
         renderTasks();
       });
-      [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks].forEach(el => {
+      [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks, showClosedTasks].forEach(el => {
         el.addEventListener('change', event => {
           event.preventDefault();
+          if (el === showLiveTasks || el === showClosedTasks) fillFilters();
           renderTasks();
         });
       });
