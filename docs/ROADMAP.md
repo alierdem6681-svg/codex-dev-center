@@ -391,3 +391,11 @@ Faz 19B-10A Model Policy
 - [x] Markup regresyon testi scenic background referansının geri eklenmemesini doğrular.
 - [x] Dashboard settings/module/action template kayıtları nötr arka plan sözleşmesine hizalandı.
 - [x] Production deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## Faz 59 - CTO Router Dispatch Envelope
+
+- [x] Parent task kayitlari TaskEnvelope v1 metadata alanlarini tasir: source, actor_id, request_id, correlation_id, idempotency_key, task_type, risk_level, requested_permissions, reply_policy ve redacted payload.
+- [x] Router eligibility control/readiness tasklarini, Telegram parent tasklarini ve production deploy/secret/IAM/billing/DNS/firewall/destructive database/Google Ads/GCloud mutate permissionlarini worker dispatch oncesi bloke eder.
+- [x] Legacy `supervisor_cli add-task` ve `task_queue.enqueue_task` yollari router metadata helper'ina hizalandi.
+- [x] Worker subtasks parent correlation ID ve idempotency zincirini tasir.
+- [x] Hedefli unit testler, compileall ve read-only production readiness suite PASS; production deploy, staging deploy veya cloud mutate yapilmadi.

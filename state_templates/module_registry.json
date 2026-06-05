@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:09:38+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -352,11 +352,12 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini ve dispatch contract metadata alanlarini normalize eder.",
+      "description": "Telegram, SSH ve dashboard kaynakli gorevleri tek routerdan gecirir; queue statuslarini, TaskEnvelope metadata alanlarini ve worker eligibility kararlarini normalize eder.",
       "actions": [
         "cto_doctor_check",
         "cto_doctor_fix",
-        "classify_memory_os_intent"
+        "classify_memory_os_intent",
+        "validate_router_dispatch_envelope"
       ]
     },
     {

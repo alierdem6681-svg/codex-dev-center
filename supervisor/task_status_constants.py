@@ -110,6 +110,20 @@ TERMINAL_TASK_STATUSES = {
 
 APPROVAL_RISKS: set[str] = set()
 WORKER_BLOCKED_SOURCES = {"telegram"}
+WORKER_FORBIDDEN_PERMISSIONS = {
+    "production_deploy",
+    "secret_value_view_or_change",
+    "token_private_key_env_value_change",
+    "iam_owner_editor_change",
+    "billing_change",
+    "firewall_change",
+    "dns_change",
+    "database_destructive_operation",
+    "irreversible_migration",
+    "google_ads_live_mutate",
+    "live_customer_or_data_loss_risk",
+    "gcloud_mutate",
+}
 
 SENSITIVE_PATTERNS = [
     re.compile(r"(?i)\b[A-Za-z0-9_-]*(?:token|api[_-]?key|password|passwd|secret|private[_-]?key)[A-Za-z0-9_-]*\s*[:=]\s*['\"]?[^'\"\s]+"),
@@ -197,6 +211,14 @@ def _positive_int(value: Any, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def _boolish_false(value: Any) -> bool:
+    if value is False:
+        return True
+    if value is True or value is None:
+        return False
+    return str(value).strip().lower() in {"false", "0", "no", "n", "off", "blocked"}
+
+
 def ensure_dispatch_contract(task: dict[str, Any]) -> dict[str, Any]:
     task_id = str(task.get("id") or "").strip()
     parent_task_id = str(task.get("parent_task_id") or "").strip()
@@ -248,8 +270,16 @@ def is_active_task(task: dict[str, Any]) -> bool:
 
 def worker_block_reason(task: dict[str, Any]) -> str:
     source = str(task.get("source", "")).lower()
-    if task.get("worker_eligible") is False:
-        return "worker_eligible_false"
+    router_reason = str(task.get("worker_eligibility_reason") or task.get("worker_block_reason") or "").strip()
+    if _boolish_false(task.get("worker_eligible")):
+        return router_reason or "worker_eligible_false"
+    requested_permissions = task.get("requested_permissions") or []
+    if isinstance(requested_permissions, str):
+        requested_permissions = [requested_permissions]
+    if any(str(item).strip() in WORKER_FORBIDDEN_PERMISSIONS for item in requested_permissions):
+        return router_reason or "forbidden_permission_requested"
+    if task.get("critical_operation_findings"):
+        return router_reason or "critical_operation_blocked_for_router_review"
     if source in WORKER_BLOCKED_SOURCES:
         return "telegram_reserved_for_cto"
     return ""

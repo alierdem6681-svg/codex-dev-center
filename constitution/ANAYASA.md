@@ -36,6 +36,8 @@ Başlangıç rolleri:
 
 Worker dispatch sözleşmesi izlenebilir olmalıdır: queue task kayıtları `root_task_id`, `dispatch_id`, `worker_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını taşımalı; terminal task statusları yeniden worker kuyruğuna alınmamalıdır.
 
+CTO router parent task kayıtları TaskEnvelope v1 metadata'sı taşımalıdır: `source`, `actor_id`, `request_id`, `correlation_id`, `idempotency_key`, `task_type`, `risk_level`, `requested_permissions`, `reply_policy` ve redacted `payload`. Telegram parent taskları, control/readiness işleri ve production deploy/secret/IAM/billing/DNS/firewall/destructive database/Google Ads/GCloud mutate permissionları worker dispatch öncesi bloke edilmelidir. Worker alt görevleri `source=cto` ile parent correlation ve idempotency zincirini korumalıdır.
+
 Paralel worker regression kapısı dört düşük/orta riskli simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması davranışını production deploy yapmadan doğrulamalıdır.
 
 ## 6. Canlı Ortam Kuralı

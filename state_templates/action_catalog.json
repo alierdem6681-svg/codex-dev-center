@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:09:38+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -270,6 +270,20 @@
       "dispatch_contract_metadata_required": true,
       "stale_claim_retry_dispatch_enabled": true,
       "stale_claim_terminal_status": "FAILED_TIMEOUT"
+    },
+    {
+      "id": "validate_router_dispatch_envelope",
+      "label": "Router Dispatch Envelope Doğrulaması",
+      "module": "cto_router",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_control_readiness_request_routes_as_proposal_only tests.test_runtime_status_model.WorkerStatusModelTest.test_router_blocks_forbidden_permissions_before_worker_dispatch tests.test_runtime_status_model.WorkerStatusModelTest.test_router_subtasks_inherit_parent_correlation_and_idempotency tests.test_runtime_status_model.WorkerStatusModelTest.test_worker_block_reason_handles_legacy_string_false_and_permissions tests.test_runtime_status_model.WorkerStatusModelTest.test_legacy_task_queue_enqueue_uses_router_metadata",
+      "production_deploy": false,
+      "secret_values_logged": false,
+      "task_envelope_schema_version": 1,
+      "router_policy_version": "cto_router_dispatch_review_v1"
     },
     {
       "id": "classify_telegram_asset_intake",

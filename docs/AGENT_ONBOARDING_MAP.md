@@ -188,6 +188,9 @@ Observed issue completion notu:
 - Drift registry/settings eksikleri `classify_module_registry_settings_candidates()` ile candidate olarak siniflandirilir; tek drift alert sinyali otomatik registry/settings eklemek icin yeterli degildir.
 - Repo apply no-change sonucu `classify_repo_apply_outcome()` ile terminal `NO_CHANGE` veya `DONE` olur; terminal sonuclar retry/backlog enqueue etmez.
 - `cto_task_router.classify_task_route()` readiness, audit, risk review, test plan ve proposal-only isleri `Controls / Readiness` lane'ine tasir.
+- `cto_task_router.submit_task()` her parent task icin TaskEnvelope v1 metadata'si yazar: source, actor_id, request_id, correlation_id, idempotency_key, task_type, risk_level, requested_permissions, reply_policy ve redacted payload.
+- Worker dispatch eligibility router kararindan gelir; control task, Telegram parent task, production deploy ve secret/IAM/billing/DNS/firewall/destructive database/Google Ads/GCloud mutate permissionlari worker dispatch oncesi bloke edilir.
+- Eski queue kayitlarinda `worker_eligible` string `false`/`0`/`no` gibi gelirse `worker_block_reason()` bunu blok kabul eder; worker subtasks parent correlation ID ve idempotency zincirini tasir.
 - Worker workspace preflight `bootstrap_diagnostics.json` uretir; missing/invalid bootstrap ana isi baslatmadan acik tanı verir. Sıkı modda eksik repo checkout `repo_checkout_missing`, gecersiz checkout `repo_checkout_invalid`, test yuzeyi yoklugu `no_test_surface`, pipeline kaniti yoklugu `pipeline_evidence_missing` reason code'u ile fail olur.
 - Timeout/usage-limit retry kararlari `retry_policy` idempotency key'i ile ayni task uzerinde tutulur.
 - `atomic_json_state_audit()` state JSON ve kalan tmp dosyalarini raporlar; tmp dosyasini otomatik guvenilir state saymaz.
