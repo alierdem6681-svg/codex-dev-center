@@ -447,3 +447,9 @@ Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regres
 Dashboard Görevler listesi geçmiş görev kalabalığını veri silmeden UI filtre katmanında temizleyecek şekilde güncellendi. Varsayılan görünüm canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change ve tamamlanmış kayıtları gizler; `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak dahil eder.
 
 Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` boş durumu görünür. Davranış `tests/test_dashboard_account_menu_markup.py` markup regresyon testiyle sabitlendi ve dashboard state template kayıtları yeni sözleşmeye hizalandı. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## 2026-06-05 Staging Readiness Wrapper Command Source Apply
+
+Production readiness analizi devamında staging health/smoke default command kaynakları wrapper scriptlere hizalandı. `production_environment_manager` ve `production_deploy_controller` default map'leri, deploy policy template, module settings ve action catalog artık `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` komutlarını gösterir.
+
+Doğrudan `production_environment_manager.py health-check/smoke-test --scope staging` çağrıları wrapper iç uygulaması olarak kalır; policy/action/default görünürlüğü wrapper scriptleri tek kaynak yapar. Davranış `tests/test_staging_readiness_wrappers.py` içine eklenen regresyon testiyle sabitlendi. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.

@@ -353,6 +353,7 @@ Faz 19B-10A Model Policy
 - [x] Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur.
 - [x] Statik wrapper kontrati `tests/test_staging_readiness_wrappers.py` ile sabitlendi.
 - [x] Deploy policy, module registry/settings/action catalog ve onboarding dokumanlari staging wrapper sozlesmesine hizalandi.
+- [x] Staging health/smoke default command kaynaklari wrapper scriptlere hizalandi.
 
 ## Faz 55 - Readiness Report Text Freshness
 

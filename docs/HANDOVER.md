@@ -1211,3 +1211,30 @@ Not:
 - Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## Staging Readiness Wrapper Command Source Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-140039 / CTO-TASK-20260605-132138-723946-PRODUCTION-READINESS-ANALIZI
+Worker: worker-1
+
+Eklenenler:
+- Staging health/smoke default command kaynakları `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` wrapper scriptlerine hizalandı.
+- `supervisor/production_environment_manager.py`, `supervisor/production_deploy_controller.py`, `state_templates/deploy_policy.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` aynı wrapper command sözleşmesini taşır.
+- `tests/test_staging_readiness_wrappers.py` policy/default/action kayıtlarının wrapper scriptleri göstermesini regresyon testiyle sabitler.
+- Onboarding, production readiness gate, AGENTS, anayasa, roadmap ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m unittest tests.test_staging_readiness_wrappers` PASS, 3 test.
+- `python3 -m unittest tests.test_runtime_status_model.ProductionReadinessSuiteScanTest` PASS, 11 test.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m json.tool` ile değişen state template JSON dosyaları ayrı ayrı PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; state/report yazımları read-only modda `write-skipped`.
+- `git diff --check` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` bu sandbox'ta `/opt/codex-dev-center/state/task_queue.json.lock` read-only filesystem hatası nedeniyle tamamlanamadı; hedefli production readiness scan testi ayrıca PASS alındı.
+
+Not:
+- Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, `reports/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.

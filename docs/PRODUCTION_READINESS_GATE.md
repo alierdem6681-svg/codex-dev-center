@@ -32,6 +32,7 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 
 - `staging_smoke_test` dry-run sonucunda `dry_run=true` ve `mutating_cloud_operations_performed=false` alanlarını doğrular.
 - `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` staging scope'u explicit geçirir; production scope varsayılan wrapperları ön canlı kapısı yerine kullanılmamalıdır.
+- Staging health/smoke default command kayıtları wrapper scriptleri göstermelidir; doğrudan manager health/smoke çağrıları yalnız wrapper iç uygulaması olarak kabul edilir.
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
 - `ack_watchdog_retry_contract` aynı Telegram update için ACK correlation id ve duplicate ACK suppression davranışını, output gürültüsünü anlamlı progress saymayan watchdog ayrımını ve retryable/non-retryable hata matrisini doğrular.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.

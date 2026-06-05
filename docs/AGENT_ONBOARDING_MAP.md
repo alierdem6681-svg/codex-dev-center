@@ -181,6 +181,7 @@ Read-only / dry-run write policy notu:
 Staging readiness wrapper notu:
 - `scripts/staging_health_check.sh` `production_environment_manager.py health-check --scope staging` calistirir.
 - `scripts/staging_smoke_test.sh` `production_environment_manager.py smoke-test --scope staging` calistirir.
+- Staging health/smoke default command kaynakları wrapper scriptlere isaret eder; direct manager komutu sadece wrapper ic uygulamasi olarak kalir.
 - Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur; `tests/test_staging_readiness_wrappers.py` bunu statik dogrular.
 - Bu sozlesme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 

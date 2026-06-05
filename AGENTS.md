@@ -273,3 +273,5 @@ Her test icin `{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}` formatinda 
 - `scripts/staging_smoke_test.sh`
 
 Bu wrapperlar `production_environment_manager.py health-check --scope staging` ve `smoke-test --scope staging` çağrılarını yapar; `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek argüman passtrough desteğini korur. Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
+Deploy policy ve action/default command kayıtlarında staging health/smoke komutları wrapper scriptleri göstermelidir; doğrudan manager çağrısı yalnız wrapper iç uygulaması olarak kalır.

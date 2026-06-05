@@ -141,6 +141,8 @@ Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı
 
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 
+Deploy policy, action catalog ve default command kayıtları staging health/smoke için wrapper scriptleri göstermelidir; doğrudan manager çağrıları yalnız wrapper iç uygulaması olarak kalır.
+
 Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
 
 ## 15. Worker Bootstrap Preflight Kuralı
