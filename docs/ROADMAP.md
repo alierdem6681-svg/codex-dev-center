@@ -198,6 +198,8 @@ Faz 19B-10A Model Policy
 - [x] `RUNNING` / `Calisiyor` gorevleri listenin ustunde kalir.
 - [x] Canliya alinmis gorevler varsayilan ana listeden gizlenir.
 - [x] `Canliya alinanlari goster` checkbox'i canli gorevleri listeye dahil eder.
+- [x] Kapali/gecmis gorevler varsayilan ana listeden gizlenir; aktif ve yeni gorev akislari gorunur kalir.
+- [x] Guncel gorev listesi bosaldiginda temiz bos durum metni gosterilir.
 - [x] Filtre option'lari yenilemede gereksiz yeniden yazilmayarak secili filtre korunur.
 - [x] Dashboard markup regresyon testi ile davranis sozlesmesi sabitlendi.
 

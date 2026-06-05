@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T12:00:11+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -48,6 +48,20 @@
       "legacy_decision_source_allowed": false,
       "readiness_report_text_freshness_checked": true,
       "readiness_report_required_gate_consistency_checked": true
+    },
+    {
+      "id": "view_dashboard_tasks",
+      "label": "Dashboard Görev Listesini Gör",
+      "module": "dashboard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "endpoint": "/api/status",
+      "payload_key": "tasks",
+      "hides_historical_by_default": true,
+      "hides_live_by_default": true,
+      "production_deploy_allowed": false
     },
     {
       "id": "panel_first_user_setup",

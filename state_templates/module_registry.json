@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+    "updated_at": "2026-06-05T12:00:11+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -9,12 +9,13 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Canlı izleme, pipeline tracking, report text freshness metadata, ayarlar ve kontrol paneli.",
-      "actions": [
-        "refresh_dashboard",
-        "view_quality_gate_status",
-        "update_dashboard_settings",
-        "restart_panel"
+            "description": "Canlı izleme, pipeline tracking, report text freshness metadata, geçmiş görevleri gizleyen görev listesi, ayarlar ve kontrol paneli.",
+            "actions": [
+                "refresh_dashboard",
+                "view_dashboard_tasks",
+                "view_quality_gate_status",
+                "update_dashboard_settings",
+                "restart_panel"
       ]
     },
     {

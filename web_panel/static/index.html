@@ -760,6 +760,7 @@
         return ['DONE','FINAL_REPORTED','CANCELLED','CANCELED','ARCHIVED','CLOSED'].includes(status)
           || ['CLOSED','CANCELLED','CANCELED','ARCHIVED'].includes(foldedText(t.pipeline_status || t.lifecycle_status));
       }
+      function taskIsHistorical(t){ return taskIsClosed(t) && !taskIsLive(t); }
       function workerIsAvailable(w){
         const status = foldedText(w.status || w.state || w.active);
         const serviceActive = foldedText(w.service_active || w.active);
@@ -839,7 +840,8 @@
         selectEl.value = current === '' || values.includes(current) ? current : '';
       }
       function fillFilters(){
-        const allTasks = tasks();
+        let allTasks = tasks().filter(t => !taskIsHistorical(t));
+        if (!showLiveTasks.checked) allTasks = allTasks.filter(t => !taskIsLive(t));
         const allWorkers = workers();
         const statuses = [...new Set(allTasks.map(t => t.status).filter(Boolean))].sort();
         const risks = [...new Set(allTasks.map(t => t.risk || t.risk_level).filter(Boolean))].sort();
@@ -851,6 +853,7 @@
       function filteredTasks(){
         let list = tasks();
         if (!showLiveTasks.checked) list = list.filter(t => !taskIsLive(t));
+        list = list.filter(t => !taskIsHistorical(t));
         const q = search.value.toLowerCase();
         list = list.filter(t => {
           const text = `${t.id || ''} ${t.title || ''} ${t.description || ''}`.toLowerCase();
@@ -864,6 +867,12 @@
       }
       function renderTasks(){
         const list = filteredTasks();
+        if (!list.length) {
+          const empty = '<div class="muted">Güncel görev yok.</div>';
+          tasksTable.innerHTML = empty;
+          tasksCards.innerHTML = empty;
+          return;
+        }
         tasksTable.innerHTML = `<table><thead><tr><th>Görev</th><th>Durum</th><th>Çalışan</th><th>Risk</th></tr></thead><tbody>${
           list.map(t => `<tr><td><strong>${esc(t.title || t.id)}</strong><br><span class="muted">${esc(t.id)}</span></td><td>${badge(t.status)}</td><td>${esc(t.assigned_worker || '-')}</td><td>${esc(t.risk || t.risk_level || '-')}</td></tr>`).join('')
         }</tbody></table>`;
@@ -1123,6 +1132,7 @@
       [statusFilter, workerFilter, riskFilter, sortMode, showLiveTasks].forEach(el => {
         el.addEventListener('change', event => {
           event.preventDefault();
+          fillFilters();
           renderTasks();
         });
       });
