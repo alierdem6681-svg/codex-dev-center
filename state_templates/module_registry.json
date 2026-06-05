@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:00:15+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -28,6 +28,19 @@
       "description": "Read-only pipeline stage backend payload with live polling revision/reset contract for dashboard flow tabs without raw task messages or terminal output.",
       "actions": [
         "view_pipeline_flow"
+      ]
+    },
+    {
+      "id": "memory_os",
+      "name": "Memory OS Readiness Guard",
+      "status": "planned",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": true,
+      "description": "Read-only guard and dashboard visibility for future Memory OS readiness; full Memory OS is not implemented yet.",
+      "actions": [
+        "check_memory_os_readiness"
       ]
     },
     {

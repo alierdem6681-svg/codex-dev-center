@@ -1076,3 +1076,27 @@ Not:
 - Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `.git/index.lock` yazımı read-only filesystem nedeniyle başarısız oldu; GitHub MCP branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## Memory OS Readiness Guard Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-050012 / CTO-BACKLOG-20260605-045453-653459-PRODUCTION-READINESS-ANALIZI
+Worker: worker-1
+
+Eklenenler:
+- `supervisor/memory_os_readiness.py` read-only JSON kontrolu.
+- Ana ve legacy `/api/status` payload'unda `memory_os_readiness` dashboard-safe ozeti.
+- `modules/memory_os/` planned modul sozlesmesi.
+- `state_templates/module_registry.json`, `state_templates/module_settings.json` ve `state_templates/action_catalog.json` kayitlari.
+- `tests/test_memory_os_readiness.py` regresyon testi.
+
+Davranis:
+- Mevcut `memory/project_memory.md` sadece baseline memory sayilir; full Memory OS hazir sayilmaz.
+- Eksik kayit semasi, index/cache, health state, Telegram hafiza komutlari, Dashboard Memory Center ve secret redaction testleri `not_ready` / `blocked_not_implemented` olarak gorunur.
+- Dashboard ozeti raw log, stdout/stderr, terminal dump, secret/env/token/private key veya production deploy yetkisi dondurmez.
+
+Not:
+- Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Apply clone icinde runtime `state/system_state.json` bulunmadigi icin state template karsiliklari guncellendi.

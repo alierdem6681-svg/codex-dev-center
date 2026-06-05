@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:00:15+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -32,6 +32,24 @@
       "server_revision": true,
       "reset_token": true,
       "client_state_preserved_on_poll": true
+    },
+    {
+      "id": "check_memory_os_readiness",
+      "label": "Memory OS Hazırlık Durumunu Kontrol Et",
+      "module": "memory_os",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} supervisor/memory_os_readiness.py --json",
+      "endpoint": "/api/status",
+      "payload_key": "memory_os_readiness",
+      "full_memory_os_implemented": false,
+      "dashboard_safe_summary": true,
+      "raw_logs_included": false,
+      "terminal_output_included": false,
+      "secret_values_included": false,
+      "production_deploy": false
     },
     {
       "id": "view_quality_gate_status",

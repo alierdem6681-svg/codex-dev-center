@@ -57,6 +57,26 @@ except Exception:
             return "worker_eligible_false"
         return ""
 
+try:
+    from memory_os_readiness import build_dashboard_memory_os_readiness
+except Exception:
+    def build_dashboard_memory_os_readiness(_root=None):
+        return {
+            "contract_version": 1,
+            "status": "unknown",
+            "ready": False,
+            "blocking_reason": "memory_os_readiness_unavailable",
+            "missing_count": 0,
+            "missing_capabilities": [],
+            "implemented_capabilities": [],
+            "dashboard_safe": True,
+            "raw_logs_included": False,
+            "terminal_output_included": False,
+            "secret_values_included": False,
+            "production_deploy_allowed": False,
+            "production_deploy_performed": False,
+        }
+
 
 ACTIVE_STATUSES = {"PENDING", "QUEUED", "ASSIGNED", "RUNNING"}
 RECOVERABLE_STATUSES = {
@@ -348,6 +368,7 @@ def status_payload():
         "time": now(),
         "system_state": system_state,
         "controlled_execution": controlled_execution_summary(system_state),
+        "memory_os_readiness": build_dashboard_memory_os_readiness(ROOT),
         "qualityGateView": build_quality_gate_view(production_readiness, last_health_check, legacy_quality_gate),
         "workers": workers_payload,
         "tasks": tasks_payload,

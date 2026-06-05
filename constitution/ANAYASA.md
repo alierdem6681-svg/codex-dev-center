@@ -138,3 +138,9 @@ Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 
 Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 15. Memory OS Readiness Kuralı
+
+Mevcut `memory/project_memory.md` kalıcı proje hafızasıdır ancak tek başına full Memory OS değildir. Memory OS hazır sayılmadan önce kayıt şeması, index/cache, health state, Telegram hafıza komutları, Dashboard Memory Center ve secret redaction testleri uygulanmış olmalıdır.
+
+`memory_os_readiness` görünürlüğü sadece read-only durum özeti sağlar. Bu özet production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.

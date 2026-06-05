@@ -1,0 +1,14 @@
+{
+  "id": "memory_os",
+  "name": "Memory OS Readiness Guard",
+  "status": "planned",
+  "risk": "medium",
+  "settings_enabled": true,
+  "actions_enabled": true,
+  "dashboard_visible": true,
+  "description": "Read-only readiness guard for the future Memory OS; existing project memory is not treated as full Memory OS.",
+  "actions": [
+    "check_memory_os_readiness"
+  ],
+  "updated_at": "2026-06-05T05:00:15+00:00"
+}

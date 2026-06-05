@@ -26,6 +26,30 @@ HOST = os.environ.get("CODEX_PANEL_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CODEX_PANEL_PORT", "8080"))
 SCOPE = os.environ.get("CODEX_PANEL_SCOPE", "production")
 
+SUPERVISOR_DIR = ROOT / "supervisor"
+if str(SUPERVISOR_DIR) not in sys.path:
+    sys.path.insert(0, str(SUPERVISOR_DIR))
+
+try:
+    from memory_os_readiness import build_dashboard_memory_os_readiness
+except Exception:
+    def build_dashboard_memory_os_readiness(_root=None):
+        return {
+            "contract_version": 1,
+            "status": "unknown",
+            "ready": False,
+            "blocking_reason": "memory_os_readiness_unavailable",
+            "missing_count": 0,
+            "missing_capabilities": [],
+            "implemented_capabilities": [],
+            "dashboard_safe": True,
+            "raw_logs_included": False,
+            "terminal_output_included": False,
+            "secret_values_included": False,
+            "production_deploy_allowed": False,
+            "production_deploy_performed": False,
+        }
+
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -125,6 +149,7 @@ def status_payload():
         "time": now(),
         "system_state": system_state,
         "controlled_execution": controlled_execution_summary(system_state),
+        "memory_os_readiness": build_dashboard_memory_os_readiness(ROOT),
         "qualityGateView": build_quality_gate_view(production_readiness, last_health_check, legacy_quality_gate),
         "workers": read_json(STATE / "workers.json", {"workers": []}),
         "tasks": read_json(STATE / "task_queue.json", {"tasks": []}),

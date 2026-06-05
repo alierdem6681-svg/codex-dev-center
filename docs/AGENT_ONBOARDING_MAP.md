@@ -91,6 +91,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `parallel_worker_regression` kapısı dört dummy/simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
+- supervisor/memory_os_readiness.py gelecekteki Memory OS için read-only readiness guard üretir; mevcut `memory/project_memory.md` dosyasını full Memory OS saymaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
@@ -120,6 +121,7 @@ Dashboard status API notu:
 - Expand state regresyonu `tests/test_runtime_status_model.py` icindeki `DashboardPipelineFlowUiTest` ile stable key, click-intent handler ve refresh state merge sozlesmesini kontrol eder.
 - `/api/pipeline-flow` live polling kontrati `serverRevision`, `resetToken`, `requiresUiReset`, `mergePolicy` ve `initialUiDefaults` alanlarini dondurur. Frontend eski veya ayni revision refresh'lerini uygulamaz; reset token degismedikce client-owned stage/expand/filter/scroll state korunmalidir.
 - `/api/status` ana ve legacy panelde `qualityGateView` alanini dondurur; dashboard kalite kapisi badge, renk, filtre ve ozet karari icin sadece bu kontrati kullanmalidir. `quality_gate_status` legacy diagnostik bilgi olarak `legacy_quality_gate_status` altinda tasinir ve pozitif READY karari uretmez.
+- `/api/status` ana ve legacy panelde `memory_os_readiness` alanini dondurur. Bu alan kisa, read-only ve dashboard-safe ozettir; Memory OS eksikse `not_ready` / `blocked_not_implemented` gorunur ve production deploy yetkisi vermez.
 - `web_panel/static/index.html` Gorevler listesi render oncesinde deterministik siralama uygular; `RUNNING`/`Calisiyor` gorevleri ustte kalir, `DEPLOYED`/canli gorevler varsayilan listeden gizlenir ve `Canliya alinanlari goster` checkbox'i ile dahil edilir.
 - Gorev filtreleri runtime yenilemelerinde secili degeri korumali ve filtre option HTML'i degismediyse yeniden yazilmamalidir; bu sayede filtre secimi panel davranisini bozmaz.
 
@@ -174,6 +176,12 @@ Read-only / dry-run write policy notu:
 - `CHECK_MODE` veya `CODEX_CHECK_MODE` `read_only` ya da `dry_run` ise readiness, drift ve smoke write adapter'lari state/report dosyasi olusturmaz.
 - Sonuc payload'lari `mode`, `runtime_write_status`, `write_evidence`, `write_status`, `target`, `operation`, `write_attempted`, `write_status=skipped` ve `skip_reason` alanlariyla kanit dondurur.
 - `CHECK_MODE` verilmezse davranis `write_enabled` olarak geriye uyumludur.
+
+Memory OS readiness notu:
+- `modules/memory_os/` Memory OS'un kendisi degil, gelecekteki Memory OS icin readiness guard sozlesmesidir.
+- `supervisor/memory_os_readiness.py --json` kayit semasi, index/cache, health state, Telegram hafiza komutlari, Dashboard Memory Center ve secret redaction testleri eksikse `not_ready` dondurur.
+- Dashboard ozeti raw log, stdout/stderr, secret/env/token/private key, terminal dump veya production deploy yetkisi tasimaz.
+- Module registry status `planned` kalmalidir; full Memory OS uygulanmadan `active` yapilmamalidir.
 
 Staging readiness wrapper notu:
 - `scripts/staging_health_check.sh` `production_environment_manager.py health-check --scope staging` calistirir.

@@ -1,0 +1,17 @@
+{
+  "actions": [
+    {
+      "id": "check_memory_os_readiness",
+      "label": "Check Memory OS Readiness",
+      "module": "memory_os",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} supervisor/memory_os_readiness.py --json",
+      "dashboard_payload_key": "memory_os_readiness",
+      "production_deploy": false
+    }
+  ],
+  "updated_at": "2026-06-05T05:00:15+00:00"
+}

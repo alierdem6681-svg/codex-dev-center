@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T18:05:05+00:00",
+  "updated_at": "2026-06-05T05:00:15+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -53,6 +53,68 @@
     "reset_token_required": true,
     "requires_ui_reset_default": false,
     "merge_policy_client_state_preserved": true
+  },
+  "memory_os": {
+    "enabled": false,
+    "readiness_guard_enabled": true,
+    "implementation_status": "planned",
+    "dashboard_status_payload_key": "memory_os_readiness",
+    "full_memory_os_implemented": false,
+    "project_memory_file_available": true,
+    "record_schema_defined": false,
+    "index_cache_enabled": false,
+    "health_state_enabled": false,
+    "telegram_memory_commands_enabled": false,
+    "dashboard_memory_center_enabled": false,
+    "secret_redaction_tests_enabled": false,
+    "return_raw_logs": false,
+    "return_terminal_output": false,
+    "return_secret_values": false,
+    "production_deploy_allowed": false,
+    "capabilities": {
+      "project_memory_file": {
+        "implemented": true,
+        "evidence_files": [
+          "memory/project_memory.md"
+        ]
+      },
+      "record_schema": {
+        "implemented": false,
+        "evidence_files": [
+          "state_templates/memory_os_schema.json"
+        ]
+      },
+      "index_cache": {
+        "implemented": false,
+        "evidence_files": [
+          "supervisor/memory_os_index.py"
+        ]
+      },
+      "health_state": {
+        "implemented": false,
+        "evidence_files": [
+          "state_templates/memory_os_health.json"
+        ]
+      },
+      "telegram_memory_commands": {
+        "implemented": false,
+        "evidence_files": [
+          "supervisor/telegram_memory_commands.py"
+        ]
+      },
+      "dashboard_memory_center": {
+        "implemented": false,
+        "evidence_files": [
+          "web_panel/memory_center.py"
+        ]
+      },
+      "secret_redaction_tests": {
+        "implemented": false,
+        "evidence_files": [
+          "tests/test_memory_os_secret_redaction.py"
+        ]
+      }
+    }
   },
   "panel_auth": {
     "enabled": true,

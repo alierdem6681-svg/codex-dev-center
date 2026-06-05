@@ -403,3 +403,15 @@ Production readiness analizi backlog devaminda staging health/smoke kontrollerin
 `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` mevcut wrapper kalibini korur, `CODEX_DEV_CENTER_HOME` ve `CODEX_PYTHON` destekler, ek argumanlari iletir ve manager komutlarini `--scope staging` ile cagirir. Wrapper sozlesmesi `tests/test_staging_readiness_wrappers.py` ile statik olarak sabitlendi; deploy policy ve module/action template kayitlari staging health/smoke komutlarini gorunur hale getirir.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Memory OS Readiness Guard Apply
+
+Memory OS henuz uygulanmis sayilmamali. Bu paket `supervisor/memory_os_readiness.py` ile read-only readiness guard ekledi ve ana/legacy dashboard `/api/status` payload'una `memory_os_readiness` ozeti bagladi.
+
+Sonuc:
+- Mevcut `memory/project_memory.md` baseline hafiza olarak taninir, full Memory OS sayilmaz.
+- Kayit semasi, index/cache, health state, Telegram hafiza komutlari, Dashboard Memory Center ve secret redaction testleri eksikse status `not_ready`, blocking reason `blocked_not_implemented` olur.
+- `modules/memory_os/` ve state template kayitlari planned/disabled durumda tutulur; full Memory OS uygulanmadan active yapilmamalidir.
+- Dashboard ozeti raw log, stdout/stderr, terminal dump, secret/env/token/private key veya production deploy yetkisi tasimaz.
+
+Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.

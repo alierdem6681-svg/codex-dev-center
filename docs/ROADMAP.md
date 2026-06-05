@@ -351,3 +351,12 @@ Faz 19B-10A Model Policy
 - [x] Wrapperlar `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek arguman passtrough sozlesmesini korur.
 - [x] Statik wrapper kontrati `tests/test_staging_readiness_wrappers.py` ile sabitlendi.
 - [x] Deploy policy, module registry/settings/action catalog ve onboarding dokumanlari staging wrapper sozlesmesine hizalandi.
+
+## Faz 55 - Memory OS Readiness Guard
+
+- [x] `memory_os` module/action/settings sozlesmesi planned durumda eklendi.
+- [x] `supervisor/memory_os_readiness.py` read-only kontrolu Memory OS eksiklerini `not_ready` olarak raporlar.
+- [x] Ana ve legacy `/api/status` payload'u kisa `memory_os_readiness` dashboard ozeti dondurur.
+- [x] Mevcut `memory/project_memory.md` full Memory OS olarak sayilmaz.
+- [x] Regresyon testi dashboard ozeti, eksik capability listesi ve template kayitlarini sabitledi.
+- [ ] Full Memory OS kayit semasi, index/cache, health state, Memory Center ve Telegram hafiza komutlari sonraki paketlere birakildi.

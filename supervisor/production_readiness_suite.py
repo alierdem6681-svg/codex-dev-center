@@ -198,6 +198,7 @@ def import_smoke(results: dict[str, Any]) -> None:
         ROOT / "supervisor" / "production_readiness_suite.py",
         ROOT / "supervisor" / "production_environment_manager.py",
         ROOT / "supervisor" / "github_safe_flow.py",
+        ROOT / "supervisor" / "memory_os_readiness.py",
         ROOT / "web_panel" / "auth.py",
         ROOT / "web_panel" / "server.py",
     ]
@@ -242,6 +243,10 @@ def required_file_regression(results: dict[str, Any]) -> None:
         "state_templates/production_readiness_policy.json",
         "state_templates/github_safe_flow_policy.json",
         "web_panel/static/index.html",
+        "supervisor/memory_os_readiness.py",
+        "modules/memory_os/module.json",
+        "modules/memory_os/settings.json",
+        "modules/memory_os/actions.json",
     ]
     missing = [item for item in required if not path_exists(item)]
     record(results, "regression_test", not missing, {"missing": missing})

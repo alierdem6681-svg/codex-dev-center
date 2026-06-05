@@ -247,3 +247,9 @@ Her test icin `{suite}/{worker_id}/{test_name_hash}-{pid}-{counter}` formatinda 
 - `scripts/staging_smoke_test.sh`
 
 Bu wrapperlar `production_environment_manager.py health-check --scope staging` ve `smoke-test --scope staging` çağrılarını yapar; `CODEX_DEV_CENTER_HOME`, `CODEX_PYTHON` ve ek argüman passtrough desteğini korur. Bu görünürlük production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
+## MEMORY OS READINESS GUARD V1
+
+`supervisor/memory_os_readiness.py` gelecekteki Memory OS icin read-only hazirlik kontrolu uretir. Mevcut `memory/project_memory.md` full Memory OS sayilmaz.
+
+Ana ve legacy `/api/status` payload'u `memory_os_readiness` alanini kisa ve dashboard-safe olarak dondurur. Memory OS eksikse status `not_ready`, blocking reason `blocked_not_implemented` olur. Bu gorunurluk raw log, stdout/stderr, terminal dump, secret/env/token/private key, production deploy, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
