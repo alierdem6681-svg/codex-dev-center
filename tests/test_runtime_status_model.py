@@ -742,6 +742,20 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertFalse(contract["production_deploy_performed"])
         self.assertFalse(contract["mutating_cloud_operations_performed"])
 
+    def test_pipeline_gate_rollback_readiness_contract_is_non_mutating(self):
+        contract = production_readiness_suite.pipeline_gate_rollback_readiness_contract()
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "static_policy_readiness_contract")
+        self.assertTrue(contract["self_registered"])
+        self.assertEqual(contract["missing_required_gates"], [])
+        self.assertTrue(contract["workflow_guard_ok"])
+        self.assertTrue(contract["go_no_go_criteria"]["go_requires_all_required_gates_pass"])
+        self.assertTrue(contract["rollback_decision_chain"]["post_rollback_health_check_required"])
+        self.assertFalse(contract["production_deploy_performed"])
+        self.assertFalse(contract["staging_deploy_performed"])
+        self.assertFalse(contract["mutating_cloud_operations_performed"])
+
     def test_standard_quality_report_passes_with_required_readiness_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -757,6 +771,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "integration_test",
                 "staging_smoke_test",
                 "rollback_simulation",
+                "pipeline_gate_rollback_readiness",
                 "restart_simulation",
                 "failure_injection_simulation",
                 "parallel_worker_regression",
@@ -870,6 +885,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "integration_test",
                 "staging_smoke_test",
                 "rollback_simulation",
+                "pipeline_gate_rollback_readiness",
                 "restart_simulation",
                 "failure_injection_simulation",
                 "parallel_worker_regression",
@@ -935,6 +951,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "integration_test",
                 "staging_smoke_test",
                 "rollback_simulation",
+                "pipeline_gate_rollback_readiness",
                 "restart_simulation",
                 "failure_injection_simulation",
                 "parallel_worker_regression",
@@ -1003,6 +1020,7 @@ class WorkerStatusModelTest(unittest.TestCase):
                 "integration_test",
                 "staging_smoke_test",
                 "rollback_simulation",
+                "pipeline_gate_rollback_readiness",
                 "restart_simulation",
                 "failure_injection_simulation",
                 "parallel_worker_regression",

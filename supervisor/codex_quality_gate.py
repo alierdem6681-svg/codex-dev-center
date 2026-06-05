@@ -50,6 +50,7 @@ STANDARD_REPORT_GATES = {
     "simulation_dry_run": [
         "staging_smoke_test",
         "rollback_simulation",
+        "pipeline_gate_rollback_readiness",
         "restart_simulation",
         "failure_injection_simulation",
         "parallel_worker_regression",

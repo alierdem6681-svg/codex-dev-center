@@ -90,6 +90,8 @@ Production readiness sonucu Telegram'a bildirilecekse önce `telegram_result_rep
 
 Arka plan CTO ACK, progress-aware watchdog ve retryable hata sınıflandırması production readiness içinde ayrı sözleşmeyle doğrulanmalıdır. Aynı Telegram `update_id` için `ack_correlation_id` tek job/tek ACK davranışını korumalı; yalnız stdout gürültüsü anlamlı progress sayılmamalı; timeout/usage-limit/geçici worker hataları retryable, proposal üretmeden biten veya kritik destructive istekler non-retryable/approval kapsamında kalmalıdır.
 
+Pipeline gate ve rollback readiness review production readiness içinde `pipeline_gate_rollback_readiness` sözleşmesiyle doğrulanmalıdır. Bu sözleşme Go/No-Go kriterlerini, zorunlu readiness gate listesini, GitHub Actions manuel production kapısını ve rollback hedef artifact/config/post-rollback health check karar zincirini statik policy/doküman kanıtıyla kontrol eder; production deploy veya canlı mutasyon yetkisi vermez.
+
 ## 8. Kayıt Zorunluluğu
 
 Her görev için kayıt tutulur:

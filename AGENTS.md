@@ -220,6 +220,14 @@ Telegram async ACK akisi `update_id` varsa `ack_correlation_id` ile ayni update 
 
 Bu kapi gercek Telegram API cagirmaz, production/staging deploy yapmaz, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
+## PIPELINE GATE ROLLBACK READINESS CONTRACT V1
+
+`supervisor/production_readiness_suite.py` `pipeline_gate_rollback_readiness` kapisiyla pipeline gate, Go/No-Go kriterleri ve rollback karar zincirini static policy/dokuman sozlesmesi olarak dogrular.
+
+Bu gate tum zorunlu readiness gate'lerinin policy'de yer aldigini, production kanalinin GitHub Actions manuel `Deploy to VM` workflow'u olarak kaldigini, rollback hedef artifact/config dogrulama ve post-rollback health check kaydinin dokumante edildigini kontrol eder.
+
+Bu kapi production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## OBSERVED ISSUE COMPLETION CONTRACT V1
 
 Drift registry/settings farklari tek alert sinyaliyle otomatik eklenmez; `supervisor/drift_checker.py` adaylari kanit kaynaklari ve confidence ile siniflandirir.

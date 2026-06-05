@@ -90,6 +90,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki `static_non_mutating_contract` simülasyon kapıları
 - supervisor/production_readiness_suite.py içindeki `parallel_worker_regression` kapısı dört dummy/simülasyon task için dispatch, wake, tek claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
+- supervisor/production_readiness_suite.py içindeki `pipeline_gate_rollback_readiness` kapısı pipeline gate, Go/No-Go kriterleri ve rollback karar zincirini static policy/doküman sözleşmesiyle doğrular; production deploy veya staging deploy yapmaz
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
@@ -200,6 +201,10 @@ ACK / watchdog / retry readiness notu:
 - `async_job_created(job_id)` false ise handler duplicate ACK gondermez; bu davranis Telegram polling offsetine ek idempotency emniyetidir.
 - `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'i async ACK deadline, duplicate ACK suppression, progress-aware watchdog signal ayrimi ve retryable/non-retryable hata matrisini non-mutating olarak dogrular.
 - Bu gate gercek Telegram API cagrisi, production/staging deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
+Pipeline gate / rollback readiness notu:
+- `supervisor/production_readiness_suite.py` `pipeline_gate_rollback_readiness` gate'i required readiness gate listesini, Go/No-Go kriterlerini, GitHub Actions manuel production kapısını ve rollback hedef artifact/config/post-rollback health check karar zincirini non-mutating static contract olarak doğrular.
+- Bu gate gerçek deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
 
 ## Servis Keşfi
 
