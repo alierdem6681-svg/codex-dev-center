@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T11:59:18+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -48,6 +48,18 @@
       "legacy_decision_source_allowed": false,
       "readiness_report_text_freshness_checked": true,
       "readiness_report_required_gate_consistency_checked": true
+    },
+    {
+      "id": "view_dashboard_shell",
+      "label": "Dashboard Kabuk Görünümü",
+      "module": "dashboard",
+      "risk": "low",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "static_markup_contract": true,
+      "background_image_enabled": false,
+      "removed_background_asset": "web_panel/static/assets/dashboard-landscape.png"
     },
     {
       "id": "panel_first_user_setup",

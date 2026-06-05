@@ -411,3 +411,9 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 Dashboard Neutral Background Apply
+
+Kisa Analiz apply gorevinde dashboard kabugundaki doga/manzara arka plan gorseli kaldirildi. `web_panel/static/index.html` notr `var(--bg)` arka plana donduruldu ve kullanilmayan `web_panel/static/assets/dashboard-landscape.png` repo asset'i silindi.
+
+Regresyon testi dashboard markup'inda `/assets/dashboard-landscape.png` veya CSS asset `url()` arka plan referansi bulunmamasini dogrular. Dashboard template kayitlari `background_image_enabled=false` olarak guncellendi. Production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

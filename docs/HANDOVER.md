@@ -1095,3 +1095,21 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## Dashboard Neutral Background Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-115547 / CTO-TASK-20260605-075403-232757-KISA-ANALIZ
+Worker: worker-3
+
+Eklenenler:
+- Dashboard kabugundaki doga/manzara arka plan gorseli kaldirildi ve sayfa notr `var(--bg)` arka plana donduruldu.
+- Kullanilmayan `web_panel/static/assets/dashboard-landscape.png` repo asset'i silindi.
+- `tests/test_dashboard_account_menu_markup.py` dashboard markup'inda `/assets/dashboard-landscape.png` ve CSS asset `url()` arka plan referansi bulunmamasini dogrular.
+- Dashboard module/template kayitlari `background_image_enabled=false` kontratiyla guncellendi.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
+- Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.

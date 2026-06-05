@@ -86,6 +86,8 @@ Dashboard kalite kapısı görünümü tek kaynaklı olmalıdır. Ana ve legacy 
 
 Dashboard ham readiness rapor metnini gösterirken `report_text_status.readiness` metadata'sını da döndürmelidir. Rapor policy güncellemesinden eskiyse veya policy `required_gates` listesini tam yansıtmıyorsa ham PASS metni güncel kanıt sayılmaz ve `UNKNOWN`/stale olarak işaretlenir.
 
+Dashboard panel kabuğu nötr arka plan kullanmalıdır; doğa/manzara görseli dashboard arka planı olarak yüklenmemelidir. Bu UI sözleşmesi production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
 Production readiness sonucu Telegram'a bildirilecekse önce `telegram_result_report_flow` sözleşmesiyle kısa ve güvenli özet doğrulanmalıdır. Bu özet staging health/smoke, rollback planı, readiness sonucu ve production deploy yapılmadı bilgisini taşıyabilir; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key değeri veya runtime path bilgisi taşıyamaz ve gerçek Telegram API çağrısı yapmadan test edilir.
 
 ## 8. Kayıt Zorunluluğu
