@@ -113,12 +113,7 @@ def settings() -> dict[str, Any]:
                 deploy_policy_data.get("automatic_production_enabled", deploy.get("automatic_production_enabled", False)),
             )
         ),
-        "manual_approval_required": bool(
-            production_policy.get(
-                "manual_approval_required_for_normal_app_deploy",
-                deploy_policy_data.get("production_requires_explicit_approval", deploy.get("production_requires_explicit_approval", False)),
-            )
-        ),
+        "manual_approval_required": False,
         "normal_app_deploy_allowed_when_all_gates_pass": bool(
             production_policy.get(
                 "normal_app_deploy_allowed_when_all_gates_pass",
@@ -241,8 +236,6 @@ def start(auto: bool = False) -> dict[str, Any]:
     blockers: list[str] = []
     if not cfg["automatic_production_enabled"]:
         blockers.append("automatic_production_disabled")
-    if cfg["manual_approval_required"]:
-        blockers.append("normal_app_deploy_explicit_approval_required_by_policy")
     if not readiness["ok"]:
         blockers.append("readiness_not_pass")
     if not critical["ok"]:

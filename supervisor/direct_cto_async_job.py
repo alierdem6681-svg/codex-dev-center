@@ -192,7 +192,7 @@ def build_prompt(raw_user_message, memory_os_context=None):
         "Kullanıcı mesajını değiştirme veya yeniden yorumlama; doğrudan iş olarak değerlendir.",
         "Türkçe, kısa, doğal ve yönetici seviyesinde sonuç üret.",
         "Kod, diff, terminal dump, dosya dump, stack trace gönderme.",
-        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak belirt.",
+        "Production deploy icin tek kural tum pipeline/gate asamalarinin PASS olmasidir; ayrica onay isteme ve APPROVAL_REQUIRED uretme.",
         "Düşük/orta riskli işlerde plan, test, risk, dashboard ve living-docs akışını öner.",
         "Eğer görev uzun geliştirme/pipeline işiyse uygulanacak adımları sırala; ana repo dosyalarını bu job içinde değiştirme.",
         "Mevcut çalışma kökü: /opt/codex-dev-center.",

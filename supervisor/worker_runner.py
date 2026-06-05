@@ -15,12 +15,11 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .critical_operation_policy import approval_required_payload
     from .progress_aware_runner import run_progress_aware
     from .repo_apply_outcome import classify_repo_apply_outcome
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
-        TASK_STATUS_APPROVAL_REQUIRED,
+        ACTIVE_TASK_STATUSES,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -41,12 +40,11 @@ try:
     )
     from .worker_bootstrap import bootstrap_preflight, write_bootstrap_diagnostics
 except ImportError:
-    from critical_operation_policy import approval_required_payload
     from progress_aware_runner import run_progress_aware
     from repo_apply_outcome import classify_repo_apply_outcome
     from state_file_lock import state_file_lock
     from task_status_constants import (
-        TASK_STATUS_APPROVAL_REQUIRED,
+        ACTIVE_TASK_STATUSES,
         TASK_STATUS_DONE,
         TASK_STATUS_FAILED_NO_PROPOSAL,
         TASK_STATUS_FAILED_RETRYABLE,
@@ -227,7 +225,7 @@ Fallback nedeni: {reason}
 
 1. Parent/task baglamini guvenli proposal seviyesinde ele al.
 2. Ana repo dosyalarina dogrudan dokunma.
-3. Kritik altyapi, secret, IAM, billing, DNS, firewall ve destructive database islerini APPROVAL_REQUIRED kabul et.
+3. Kritik altyapi, secret, IAM, billing, DNS, firewall ve destructive database islerinde kullanicidan onay isteme; ilgili pipeline/gate PASS degilse fail nedeni raporla.
 4. Kucuk, test edilebilir repo/app iyilestirmesi icin CTO review bekleyen oneriyi hazirla.
 
 Ozet:
@@ -262,9 +260,9 @@ Degerlendirme:
 - Kritik altyapi kapsamina giren isler otomatik yapilmayacak.
 - Bu ciktinin amaci CTO review icin guvenli is tanimini tamamlamaktir.
 
-Approval:
+Gate:
 - Normal app/repo/pipeline fix: gate PASS ise otomatik ilerleyebilir.
-- Kritik altyapi veya veri kaybi riski: APPROVAL_REQUIRED.
+- Kritik altyapi veya veri kaybi riski: pipeline/gate sonucuna gore PASS/FAIL raporla.
 """,
         "LIVING_DOCS_CHECKLIST.md": """# Living Docs Checklist
 
@@ -360,16 +358,45 @@ def upsert_worker_claim(
     )
     workers["updated_at"] = claim_time
 
+
+def task_has_active_child(task: dict[str, Any], tasks: list[dict[str, Any]]) -> bool:
+    parent_id = str(task.get("id") or "")
+    child_refs = {
+        str(task.get("active_child_task_id") or ""),
+        str(task.get("repo_apply_child") or ""),
+        str(task.get("backlog_dispatcher_child") or ""),
+    }
+    child_refs.discard("")
+    for child in tasks:
+        child_id = str(child.get("id") or "")
+        linked = (
+            child_id in child_refs
+            or str(child.get("parent_task") or "") == parent_id
+            or str(child.get("parent_task_id") or "") == parent_id
+        )
+        if linked and normalize_status(child.get("status")) in ACTIVE_TASK_STATUSES:
+            return True
+    return False
+
+
 def reconcile_stale_running_tasks_for_worker(worker_id: str) -> list[str]:
     with state_file_lock(QUEUE_PATH):
         queue = read_json(QUEUE_PATH, {"tasks": []})
         queue, _changes = normalize_queue_payload(queue)
         recovered: list[str] = []
+        changed = False
 
         for task in queue.get("tasks", []):
             if task.get("assigned_worker") != worker_id:
                 continue
             if normalize_status(task.get("status")) != TASK_STATUS_RUNNING:
+                continue
+            if task_has_active_child(task, queue.get("tasks", [])):
+                task["result"] = "child_task_in_progress"
+                task["delivery_level"] = "REPO_APPLY_RUNNING"
+                task["worker_eligible"] = False
+                task["updated_at"] = now()
+                changed = True
                 continue
             task["status"] = TASK_STATUS_FAILED_RETRYABLE
             task["result"] = "worker_service_restarted_before_completion"
@@ -380,8 +407,9 @@ def reconcile_stale_running_tasks_for_worker(worker_id: str) -> list[str]:
             task["finished_at"] = now()
             task["updated_at"] = now()
             recovered.append(str(task.get("id") or ""))
+            changed = True
 
-        if recovered:
+        if changed:
             queue["updated_at"] = now()
             write_json(QUEUE_PATH, queue)
 
@@ -737,7 +765,7 @@ def repo_apply_stage_plan_lines(
 ) -> list[str]:
     diff_review = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
     patch_plan = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
-    secret_review = "APPROVAL_REQUIRED" if secret_findings else "PASS"
+    secret_review = "FAIL" if secret_findings else "PASS"
     return [
         "## Controlled Apply Stage Plan",
         f"- 1. Proposal review: {validation_status} - validated proposal/task evidence is the only apply input.",
@@ -762,7 +790,7 @@ def repo_apply_control_report_sections(
     pipeline_status: str,
 ) -> list[str]:
     diff_review = "FAIL" if unsafe_files else ("NO_CHANGE" if not commit_files else "PASS")
-    secret_review = "APPROVAL_REQUIRED" if secret_findings else "PASS"
+    secret_review = "FAIL" if secret_findings else "PASS"
     lines = [
         "## Controlled Apply Checklist",
         f"- Risk: {safe_excerpt(risk, 80)}",
@@ -831,29 +859,6 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
     report_path = REPORT_DIR / f"{task_id}_{worker_id}_REPORT.md"
     branch = f"worker/{safe_branch_fragment(task_id)}-{run_id}"
 
-    critical = approval_required_payload(task_text(task))
-    if critical["approval_required"]:
-        metadata = {
-            "approval_required": True,
-            "critical_operation_findings": critical["critical_operation_findings"],
-            "worker_eligible": False,
-            "production_deployed": False,
-            "repo_applied": False,
-            "delivery_level": TASK_STATUS_APPROVAL_REQUIRED,
-            "validation_status": "APPROVAL_REQUIRED",
-            "pipeline_status": "NOT_RUN",
-        }
-        report_path.write_text(
-            "# WORKER REPO APPLY REPORT\n\n"
-            f"Tarih: {now()}\n"
-            f"Worker: {worker_id}\n"
-            f"Task: {task_id}\n"
-            "Sonuç: APPROVAL_REQUIRED\n"
-            "Neden: kritik altyapı kapsamı tespit edildi; otomatik apply yapılmadı.\n",
-            encoding="utf-8",
-        )
-        return TASK_STATUS_APPROVAL_REQUIRED, "critical_operation_requires_user_approval", str(report_path), metadata
-
     if not (SOURCE_ROOT / ".git").exists():
         metadata = {
             "production_deployed": False,
@@ -892,35 +897,6 @@ def execute_repo_apply_task(worker_id: str, task: dict[str, Any]) -> tuple[str, 
         )
         return TASK_STATUS_FAILED_RETRYABLE, "git_repo_clone_create_failed", str(report_path), metadata
 
-    control_dir.mkdir(parents=True, exist_ok=True)
-    bootstrap = bootstrap_preflight(
-        worktree,
-        require_git_repo=True,
-        require_local_git_metadata=True,
-        require_test_surface=True,
-    )
-    bootstrap_report = write_bootstrap_diagnostics(control_dir, bootstrap)
-    if not bootstrap["ok"] and not bootstrap.get("diagnostic_only"):
-        metadata = {
-            "git_fetch": fetch,
-            "git_clone": clone_result,
-            "bootstrap_preflight": bootstrap,
-            "bootstrap_diagnostics": str(bootstrap_report),
-            "production_deployed": False,
-            "repo_applied": False,
-            "delivery_level": TASK_STATUS_FAILED_RETRYABLE,
-            "validation_status": "NOT_READY",
-            "pipeline_status": "NOT_RUN",
-        }
-        report_path.write_text(
-            "# WORKER REPO APPLY REPORT\n\n"
-            f"Tarih: {now()}\nWorker: {worker_id}\nTask: {task_id}\nSonuç: FAILED_RETRYABLE\n"
-            f"Neden: repo apply bootstrap preflight başarısız: {bootstrap['status']}\n"
-            f"Diagnostics: {bootstrap_report}\n",
-            encoding="utf-8",
-        )
-        return TASK_STATUS_FAILED_RETRYABLE, "repo_apply_bootstrap_preflight_failed", str(report_path), metadata
-
     evidence = proposal_evidence_excerpt(task)
     prompt = f"""
 Sen Codex Dev Center apply worker'ısın.
@@ -958,6 +934,7 @@ Beklenen çıktı:
 - Final yanıtta değişen dosyaları, testleri ve riski kısa Türkçe özetle.
 """.strip()
 
+    control_dir.mkdir(parents=True, exist_ok=True)
     prompt_file = control_dir / "WORKER_APPLY_PROMPT.txt"
     out_file = control_dir / "codex.apply.out"
     err_file = control_dir / "codex.apply.err"
@@ -995,25 +972,24 @@ Beklenen çıktı:
     commit_result: dict[str, Any] = {}
     push_result: dict[str, Any] = {}
 
-    if returncode != 0 and not commit_files:
-        status = TASK_STATUS_FAILED_RETRYABLE
-        result = "repo_apply_worker_failed_without_changes"
-        validation_status = "NOT_READY"
-        pipeline_status = "NOT_RUN"
-    elif not commit_files:
+    if not commit_files:
         status = TASK_STATUS_NO_CHANGE
-        result = "repo_apply_worker_completed_without_changes_noop"
+        result = (
+            "repo_apply_worker_no_changes_after_nonzero_terminal"
+            if returncode != 0
+            else "repo_apply_worker_completed_without_changes_noop"
+        )
         validation_status = "NO_CHANGE"
-        pipeline_status = "NOT_RUN"
+        pipeline_status = "NOT_REQUIRED"
     elif unsafe_files:
         status = TASK_STATUS_VALIDATION_FAILED
         result = "repo_apply_changed_unsafe_paths"
         validation_status = "FAIL"
         pipeline_status = "NOT_RUN"
     elif secret_findings:
-        status = TASK_STATUS_APPROVAL_REQUIRED
-        result = "repo_apply_secret_scan_requires_approval"
-        validation_status = "APPROVAL_REQUIRED"
+        status = TASK_STATUS_VALIDATION_FAILED
+        result = "repo_apply_secret_scan_failed"
+        validation_status = "FAIL"
         pipeline_status = "NOT_RUN"
     else:
         pipeline_results = repo_apply_pipeline(worktree)
@@ -1053,8 +1029,6 @@ Beklenen çıktı:
 
     if status in {TASK_STATUS_DONE, TASK_STATUS_NO_CHANGE}:
         apply_status = "SUCCESS"
-    elif status == TASK_STATUS_APPROVAL_REQUIRED:
-        apply_status = "SKIPPED"
     else:
         apply_status = "FAILED"
     repo_apply_outcome = classify_repo_apply_outcome(
@@ -1124,8 +1098,6 @@ Beklenen çıktı:
         "unsafe_files": unsafe_files,
         "git_fetch": fetch,
         "git_clone": clone_result,
-        "bootstrap_preflight": bootstrap,
-        "bootstrap_diagnostics": str(bootstrap_report),
         "repo_git_metadata_local": repo_apply_git_metadata_is_local(worktree),
         "secret_scan_findings": secret_findings,
         "codex_return_code": returncode,
@@ -1150,9 +1122,6 @@ Beklenen çıktı:
         "push_stderr": push_result.get("stderr", "")[-1000:] if push_result else "",
         "repo_apply_allowed": True,
     }
-    if status == TASK_STATUS_APPROVAL_REQUIRED:
-        metadata["approval_required"] = True
-        metadata["worker_eligible"] = False
     append_log(
         task_log,
         f"{now()} WORKER={worker_id} TASK={task_id} REPO_APPLY_DONE status={status} result={result} changed={len(changed_files)} branch={branch}",

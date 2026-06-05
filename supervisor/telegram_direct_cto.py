@@ -249,9 +249,9 @@ def local_natural_reply(text):
     critical = critical_operation_findings(text)
     if critical:
         return (
-            "Bu istek kritik altyapı kapsamına giriyor ve otomatik yapılmayacak.\n"
-            "Durum: APPROVAL_REQUIRED.\n"
-            "Kısa özet: secret, token/private key/env, IAM, billing, DNS/firewall veya destructive database türü işler için açık onay gerekir."
+            "Bu istek kritik altyapı kapsamına giriyor.\n"
+            "Durum: PIPELINE_GATES_REQUIRED.\n"
+            "Kısa özet: CTO kullanıcı onayı istemeden ilerleyebilir; canlıya alma için tüm pipeline/gate aşamaları PASS olmalıdır."
         )
 
     if is_non_task_information_or_preference(text):
@@ -427,13 +427,13 @@ def classify_job_metadata(text):
         eta = "20-45 dakika"
         first_update = "yaklaşık 2 dakika içinde"
         interval = 300
-        risk = "orta; normal app kodu gate PASS ise otomatik deploy, kritik altyapı işlemi varsa onay gerekli"
+        risk = "orta; deploy için tüm pipeline/gate aşamaları PASS olmalı"
     elif deploy_approval_policy:
         name = "Production Deploy Policy"
         eta = "2-5 dakika"
         first_update = "yaklaşık 1 dakika içinde"
         interval = 180
-        risk = "orta; normal app deploy gate PASS ise otomatik, kritik altyapı işlemi APPROVAL_REQUIRED kalır"
+        risk = "orta; deploy için tüm pipeline/gate aşamaları PASS olmalı"
     elif dashboard_cleanup:
         name = "Dashboard Alan Temizliği"
         eta = "5-10 dakika"
@@ -451,13 +451,13 @@ def classify_job_metadata(text):
         eta = "10-20 dakika"
         first_update = "yaklaşık 2 dakika içinde"
         interval = 600
-        risk = "orta/yüksek; DNS/firewall/sertifika gibi kritik değişiklik gerekirse APPROVAL_REQUIRED"
+        risk = "orta/yüksek; tüm pipeline/gate aşamaları PASS olmalı"
     elif any(x in lowered for x in ["production", "canlı", "canli", "deploy", "staging", "rollback"]):
         name = "Production Readiness Analizi"
         eta = "10-20 dakika"
         first_update = "yaklaşık 2 dakika içinde"
         interval = 600
-        risk = "orta/yüksek; normal app deploy gate PASS ise otomatik, kritik altyapı işlemi varsa onay gerekli"
+        risk = "orta/yüksek; tüm pipeline/gate aşamaları PASS olmalı"
     elif any(x in lowered for x in ["pipeline", "quality gate", "test", "simülasyon", "simulasyon"]):
         name = "Pipeline Eksik Analizi"
         eta = "3-8 dakika"
@@ -1010,11 +1010,11 @@ def build_prompt(raw_user_message):
         "Cevabı mümkünse 8-12 satırda bitir.",
         "Task ID, worker id, kuyruk, iç süreç, log yolu gibi teknik iç bilgileri kullanıcıya gösterme.",
         "Normal cevaplarda şu tür savunma/iç süreç cümleleri yazma: Telegram onayı olmadan uygulama yapılmayacak, bu job’da ana repo dosyası değiştirmedim, task queue’ya aldım, loglara yazdım.",
-        "Bu tür kısıtları sadece kullanıcı özellikle sorarsa veya gerçekten risk/onay aşaması geldiyse kısa şekilde belirt.",
+        "Bu tür kısıtları sadece kullanıcı özellikle sorarsa veya gerçekten pipeline/gate riski varsa kısa şekilde belirt.",
         "Kullanıcıya iç süreç değil karar, risk, ilerleme ve sonraki adımı söyle.",
         "Kod, diff, dosya dump, terminal dump ve stack trace dökme.",
-        "Gerekiyorsa kısa plan ver; sonra kullanıcıdan net onay bekle.",
-        "Normal app production deploy icin tum gate'ler PASS ise ayrica onay isteme. IAM, secret, token/private key/env, database destructive, DNS, firewall, billing, GCloud mutate veya destructive işlem gerekiyorsa uygulama yapma; APPROVAL_REQUIRED olarak isaretle.",
+        "Gerekiyorsa kısa plan ver; kullanıcıdan onay bekleme.",
+        "Production deploy icin tek kural tum pipeline/gate asamalarinin PASS olmasidir; ayrica onay isteme ve APPROVAL_REQUIRED uretme.",
         "Düşük/orta riskli repo işleri için önce plan/test/diff/report/living-docs akışı öner.",
         "Model politikası: gpt-5.5, reasoning xhigh.",
         "",
@@ -1160,12 +1160,6 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
 
     safe_text = redact_sensitive_text(text)
     audit_passthrough(chat_id, from_user, text, safe_text, "intake")
-
-    critical_reply = local_natural_reply(safe_text) if critical_operation_findings(safe_text) else None
-    if critical_reply:
-        audit_passthrough(chat_id, from_user, text, safe_text, "approval_required")
-        send_message(token, chat_id, critical_reply)
-        return
 
     if wants_summary_before_new_tasks(safe_text):
         audit_passthrough(chat_id, from_user, text, safe_text, "summary_before_task_creation")

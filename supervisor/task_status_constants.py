@@ -108,7 +108,7 @@ TERMINAL_TASK_STATUSES = {
     TASK_STATUS_DEPLOYED,
 }
 
-APPROVAL_RISKS = {"HIGH", "CRITICAL"}
+APPROVAL_RISKS: set[str] = set()
 WORKER_BLOCKED_SOURCES = {"telegram"}
 
 SENSITIVE_PATTERNS = [
@@ -252,8 +252,6 @@ def worker_block_reason(task: dict[str, Any]) -> str:
         return "worker_eligible_false"
     if source in WORKER_BLOCKED_SOURCES:
         return "telegram_reserved_for_cto"
-    if task_risk_upper(task) in APPROVAL_RISKS:
-        return "approval_required"
     return ""
 
 

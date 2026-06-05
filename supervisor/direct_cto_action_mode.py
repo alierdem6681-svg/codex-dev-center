@@ -186,7 +186,7 @@ def record_deploy_approval_policy():
             "production_deploy_requires_quality_gate": True,
             "production_deploy_requires_staging": True,
             "production_deploy_requires_rollback_plan": True,
-            "critical_infrastructure_requires_approval": True,
+            "critical_infrastructure_requires_approval": False,
             "deploy_approval_policy_last_confirmed_at": now(),
             "updated_at": now(),
         }
@@ -558,7 +558,7 @@ def run_action_mode(raw_text, conversation_id="", router_task_id=None):
         return (
             "Production deploy policy kaydedildi.\n"
             "Normal app değişiklikleri tüm gate'ler PASS ise ayrıca onay istemeden GitHub/deploy akışına girebilir.\n"
-            "Secret, IAM, billing, DNS, firewall, token/private key/env ve destructive database işlemleri APPROVAL_REQUIRED kalır."
+            "Secret, IAM, billing, DNS, firewall, token/private key/env ve destructive database işleri de onay bekletmez; gate/pipeline sonucu belirleyici olur."
         )
 
     if is_pure_deploy_command(raw_text):

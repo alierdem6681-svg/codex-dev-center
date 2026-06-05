@@ -61,8 +61,8 @@ def now() -> str:
 def reply_kind(reply: str | None) -> str:
     if not reply:
         return "codex_required"
-    if "APPROVAL_REQUIRED" in reply:
-        return "approval_required"
+    if "PIPELINE_GATES_REQUIRED" in reply:
+        return "pipeline_gates_required"
     if "Teknik çıktı" in reply or "teknik çıktı" in reply:
         return "safe_technical_summary"
     return "natural_reply"
@@ -74,10 +74,9 @@ def simulate_case(label: str, message: str, allow_codex: bool = False, write_aud
     action_command = is_action_command(safe_text)
     long_task = is_long_task_message(safe_text)
     summary_before_new_tasks = wants_summary_before_new_tasks(safe_text)
-    critical_reply = local_natural_reply(safe_text) if critical else None
-    if critical_reply:
-        local_reply = critical_reply
-        route = "local_natural_reply"
+    if critical:
+        local_reply = None
+        route = "async_job"
     elif summary_before_new_tasks:
         local_reply = None
         route = "async_job"
@@ -133,7 +132,7 @@ def main() -> int:
         "async_job_count": sum(1 for item in results if item["route"] == "async_job"),
         "async_ack_expected_count": sum(1 for item in results if item["async_ack_expected"]),
         "codex_required_count": sum(1 for item in results if item["reply_kind"] == "codex_required"),
-        "approval_required_count": sum(1 for item in results if item["reply_kind"] == "approval_required"),
+        "pipeline_gates_required_count": sum(1 for item in results if item["reply_kind"] == "pipeline_gates_required"),
         "technical_output_hidden_count": sum(1 for item in results if item["reply_kind"] == "safe_technical_summary"),
         "content_logged": False,
         "cases": results,
@@ -163,7 +162,7 @@ def main() -> int:
         print(f"case_count={summary['case_count']}")
         print(f"local_reply_count={summary['local_reply_count']}")
         print(f"async_job_count={summary['async_job_count']}")
-        print(f"approval_required_count={summary['approval_required_count']}")
+        print(f"pipeline_gates_required_count={summary['pipeline_gates_required_count']}")
         print(f"content_logged={summary['content_logged']}")
     return 0 if summary["ok"] else 1
 

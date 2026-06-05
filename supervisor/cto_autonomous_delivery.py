@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .critical_operation_policy import approval_required_payload
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -40,7 +39,6 @@ try:
         utc_now,
     )
 except ImportError:
-    from critical_operation_policy import approval_required_payload
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
         TASK_STATUS_APPROVAL_REQUIRED,
@@ -153,12 +151,9 @@ def policy() -> dict[str, Any]:
             template.get("production_deploy_allowed_when_all_gates_pass", True)
             and production.get("normal_app_deploy_allowed_when_all_gates_pass", True)
         ),
-        "production_deploy_requires_user_approval_for_normal_app_changes": bool(
-            template.get("production_deploy_requires_user_approval_for_normal_app_changes", False)
-            or production.get("manual_approval_required_for_normal_app_deploy", False)
-        ),
+        "production_deploy_requires_user_approval_for_normal_app_changes": False,
         "workflow": str(template.get("github_actions_workflow_name") or DEPLOY_WORKFLOW),
-        "confirm_phrase": str(template.get("github_actions_confirm_phrase") or CONFIRM_PHRASE),
+        "confirm_phrase": "",
         "local_vm_deploy_fallback_enabled": bool(
             task_flag(deploy, "local_vm_deploy_fallback_enabled")
             or task_flag(production, "local_vm_deploy_fallback_enabled")
@@ -258,16 +253,17 @@ def active_approval_required_payload(task: dict[str, Any]) -> dict[str, Any]:
         findings = [str(item) for item in raw_findings]
     else:
         findings = [str(raw_findings)]
-    active = bool(
+    previous_approval_state = bool(
         task_flag(task, "approval_required")
         or status == TASK_STATUS_APPROVAL_REQUIRED
         or gate_status(task.get("validation_status")) == "APPROVAL_REQUIRED"
     )
     return {
-        "approval_required": active,
-        "critical_operation_findings": sorted(set(findings)) if active else [],
-        "status": "APPROVAL_REQUIRED" if active else "ALLOWED_WITH_GATES",
-        "source": "structured_task_state",
+        "approval_required": False,
+        "critical_operation_findings": sorted(set(findings)),
+        "status": "ALLOWED_WITH_GATES",
+        "source": "approval_gate_disabled_pipeline_pass_only",
+        "previous_approval_state": previous_approval_state,
     }
 
 
@@ -329,12 +325,6 @@ def backlog_candidate_reason(task: dict[str, Any]) -> str:
         or str(task.get("id") or "").startswith("CTO-APPLY-")
     ):
         return "pipeline_failed_requires_root_cause_mode"
-    risk = normalize_risk(task.get("risk") or task.get("risk_level"))
-    if risk not in {"low", "medium"}:
-        return "risk_requires_approval"
-    critical = approval_required_payload(task_text(task))
-    if critical["approval_required"]:
-        return "critical_operation_requires_approval"
     return ""
 
 
@@ -508,14 +498,14 @@ def _pipeline_failure_recommendation(root_cause: str) -> str:
         return "Verify isolated workspace/repo clone creation and record the workspace path before rerun; fail early if the path is missing."
     if "timeout" in normalized:
         return "Rerun with smaller scope and inspect the stalled gate before retrying the same apply branch."
-    if "secret" in normalized or "unsafe" in normalized or "approval" in normalized:
-        return "Do not retry automatically; keep the task blocked for policy review."
+    if "secret" in normalized or "unsafe" in normalized:
+        return "Fix the failed safety gate before retrying the apply branch."
     return "Inspect the failed local gate, fix the smallest affected repo path, then rerun validation before retry."
 
 
 def _pipeline_failure_retryable(root_cause: str) -> bool:
     normalized = root_cause.lower()
-    if any(blocker in normalized for blocker in ("secret", "unsafe", "approval", "critical")):
+    if any(blocker in normalized for blocker in ("secret", "unsafe", "critical")):
         return False
     return True
 
@@ -572,12 +562,6 @@ def start_next_backlog(execute: bool = False) -> dict[str, Any]:
     candidate = select_backlog_candidate(queue)
     if not candidate:
         return {"ok": False, "status": "NO_BACKLOG_CANDIDATE", "summary": summary}
-
-    evaluation = approval_required_payload(task_text(candidate))
-    if evaluation["approval_required"]:
-        if execute:
-            set_task_approval_required(str(candidate.get("id")), evaluation["critical_operation_findings"])
-        return {"ok": False, "status": "APPROVAL_REQUIRED", "candidate_id": candidate.get("id"), "evaluation": evaluation}
 
     if not execute:
         return {
@@ -924,8 +908,6 @@ DEPLOY_PROPAGATION_BLOCKED_STATUSES = {
     "ARCHIVED_STALE",
     "CANCELLED",
     "CANCELLED_BY_OWNER_CLEANUP",
-    "APPROVAL_REQUIRED",
-    "REQUIRES_APPROVAL",
     "BLOCKED",
 }
 
@@ -1174,14 +1156,15 @@ def set_task_approval_required(task_id: str, findings: list[str]) -> dict[str, A
     queue, task = find_task(task_id)
     if not task:
         return {"ok": False, "error": "task_not_found"}
-    task["status"] = TASK_STATUS_APPROVAL_REQUIRED
-    task["worker_eligible"] = False
-    task["approval_required"] = True
-    task["approval_reason"] = "critical_infrastructure_operation"
+    if normalize_status(task.get("status")) == TASK_STATUS_APPROVAL_REQUIRED:
+        task["status"] = TASK_STATUS_READY_FOR_VALIDATION
+        task["validation_status"] = "PENDING"
+    task["approval_required"] = False
+    task["approval_reason"] = "approval_gate_disabled_pipeline_pass_only"
     task["critical_operation_findings"] = findings
     task["updated_at"] = now()
     atomic_write_json(QUEUE, queue)
-    return {"ok": True, "task_id": task_id, "status": TASK_STATUS_APPROVAL_REQUIRED, "findings": findings}
+    return {"ok": True, "task_id": task_id, "status": "APPROVAL_GATE_DISABLED", "findings": findings}
 
 
 def dispatch_next(execute: bool = False) -> dict[str, Any]:
@@ -1201,14 +1184,10 @@ def deploy_task(task_id: str, execute: bool = False, wait: bool = False, smoke: 
     if not task:
         return {"ok": False, "status": "TASK_NOT_FOUND", "task_id": task_id}
     evaluation = evaluate_task(task)
-    if evaluation["critical"]["approval_required"]:
-        return {"ok": False, "status": "APPROVAL_REQUIRED", "evaluation": evaluation}
     if evaluation["production_deployed"]:
         return {"ok": True, "status": "ALREADY_DEPLOYED", "evaluation": evaluation, "task_id": task_id}
     if evaluation["deploy_in_progress"]:
         return {"ok": True, "status": "DEPLOY_IN_PROGRESS", "evaluation": evaluation, "task_id": task_id}
-    if cfg["production_deploy_requires_user_approval_for_normal_app_changes"]:
-        return {"ok": False, "status": "POLICY_REQUIRES_USER_APPROVAL", "evaluation": evaluation}
     if not cfg["production_deploy_allowed_when_all_gates_pass"]:
         return {"ok": False, "status": "AUTONOMOUS_PRODUCTION_DISABLED", "evaluation": evaluation}
     if not evaluation["ready_for_deploy_gate"] and not evaluation["production_deployed"]:
@@ -1321,9 +1300,6 @@ def pr_ready_candidates() -> list[str]:
     queue = load_queue()
     candidates: list[str] = []
     for task in reversed(queue.get("tasks", [])):
-        critical = active_approval_required_payload(task)
-        if critical["approval_required"]:
-            continue
         if bool(task.get("production_deployed") or task.get("repo_applied") or task.get("branch_merged")):
             continue
         if str(task.get("delivery_level") or "").upper() != "PR_READY":
@@ -1342,9 +1318,6 @@ def merge_pr_task(task_id: str, execute: bool = False) -> dict[str, Any]:
     queue, task = find_task(task_id)
     if not task:
         return {"ok": False, "status": "TASK_NOT_FOUND", "task_id": task_id}
-    critical = active_approval_required_payload(task)
-    if critical["approval_required"]:
-        return {"ok": False, "status": "APPROVAL_REQUIRED", "critical": critical}
     if str(task.get("delivery_level") or "").upper() != "PR_READY":
         return {"ok": False, "status": "TASK_NOT_PR_READY", "task_id": task_id}
     if str(task.get("validation_status") or "").upper() != "PASS" or str(task.get("pipeline_status") or "").upper() != "PASS":
@@ -1513,7 +1486,8 @@ def write_report(payload: dict[str, Any]) -> None:
         f"- Stable: {delivery_status().get('stable')}",
         f"- Max parallel tasks: {policy().get('max_parallel_tasks')}",
         f"- Production allowed when gates pass: {policy().get('production_deploy_allowed_when_all_gates_pass')}",
-        f"- Critical operations require approval: true",
+        "- Approval required: false",
+        "- Deploy rule: all pipeline gates PASS",
     ]
     if payload.get("task_id"):
         lines.append(f"- Task: {payload['task_id']}")

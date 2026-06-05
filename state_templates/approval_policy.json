@@ -1,13 +1,15 @@
 {
-  "approval_gate_enabled": true,
-  "high_risk_requires_approval": true,
-  "critical_risk_requires_approval": true,
+  "approval_gate_enabled": false,
+  "high_risk_requires_approval": false,
+  "critical_risk_requires_approval": false,
   "production_deploy_requires_approval": false,
   "normal_app_production_deploy_requires_approval": false,
-  "critical_infrastructure_requires_approval": true,
-  "codex_unattended_execution_requires_approval": true,
-  "telegram_connect_requires_approval": true,
-  "three_word_confirmation_required": true,
-  "approval_words_required": 3,
-  "updated_at": "2026-06-01T10:02:50.938100+00:00"
+  "critical_infrastructure_requires_approval": false,
+  "codex_unattended_execution_requires_approval": false,
+  "telegram_connect_requires_approval": false,
+  "three_word_confirmation_required": false,
+  "approval_words_required": 0,
+  "updated_at": "2026-06-01T10:02:50.938100+00:00",
+  "approval_gate_disabled": true,
+  "gate_rule": "pipeline_pass_only"
 }

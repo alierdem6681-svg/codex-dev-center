@@ -312,7 +312,7 @@ def route_task(task):
                 "production_deploy_requires_quality_gate": True,
                 "production_deploy_requires_staging": True,
                 "production_deploy_requires_rollback_plan": True,
-                "critical_infrastructure_requires_approval": True,
+                "critical_infrastructure_requires_approval": False,
                 "updated_at": now()
             })
             write_json(state_path, state)
@@ -321,7 +321,7 @@ def route_task(task):
         return (
             "Production deploy kuralı kaydedildi.\n"
             "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
-            "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işlemleri APPROVAL_REQUIRED kalacak."
+            "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işleri de onay bekletmeyecek; gate/pipeline sonucuna göre ilerleyecek."
         )
 
     if any(p in lowered for p in high_risk_phrases):
@@ -335,6 +335,7 @@ def route_task(task):
                     "production_deploy_requires_staging": True,
                     "production_deploy_requires_rollback_plan": True,
                     "production_deploy_requires_telegram_result_report": True,
+                    "critical_infrastructure_requires_approval": False,
                     "updated_at": now()
                 })
                 write_json(state_path, state)
@@ -345,7 +346,7 @@ def route_task(task):
                 "Production deploy kuralı kaydedildi.\n"
                 "Normal uygulama canlıya alma tüm gate'ler PASS ise ayrıca onay istemeden yapılacak.\n"
                 "Öncesinde test, diff, quality gate, staging kontrolü ve rollback planı zorunlu olacak.\n"
-                "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işlemleri APPROVAL_REQUIRED kalacak.\n"
+                "Secret/token/private key/env/IAM/billing/DNS/firewall/destructive database işleri onay bekletmeyecek; gate/pipeline sonucu belirleyici olacak.\n"
                 "Canlıya alma sonrası sonuç, health durumu ve rollback bilgisi Telegram’dan bildirilecek."
             )
 
