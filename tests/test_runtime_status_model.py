@@ -332,6 +332,169 @@ class WorkerStatusModelTest(unittest.TestCase):
         self.assertEqual(meta["name"], "Memory OS Modülü")
         self.assertNotEqual(meta["name"], "Production Readiness Analizi")
 
+    def test_memory_os_router_followup_binds_existing_scope_without_new_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            first = cto_task_router.submit_task(
+                root=runtime,
+                source="telegram",
+                title="Memory OS Modülü",
+                message="Memory OS modülünü geliştir ve CTO akışına bağla.",
+                requested_by="tester",
+                conversation_id="telegram:123",
+                split=False,
+                worker_eligible=False,
+            )
+            second = cto_task_router.submit_task(
+                root=runtime,
+                source="telegram",
+                title="Onay",
+                message="onaylıyorum",
+                requested_by="tester",
+                conversation_id="telegram:123",
+                split=False,
+                worker_eligible=False,
+            )
+            queue = json.loads((runtime / "state" / "task_queue.json").read_text(encoding="utf-8"))
+            memory_state = json.loads((runtime / "state" / "memory_os_context.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(len(queue["tasks"]), 1)
+        self.assertTrue(second["memory_os_bound_to_existing_scope"])
+        self.assertEqual(second["task"]["id"], first["task"]["id"])
+        self.assertEqual(queue["tasks"][0]["memory_os_scope_root_task_id"], first["task"]["id"])
+        self.assertEqual(queue["tasks"][0]["memory_os_continuations"][0]["event_type"], "followup_or_approval")
+        self.assertEqual(memory_state["conversations"]["telegram:123"]["root_task_id"], first["task"]["id"])
+
+    def test_action_mode_memory_os_children_share_router_root_and_followup_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            reports = runtime / "reports"
+            logs = runtime / "logs"
+            state.mkdir()
+            reports.mkdir()
+            logs.mkdir()
+            root_task_id = "CTO-TASK-MEMORY-ROOT"
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": root_task_id,
+                                "title": "Memory OS Modülü",
+                                "description": "Memory OS modülünü geliştir.",
+                                "raw_message": "Memory OS modülünü geliştir.",
+                                "source": "telegram",
+                                "status": "ROUTED",
+                                "risk": "medium",
+                                "worker_eligible": False,
+                                "intent_domain": "memory_os",
+                                "memory_os_conversation_id": "telegram:123",
+                                "memory_os_context_id": f"memory-os:{root_task_id}",
+                                "memory_os_scope_root_task_id": root_task_id,
+                                "root_task_id": root_task_id,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                direct_cto_action_mode.APP,
+                direct_cto_action_mode.STATE,
+                direct_cto_action_mode.REPORTS,
+                direct_cto_action_mode.LOGS,
+                direct_cto_action_mode.subprocess.run,
+            )
+            direct_cto_action_mode.APP = runtime
+            direct_cto_action_mode.STATE = state
+            direct_cto_action_mode.REPORTS = reports
+            direct_cto_action_mode.LOGS = logs
+            direct_cto_action_mode.subprocess.run = lambda *args, **kwargs: mock.Mock(returncode=0)
+            try:
+                direct_cto_action_mode.run_action_mode(
+                    "Memory OS modülünü uygula.",
+                    conversation_id="telegram:123",
+                    router_task_id=root_task_id,
+                )
+                first_queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+                reply = direct_cto_action_mode.run_action_mode(
+                    "onaylıyorum",
+                    conversation_id="telegram:123",
+                    router_task_id=root_task_id,
+                )
+                second_queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+            finally:
+                (
+                    direct_cto_action_mode.APP,
+                    direct_cto_action_mode.STATE,
+                    direct_cto_action_mode.REPORTS,
+                    direct_cto_action_mode.LOGS,
+                    direct_cto_action_mode.subprocess.run,
+                ) = originals
+
+        self.assertEqual(len(first_queue["tasks"]), 5)
+        self.assertEqual(len(second_queue["tasks"]), 5)
+        child_tasks = [task for task in first_queue["tasks"] if task["id"] != root_task_id]
+        self.assertEqual(len(child_tasks), 4)
+        self.assertTrue(all(task["root_task_id"] == root_task_id for task in child_tasks))
+        self.assertTrue(all(task["intent_domain"] == "memory_os" for task in child_tasks))
+        self.assertIn("yeni kök görev açmadım", reply)
+
+    def test_telegram_memory_os_approval_resolves_last_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            state.mkdir()
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "MEMORY-ROOT",
+                                "title": "Memory OS Modülü",
+                                "description": "Memory OS modülünü geliştir.",
+                                "raw_message": "Memory OS modülünü geliştir.",
+                                "status": "RUNNING",
+                                "source": "telegram",
+                                "intent_domain": "memory_os",
+                                "memory_os_conversation_id": "telegram:123",
+                                "memory_os_context_id": "memory-os:MEMORY-ROOT",
+                                "memory_os_scope_root_task_id": "MEMORY-ROOT",
+                                "root_task_id": "MEMORY-ROOT",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original_app = telegram_direct_cto.APP
+            telegram_direct_cto.APP = runtime
+            try:
+                action_text = telegram_direct_cto.resolve_memory_os_followup_action_text("123", "onaylıyorum")
+            finally:
+                telegram_direct_cto.APP = original_app
+
+        self.assertIn("Memory OS devam/onay baglami", action_text)
+        self.assertIn("MEMORY-ROOT", action_text)
+
+    def test_async_prompt_includes_memory_os_context(self):
+        prompt = direct_cto_async_job.build_prompt(
+            "onaylıyorum",
+            memory_os_context={
+                "scope_id": "memory-os:MEMORY-ROOT",
+                "root_task_id": "MEMORY-ROOT",
+                "conversation_id": "telegram:123",
+                "title": "Memory OS Modülü",
+                "last_user_text": "Memory OS modülünü geliştir.",
+            },
+        )
+
+        self.assertIn("MEMORY_OS_CONTEXT_START", prompt)
+        self.assertIn("root_task_id=MEMORY-ROOT", prompt)
+        self.assertIn("Do not create a duplicate root task", prompt)
+
     def test_dashboard_ssl_request_is_not_dashboard_cleanup(self):
         message = "Dashboard için SSL/HTTPS erişimini düzeltelim ve canlıya alalım."
 
@@ -4497,6 +4660,71 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertEqual(worker_map["worker-2"]["current_task"], "TASK-PREASSIGNED")
         self.assertEqual(tasks["TASK-UNASSIGNED"]["assigned_worker"], "worker-4")
         self.assertEqual(worker_map["worker-4"]["current_task"], "TASK-UNASSIGNED")
+
+    def test_dispatch_preserves_memory_os_scope_context_on_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            state = runtime / "state"
+            logs = runtime / "logs"
+            reports = runtime / "reports"
+            state.mkdir()
+            logs.mkdir()
+            reports.mkdir()
+            (state / "workers.json").write_text(
+                json.dumps({"workers": [{"id": "worker-2", "status": "IDLE", "current_task": None}]}),
+                encoding="utf-8",
+            )
+            (state / "task_queue.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "MEMORY-CHILD",
+                                "parent_task_id": "MEMORY-ROOT",
+                                "root_task_id": "MEMORY-ROOT",
+                                "status": "PENDING",
+                                "source": "cto",
+                                "risk": "medium",
+                                "worker_eligible": True,
+                                "assigned_worker": "worker-2",
+                                "intent_domain": "memory_os",
+                                "memory_os_context_id": "memory-os:MEMORY-ROOT",
+                                "memory_os_conversation_id": "telegram:123",
+                                "memory_os_scope_root_task_id": "MEMORY-ROOT",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            originals = (
+                supervisor_cli.STATE_DIR,
+                supervisor_cli.LOG_DIR,
+                supervisor_cli.REPORT_DIR,
+            )
+            supervisor_cli.STATE_DIR = state
+            supervisor_cli.LOG_DIR = logs
+            supervisor_cli.REPORT_DIR = reports
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    supervisor_cli.dispatch(None)
+            finally:
+                (
+                    supervisor_cli.STATE_DIR,
+                    supervisor_cli.LOG_DIR,
+                    supervisor_cli.REPORT_DIR,
+                ) = originals
+
+            queue = json.loads((state / "task_queue.json").read_text(encoding="utf-8"))
+
+        task = queue["tasks"][0]
+        self.assertEqual(task["status"], "ASSIGNED")
+        self.assertEqual(task["worker_id"], "worker-2")
+        self.assertEqual(task["root_task_id"], "MEMORY-ROOT")
+        self.assertEqual(task["memory_os_scope_root_task_id"], "MEMORY-ROOT")
+        self.assertEqual(task["dispatch_context_domain"], "memory_os")
+        self.assertTrue(task["memory_os_dispatch_context_bound"])
 
     def test_dispatch_fills_four_idle_workers_in_single_round(self):
         with tempfile.TemporaryDirectory() as tmp:

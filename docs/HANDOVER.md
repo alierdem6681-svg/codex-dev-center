@@ -1095,3 +1095,29 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## CTO Memory OS Integration Apply
+
+Tarih: 2026-06-05
+Görev: CTO-ACTION-20260605-052521-03-CTO-MEMORY-OS-INTEGRATION
+Worker: worker-2
+
+Eklenenler:
+- `supervisor/memory_os_context.py` ortak Memory OS scope bağlama helper'i eklendi.
+- `supervisor/cto_task_router.py` aynı konuşmadaki Memory OS devam/onay mesajlarını aktif scope root task'a bağlar; yeni kök task üretmez.
+- `supervisor/direct_cto_action_mode.py` Memory OS worker paketlerini tek root altında metadata ile açar ve tekrar gelen takip/onay mesajında paket çoğaltmaz.
+- `supervisor/direct_cto_async_job.py` async prompt'a Memory OS context metadata'sını ekler ve action mode'a `router_task_id` ile conversation id geçirir.
+- `supervisor/telegram_direct_cto.py` Telegram follow-up mesajlarını son Memory OS kapsamına çözer.
+- `supervisor/supervisor_cli.py` worker dispatch claim sırasında Memory OS context metadata'sını korur.
+- `modules/memory_os_context/`, state template registry/settings/action catalog ve onboarding/roadmap/memory/anayasa/AGENTS kayıtları güncellendi.
+
+Test:
+- `python3 -m py_compile supervisor/memory_os_context.py supervisor/cto_task_router.py supervisor/direct_cto_action_mode.py supervisor/direct_cto_async_job.py supervisor/telegram_direct_cto.py supervisor/supervisor_cli.py tests/test_runtime_status_model.py` PASS.
+- Hedef Memory OS unit testleri PASS.
+- Memory OS dispatch metadata ve mevcut dispatch rebalance testleri PASS.
+
+Not:
+- Production deploy, staging deploy, VM SSH, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları güncellendi.

@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "state_file": "state/memory_os_context.json",
+  "same_conversation_binding": true,
+  "bind_followup_and_approval_messages": true,
+  "duplicate_root_task_prevention": true,
+  "raw_payload_logged": false,
+  "secret_values_logged": false,
+  "production_deploy": false
+}

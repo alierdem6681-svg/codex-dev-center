@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 try:
+    from .memory_os_context import task_is_memory_os
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         ACTIVE_TASK_STATUSES,
@@ -24,6 +25,7 @@ try:
         normalize_status,
     )
 except ImportError:
+    from memory_os_context import task_is_memory_os
     from state_file_lock import state_file_lock
     from task_status_constants import (
         ACTIVE_TASK_STATUSES,
@@ -196,6 +198,22 @@ def write_json(path, data):
 def worker_state_transaction_lock_path():
     return STATE_DIR / "worker_state_transaction"
 
+def bind_memory_os_dispatch_context(task):
+    if not task_is_memory_os(task):
+        return
+    root_task_id = str(
+        task.get("memory_os_scope_root_task_id")
+        or task.get("root_task_id")
+        or task.get("parent_task_id")
+        or task.get("id")
+        or ""
+    )
+    if root_task_id:
+        task["memory_os_scope_root_task_id"] = root_task_id
+        task.setdefault("root_task_id", root_task_id)
+    task["dispatch_context_domain"] = "memory_os"
+    task["memory_os_dispatch_context_bound"] = True
+
 def log(msg):
     with open(LOG_DIR / "supervisor.log", "a", encoding="utf-8") as f:
         f.write(f"{now()} {msg}\n")
@@ -301,6 +319,7 @@ def dispatch(_args):
                     task["assigned_worker"] = worker["id"]
                     task["worker_id"] = worker["id"]
                     task["updated_at"] = claim_time
+                    bind_memory_os_dispatch_context(task)
                     assigned_task_ids.add(task["id"])
                     assignments.append({"worker": worker["id"], "task": task["id"]})
 

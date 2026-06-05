@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from memory_os_context import prompt_context as memory_os_prompt_context
     from progress_aware_runner import run_progress_aware
     from cto_task_router import mark_task_status
     from task_status_constants import (
@@ -23,6 +24,7 @@ try:
         redact_sensitive_text,
     )
 except ImportError:
+    from .memory_os_context import prompt_context as memory_os_prompt_context
     from .progress_aware_runner import run_progress_aware
     from .cto_task_router import mark_task_status
     from .task_status_constants import (
@@ -37,6 +39,8 @@ except ImportError:
 except Exception:
     run_progress_aware = None
     mark_task_status = None
+    def memory_os_prompt_context(_scope):
+        return ""
     TASK_STATUS_ERROR = "ERROR"
     TASK_STATUS_FAILED_RETRYABLE = "FAILED_RETRYABLE"
     TASK_STATUS_PROPOSAL_READY = "PROPOSAL_READY"
@@ -171,8 +175,8 @@ def output_guard(raw):
         cleaned = cleaned[:3300].rstrip() + "\n\n[Yanıt kısaltıldı; teknik ayrıntılar loglara yazıldı.]"
     return cleaned or "CTO teknik çıktı üretti; Telegram’a dökmedim."
 
-def build_prompt(raw_user_message):
-    return "\n".join([
+def build_prompt(raw_user_message, memory_os_context=None):
+    lines = [
         "Sen Codex Dev Center sisteminin CTO'susun.",
         "Bu bir arka plan CTO job çalışmasıdır.",
         "Kullanıcının mesajı aşağıda birebir verilmiştir.",
@@ -185,10 +189,16 @@ def build_prompt(raw_user_message):
         "Mevcut çalışma kökü: /opt/codex-dev-center.",
         "Model politikası: gpt-5.5, reasoning xhigh.",
         "",
+    ]
+    context = memory_os_prompt_context(memory_os_context or {})
+    if context:
+        lines.extend([context, ""])
+    lines.extend([
         "RAW_USER_MESSAGE_START",
         raw_user_message,
         "RAW_USER_MESSAGE_END",
     ])
+    return "\n".join(lines)
 
 def classify_codex_failure(raw_out, raw_err, progress):
     combined = "\n".join([raw_out or "", raw_err or "", json.dumps(progress or {}, ensure_ascii=False)])
@@ -243,7 +253,11 @@ def run_job(job_id):
             )
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
-            reply = mod.run_action_mode(raw_text)
+            reply = mod.run_action_mode(
+                raw_text,
+                conversation_id=job.get("conversation_id", ""),
+                router_task_id=router_task_id,
+            )
             send_message(chat_id, reply)
             job["status"] = "FINAL_REPORTED"
             job["result"] = "action_queued_and_reported"
@@ -261,7 +275,7 @@ def run_job(job_id):
 
     LOGS.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    prompt = build_prompt(raw_text)
+    prompt = build_prompt(raw_text, memory_os_context=job.get("memory_os_context"))
     prompt_file = LOGS / ("async_cto_prompt_" + run_id + ".txt")
     out_file = LOGS / ("async_cto_out_" + run_id + ".txt")
     err_file = LOGS / ("async_cto_err_" + run_id + ".txt")

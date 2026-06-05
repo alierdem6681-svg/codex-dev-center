@@ -140,3 +140,9 @@ Worker claim ve finish akışlarında `task_queue.json` ile `workers.json` aynı
 Ön canlı health/smoke kontrolleri production varsayılan wrapperlarıyla çalıştırılmamalıdır. Staging kapısı için `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` kullanılmalı; bu wrapperlar scope'u explicit `staging` olarak geçirir.
 
 Bu kural production deploy izni, secret/env/token/private key erişimi, IAM, billing, DNS/firewall, destructive database veya reklam platformu canlı yazma yetkisi vermez.
+
+## 15. Memory OS Bağlam Kuralı
+
+Direct CTO, async job, action mode, Telegram devam/onay mesajları ve worker dispatch akışları Memory OS işlerinde aynı konuşmadaki son aktif scope'u kullanmalıdır. `devam`, `onaylıyorum`, `başlayalım` gibi kısa takip mesajları yeni kök görev açmadan son Memory OS `root_task_id` değerine bağlanır.
+
+Memory OS context state yalnızca redakte edilmiş kısa bağlam ve task metadata'sı tutar; raw Telegram payload, secret/env/token/private key değeri, uzun teknik çıktı, diff veya stack trace kaydedilemez. Bu kural production deploy veya kritik altyapı yetkisi vermez.

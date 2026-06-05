@@ -14,6 +14,13 @@ from pathlib import Path
 try:
     from .critical_operation_policy import critical_operation_findings
     from .cto_task_router import submit_task, trigger_lifecycle
+    from .memory_os_context import (
+        conversation_key as memory_os_conversation_key,
+        find_latest_scope as find_latest_memory_os_scope,
+        followup_action_text as memory_os_followup_action_text,
+        is_memory_os_followup_text,
+        is_memory_os_request as memory_os_request,
+    )
     from .task_status_constants import read_json as read_state_json, redact_sensitive_text
     from .telegram_asset_intake import (
         asset_event_to_task_message,
@@ -24,6 +31,13 @@ except ImportError:
     try:
         from critical_operation_policy import critical_operation_findings
         from cto_task_router import submit_task, trigger_lifecycle
+        from memory_os_context import (
+            conversation_key as memory_os_conversation_key,
+            find_latest_scope as find_latest_memory_os_scope,
+            followup_action_text as memory_os_followup_action_text,
+            is_memory_os_followup_text,
+            is_memory_os_request as memory_os_request,
+        )
         from task_status_constants import read_json as read_state_json, redact_sensitive_text
         from telegram_asset_intake import (
             asset_event_to_task_message,
@@ -44,6 +58,16 @@ except ImportError:
             return default
         def redact_sensitive_text(value):
             return str(value or "")
+        def memory_os_conversation_key(source="", requested_by="", conversation_id=""):
+            return conversation_id or f"{source or 'telegram'}:{requested_by or 'default'}"
+        def find_latest_memory_os_scope(*_args, **_kwargs):
+            return {}
+        def memory_os_followup_action_text(_scope, text):
+            return str(text or "")
+        def is_memory_os_followup_text(_text):
+            return False
+        def memory_os_request(_text):
+            return False
         def classify_telegram_message(*_args, **_kwargs):
             return {"status": "rejected", "message_type": "unavailable", "should_enqueue_asset": False}
         def is_media_intake_event(_event):
@@ -455,20 +479,7 @@ def normalize_turkish(value):
 
 
 def is_memory_os_request(text):
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return memory_os_request(text)
 
 
 def is_infrastructure_access_request(text):
@@ -579,6 +590,22 @@ def resolve_followup_action_text(chat_id, text, log_dir=None):
         "Kullanıcı takip komutu:\n"
         f"{text}"
     )
+
+
+def resolve_memory_os_followup_action_text(chat_id, text):
+    if not is_memory_os_followup_text(text):
+        return ""
+    latest_context = latest_actionable_context(chat_id, text)
+    if latest_context and not is_memory_os_request(latest_context) and not is_memory_os_request(text):
+        return ""
+    conversation_id = memory_os_conversation_key(
+        source="telegram",
+        conversation_id=f"telegram:{chat_id}",
+    )
+    scope = find_latest_memory_os_scope(APP, conversation_id=conversation_id)
+    if not scope or not scope.get("root_task_id"):
+        return ""
+    return memory_os_followup_action_text(scope, text)
 
 
 def wants_summary_before_new_tasks(text):
@@ -760,12 +787,20 @@ def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False
     job_file = JOBS / (job_id + ".json")
     safe_text = redact_sensitive_text(raw_text)
     meta = classify_job_metadata(safe_text)
+    conversation_id = memory_os_conversation_key(
+        source="telegram",
+        conversation_id=f"telegram:{chat_id}",
+    )
+    memory_scope = {}
+    if is_memory_os_request(safe_text) or is_memory_os_followup_text(safe_text):
+        memory_scope = find_latest_memory_os_scope(APP, conversation_id=conversation_id)
     job = {
         "id": job_id,
         "status": "QUEUED",
         "chat_id": str(chat_id),
         "text": safe_text,
         "router_task_id": router_task_id,
+        "conversation_id": conversation_id,
         "action_command": bool(action_command),
         "generic_task_name": meta["name"],
         "estimated_duration": meta["eta"],
@@ -775,6 +810,8 @@ def start_async_job(chat_id, raw_text, router_task_id=None, action_command=False
         "created_at": now(),
         "updated_at": now()
     }
+    if memory_scope:
+        job["memory_os_context"] = memory_scope
     job_file.write_text(json.dumps(job, indent=2, ensure_ascii=False) + "\n")
 
     subprocess.Popen(
@@ -988,7 +1025,7 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
             send_message(token, chat_id, "Devam komutunu aldım ama router şu an hazır değil; teknik hata olarak ele alıyorum.")
         return
 
-    followup_action_text = resolve_followup_action_text(chat_id, safe_text)
+    followup_action_text = resolve_memory_os_followup_action_text(chat_id, safe_text) or resolve_followup_action_text(chat_id, safe_text)
 
     # Açık uygulama/başlatma komutları da Telegram handler'ı bloklamaz.
     # Action mode arka plan job içinde kuyruk/workerlara aktarılır.
@@ -1003,6 +1040,7 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
                 message=action_text,
                 priority="high",
                 requested_by=from_user,
+                conversation_id=f"telegram:{chat_id}",
                 split=False,
                 worker_eligible=False,
             )
@@ -1024,6 +1062,7 @@ def handle_message(token, expected_chat_id, msg, update_id=None):
                 message=safe_text,
                 priority="high",
                 requested_by=from_user,
+                conversation_id=f"telegram:{chat_id}",
                 split=True,
                 worker_eligible=False,
             )

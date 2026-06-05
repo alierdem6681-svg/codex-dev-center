@@ -92,6 +92,7 @@ Ajan şu klasörleri inceler:
 - supervisor/production_readiness_suite.py içindeki staging/rollback `dry_run_non_mutating_contract` doğrulaması
 - supervisor/production_readiness_suite.py içindeki `telegram_result_report_flow` kapısı staging health/smoke, rollback planı ve readiness sonucunu Telegram-safe kısa özet sözleşmesiyle doğrular; gerçek Telegram API çağırmaz
 - supervisor/task_status_constants.py içindeki dispatch contract metadata normalizasyonu `root_task_id`, `dispatch_id`, `attempt`, `max_attempts`, `last_error_code`, `claimed_at` ve `finished_at` alanlarını varsayılanlar
+- supervisor/memory_os_context.py Direct CTO, async job, action mode, Telegram follow-up ve worker dispatch için Memory OS scope binding sözleşmesini tutar
 - supervisor/telegram_asset_safety.py içindeki manifest, limit, checksum, MIME/uzantı, redaction, simulator ve dashboard-safe snapshot sözleşmeleri gerçek Telegram API'ye fallback yapmaz
 - supervisor/worker_runner.py worker claim sırasında `worker_id` ve `claimed_at` alanlarını yazar; terminal task statusları yeniden worker-eligible sayılmaz
 - supervisor/worker_runner.py içindeki controlled repo apply path allowlist ve PR pipeline kapıları
@@ -192,6 +193,12 @@ Observed issue completion notu:
 - `worker_runner.repo_apply_stage_plan_lines()` apply control report icinde stage plan, diff review, secret scan, local test, rollback ve production deploy kapisini gorunur yapar.
 - `codex_quality_gate` retry simulation raporu `safety_status`, `safety_reasons` ve `required_false_flags` dry-run safety alanlarini uretir.
 - `supervisor_cli.reconcile_stale_dispatch_claims()` aktif worker sahipligi olmayan stale claim'leri yeni kok gorev acmadan ayni task uzerinde retry/timeout statüsüne taşır.
+
+Memory OS context binding notu:
+- Aynı Telegram konuşmasındaki Memory OS devam/onay mesajları son aktif `memory_os_scope_root_task_id` kapsamına bağlanır.
+- `devam`, `onaylıyorum`, `başlayalım` gibi kısa takip mesajları yeni kök görev üretmemelidir.
+- Runtime context state yalnızca redakte edilmiş kısa bağlam ve task metadata'sı tutar; raw Telegram payload, secret/env/token/private key, uzun terminal çıktısı, diff veya stack trace yazılamaz.
+- Worker dispatch Memory OS task claim sırasında `root_task_id`, `memory_os_scope_root_task_id` ve `dispatch_context_domain=memory_os` metadata'sını korur.
 
 ## Servis Keşfi
 

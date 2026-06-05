@@ -358,3 +358,13 @@ Faz 19B-10A Model Policy
 - [x] Ham readiness markdown raporu policy `updated_at` tarihinden eskiyse `UNKNOWN` ve `freshness=stale` olarak isaretlenir.
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
+
+## Faz 56 - CTO Memory OS Context Integration
+
+- [x] Ortak `supervisor/memory_os_context.py` helper'i eklendi.
+- [x] CTO router aynı konuşmadaki Memory OS devam/onay mesajlarını mevcut aktif scope root'una bağlar; yeni kök görev üretmez.
+- [x] Direct CTO action mode Memory OS worker paketlerini tek `root_task_id` altında metadata ile açar ve tekrar gelen onay/devam mesajında paket çoğaltmaz.
+- [x] Async CTO job prompt'u Memory OS context metadata'sını kullanır ve action mode'a `router_task_id` ile conversation id geçirir.
+- [x] Telegram Direct CTO `devam/onaylıyorum/başlayalım` gibi takip mesajlarını son Memory OS kapsamına çözer.
+- [x] Worker dispatch Memory OS task claim sırasında `memory_os_scope_root_task_id` ve `dispatch_context_domain=memory_os` metadata'sını korur.
+- [x] Module registry, settings, action catalog, modül klasörü ve runtime status regresyon testleri güncellendi.

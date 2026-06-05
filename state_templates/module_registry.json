@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:43:34+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -432,6 +432,19 @@
       "description": "Audit helper for parseable state JSON and leftover atomic tmp files without trusting partial writes.",
       "actions": [
         "audit_atomic_json_state"
+      ]
+    },
+    {
+      "id": "memory_os_context",
+      "name": "Memory OS Context Binding",
+      "status": "active",
+      "risk": "medium",
+      "settings_enabled": true,
+      "actions_enabled": true,
+      "dashboard_visible": false,
+      "description": "Direct CTO, async job, action mode and worker dispatch flows bind same-conversation Memory OS continuation/approval messages to the last active scope without duplicate root tasks.",
+      "actions": [
+        "validate_memory_os_context_binding"
       ]
     }
   ]

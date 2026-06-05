@@ -230,6 +230,14 @@ Repo apply control report ayrıca stage plan satırlarını içermelidir: propos
 
 `supervisor_cli dispatch` aktif worker sahipliği olmayan stale `ASSIGNED`/`RUNNING` claim'leri yaş eşiğinden sonra aynı task üzerinde retry'a alabilir. Maksimum deneme dolarsa task `FAILED_TIMEOUT` olur; yeni kök görev açılmaz.
 
+## MEMORY OS CONTEXT BINDING V1
+
+`supervisor/memory_os_context.py` Direct CTO, async job, action mode, Telegram follow-up ve worker dispatch akışları için ortak Memory OS scope bağlamını tutar. Aynı Telegram konuşmasındaki `devam`, `onaylıyorum`, `başlayalım` gibi kısa devam/onay mesajları son aktif Memory OS scope root'una bağlanır; yeni kök görev çoğaltılmaz.
+
+Memory OS context state yalnızca redakte edilmiş kısa bağlam, `scope_id`, `root_task_id`, conversation id ve task id metadata'sı tutabilir. Raw Telegram payload, secret/env/token/private key değeri, uzun terminal çıktısı, diff veya stack trace bu state'e yazılamaz.
+
+Worker dispatch Memory OS task'ı claim ederken `memory_os_scope_root_task_id`, `root_task_id`, `dispatch_context_domain=memory_os` metadata'sını korur. Bu sözleşme production deploy, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## PARALLEL WORKER STATE SAFETY V1
 
 Worker claim ve finish akışları `task_queue.json` ile `workers.json` dosyalarını ortak worker state transaction lock altında güncellemelidir. Claim sırasında queue `RUNNING/worker_id/claimed_at/started_at` alanları ile worker `status=RUNNING/current_task/last_seen` birlikte yazılır; finish sırasında terminal queue statusu ile worker `current_task=None` temizliği birlikte yapılır.

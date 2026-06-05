@@ -53,6 +53,7 @@ workers/
 supervisor/
 - CTO/Supervisor sistemi
 - Telegram asset intake sınıflandırıcısı dosya indirmeden medya metadata event'i üretir
+- Memory OS context binding aynı konuşmadaki devam/onay mesajlarını son aktif Memory OS root task'a bağlar
 
 projects/
 - Geliştirilecek projeler

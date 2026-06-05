@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:43:34+00:00",
   "actions": [
     {
       "id": "panel_login",
@@ -399,6 +399,18 @@
       "enabled": true,
       "requires_approval": false,
       "non_mutating": true
+    },
+    {
+      "id": "validate_memory_os_context_binding",
+      "label": "Memory OS Context Binding Doğrulaması",
+      "module": "memory_os_context",
+      "risk": "medium",
+      "enabled": true,
+      "requires_approval": false,
+      "non_mutating": true,
+      "command": "{python} -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_memory_os_router_followup_binds_existing_scope_without_new_root tests.test_runtime_status_model.WorkerStatusModelTest.test_action_mode_memory_os_children_share_router_root_and_followup_is_idempotent tests.test_runtime_status_model.WorkerStatusModelTest.test_telegram_memory_os_approval_resolves_last_scope tests.test_runtime_status_model.WorkerStatusModelTest.test_async_prompt_includes_memory_os_context tests.test_runtime_status_model.BacklogDispatcherModelTest.test_dispatch_preserves_memory_os_scope_context_on_claim",
+      "production_deploy": false,
+      "secret_values_logged": false
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:08:06+00:00",
+  "updated_at": "2026-06-05T05:43:34+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -398,6 +398,19 @@
     "tmp_files_not_trusted_automatically": true,
     "same_filesystem_tmp_required": true,
     "fsync_before_replace": true
+  },
+  "memory_os_context": {
+    "enabled": true,
+    "state_file": "state/memory_os_context.json",
+    "same_conversation_binding": true,
+    "bind_followup_and_approval_messages": true,
+    "duplicate_root_task_prevention": true,
+    "direct_cto_action_mode_enabled": true,
+    "direct_cto_async_job_prompt_context": true,
+    "telegram_followup_context_enabled": true,
+    "worker_dispatch_context_metadata": true,
+    "raw_payload_logged": false,
+    "secret_values_logged": false
   },
   "drift_control": {
     "registry_settings_candidate_classifier": true

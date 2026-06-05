@@ -411,3 +411,13 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 CTO Memory OS Integration Apply
+
+Memory OS bağlamı Direct CTO, async job, action mode, Telegram follow-up ve worker dispatch akışlarına bağlandı. Aynı konuşmadaki `devam`, `onaylıyorum`, `başlayalım` gibi takip mesajları son aktif Memory OS `root_task_id` kapsamına bağlanır; yeni kök task çoğaltılmaz.
+
+Yeni helper `supervisor/memory_os_context.py` yalnızca redakte edilmiş kısa bağlam ve task metadata'sı tutar. Raw Telegram payload, secret/env/token/private key değeri, uzun teknik çıktı, diff veya stack trace kaydedilmez.
+
+Router duplicate follow-up'ı mevcut root task üzerinde `memory_os_continuations` event'i olarak saklar. Action mode Memory OS worker task'larını tek scope root altında metadata ile açar; tekrar gelen takip/onayda paket çoğaltmaz. Async job prompt'u Memory OS context metadata'sını taşır. Worker dispatch claim sırasında `memory_os_scope_root_task_id` ve `dispatch_context_domain=memory_os` korunur.
+
+Bu paket production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.

@@ -10,6 +10,15 @@ from typing import Any
 
 try:
     from .critical_operation_policy import critical_operation_findings
+    from .memory_os_context import (
+        bind_existing_scope_in_queue,
+        bind_task_to_scope,
+        conversation_key as memory_os_conversation_key,
+        find_latest_scope_in_queue,
+        is_memory_os_followup_text,
+        is_memory_os_request as memory_os_request,
+        record_scope,
+    )
     from .state_file_lock import state_file_lock
     from .task_status_constants import (
         TASK_STATUS_DONE,
@@ -28,6 +37,15 @@ try:
     )
 except ImportError:
     from critical_operation_policy import critical_operation_findings
+    from memory_os_context import (
+        bind_existing_scope_in_queue,
+        bind_task_to_scope,
+        conversation_key as memory_os_conversation_key,
+        find_latest_scope_in_queue,
+        is_memory_os_followup_text,
+        is_memory_os_request as memory_os_request,
+        record_scope,
+    )
     from state_file_lock import state_file_lock
     from task_status_constants import (
         TASK_STATUS_DONE,
@@ -103,20 +121,7 @@ def normalize_turkish(value: str) -> str:
 
 
 def is_memory_os_request(text: str) -> bool:
-    normalized = normalize_turkish(text)
-    return any(
-        marker in normalized
-        for marker in [
-            "memory os",
-            "memory-os",
-            "cto-memory-os",
-            "cto memory os",
-            "memoryos",
-            "hafiza os",
-            "hafiza sistemi",
-            "hafiza modulu",
-        ]
-    )
+    return memory_os_request(text)
 
 
 def is_infrastructure_access_change(text: str) -> bool:
@@ -331,6 +336,7 @@ def submit_task(
     priority: str = "normal",
     risk: str | None = None,
     requested_by: str = "",
+    conversation_id: str = "",
     split: bool | None = None,
     worker_eligible: bool | None = None,
 ) -> dict[str, Any]:
@@ -343,55 +349,123 @@ def submit_task(
     effective_risk = classify_risk(f"{title}\n{message}", risk)
     stored_message = redact_sensitive_text(message)
     route = classify_task_route(f"{title}\n{message}")
+    memory_conversation_id = memory_os_conversation_key(
+        source=source,
+        requested_by=requested_by,
+        conversation_id=conversation_id,
+    )
+    memory_text = f"{title}\n{message}"
+    memory_intent = is_memory_os_request(memory_text)
+    memory_followup = is_memory_os_followup_text(message) or is_memory_os_followup_text(title)
     if worker_eligible is None:
         worker_eligible = source != "telegram" and effective_risk not in {"high", "critical"}
     if effective_risk in {"high", "critical"}:
         worker_eligible = False
 
+    bound_existing_memory_scope = False
+    memory_scope: dict[str, Any] = {}
     with state_file_lock(qpath):
         queue = read_json(qpath, {"tasks": []})
         tasks = queue.setdefault("tasks", [])
+        existing_memory_scope = (
+            find_latest_scope_in_queue(queue, conversation_id=memory_conversation_id)
+            if (memory_intent or memory_followup)
+            else {}
+        )
+        if existing_memory_scope and (memory_intent or memory_followup):
+            bound = bind_existing_scope_in_queue(
+                queue,
+                existing_memory_scope,
+                stored_message,
+                event_type="explicit_request" if memory_intent else "followup_or_approval",
+                source=source,
+            )
+            if bound:
+                parent = bound
+                created_subtasks: list[dict[str, Any]] = []
+                bound_existing_memory_scope = True
+                memory_scope = dict(existing_memory_scope)
+                normalized, changes = normalize_queue_payload(queue)
+                atomic_write_json(qpath, normalized)
+            else:
+                existing_memory_scope = {}
 
-        parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
-        parent = {
-            "id": next_id("CTO-TASK", title),
-            "title": title,
-            "description": stored_message,
-            "raw_message": stored_message,
-            "source": source,
-            "priority": priority,
-            "status": parent_status,
-            "risk": effective_risk,
-            "risk_level": effective_risk,
-            "assigned_worker": None,
-            "worker_eligible": worker_eligible,
-            "requested_by": requested_by,
-            "created_at": utc_now(),
-            "updated_at": utc_now(),
-            "repo_applied": False,
-            "staging_deployed": False,
-            "production_deployed": False,
-            "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
-            "task_class": route["task_class"],
-            "control_type": route["control_type"],
-            "delivery_mode": route["delivery_mode"],
-            "pipeline_lane": route["pipeline_lane"],
-            "intent_domain": route.get("intent_domain", ""),
-        }
-        if route["task_class"] == "control_task":
-            parent["repo_apply_allowed"] = False
-            parent["production_deployed"] = False
-            parent["proposal_only"] = True
-        if worker_eligible:
-            parent["assigned_worker"] = choose_worker(len(tasks))
-        tasks.append(parent)
+        if not bound_existing_memory_scope:
+            parent_status = TASK_STATUS_QUEUED if worker_eligible else TASK_STATUS_ROUTED
+            parent = {
+                "id": next_id("CTO-TASK", title),
+                "title": title,
+                "description": stored_message,
+                "raw_message": stored_message,
+                "source": source,
+                "priority": priority,
+                "status": parent_status,
+                "risk": effective_risk,
+                "risk_level": effective_risk,
+                "assigned_worker": None,
+                "worker_eligible": worker_eligible,
+                "requested_by": requested_by,
+                "created_at": utc_now(),
+                "updated_at": utc_now(),
+                "repo_applied": False,
+                "staging_deployed": False,
+                "production_deployed": False,
+                "delivery_level": "ROUTED" if not worker_eligible else "QUEUED",
+                "task_class": route["task_class"],
+                "control_type": route["control_type"],
+                "delivery_mode": route["delivery_mode"],
+                "pipeline_lane": route["pipeline_lane"],
+                "intent_domain": route.get("intent_domain", ""),
+            }
+            if memory_intent:
+                memory_scope = {
+                    "schema_version": 1,
+                    "scope_id": f"memory-os:{parent['id']}",
+                    "root_task_id": parent["id"],
+                    "conversation_id": memory_conversation_id,
+                    "title": title,
+                    "last_user_text": stored_message,
+                    "active": True,
+                    "has_worker_apply_tasks": False,
+                }
+                bind_task_to_scope(parent, memory_scope, root_task_id=parent["id"])
+            if route["task_class"] == "control_task":
+                parent["repo_apply_allowed"] = False
+                parent["production_deployed"] = False
+                parent["proposal_only"] = True
+            if worker_eligible:
+                parent["assigned_worker"] = choose_worker(len(tasks))
+            tasks.append(parent)
 
-        should_create_subtasks = should_split(message) if split is None else split
-        created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
-        tasks.extend(created_subtasks)
+            should_create_subtasks = should_split(message) if split is None else split
+            created_subtasks = planning_subtasks(parent, message) if should_create_subtasks else []
+            if memory_scope and created_subtasks:
+                for subtask in created_subtasks:
+                    bind_task_to_scope(subtask, memory_scope, root_task_id=parent["id"])
+            tasks.extend(created_subtasks)
 
-        normalized, changes = normalize_queue_payload(queue)
-        atomic_write_json(qpath, normalized)
+            normalized, changes = normalize_queue_payload(queue)
+            atomic_write_json(qpath, normalized)
+
+    if memory_intent or bound_existing_memory_scope:
+        task_ids = None if bound_existing_memory_scope else [
+            str(parent.get("id") or ""),
+            *[str(item.get("id") or "") for item in created_subtasks],
+        ]
+        if not memory_scope:
+            memory_scope = {
+                "scope_id": f"memory-os:{parent.get('root_task_id') or parent.get('id')}",
+                "root_task_id": str(parent.get("root_task_id") or parent.get("id") or ""),
+                "conversation_id": memory_conversation_id,
+                "title": str(parent.get("title") or title),
+            }
+        record_scope(
+            root,
+            memory_scope,
+            user_text=stored_message,
+            task_ids=task_ids,
+            event_type="bound_existing_scope" if bound_existing_memory_scope else "scope_created",
+        )
 
     state = read_json(router_state_path(root), {})
     state.update(
@@ -405,6 +479,8 @@ def submit_task(
             "last_subtask_count": len(created_subtasks),
             "last_task_class": route["task_class"],
             "last_control_type": route["control_type"],
+            "last_memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
+            "last_memory_os_bound_to_existing_scope": bound_existing_memory_scope,
             "queue_normalization_changes": len(changes),
             "updated_at": utc_now(),
         }
@@ -420,9 +496,18 @@ def submit_task(
             "priority": priority,
             "worker_eligible": worker_eligible,
             "subtasks": len(created_subtasks),
+            "memory_os_scope_root_task_id": memory_scope.get("root_task_id", ""),
+            "memory_os_bound_to_existing_scope": bound_existing_memory_scope,
         },
     )
-    return {"ok": True, "task": parent, "subtasks": created_subtasks, "normalization_changes": changes}
+    return {
+        "ok": True,
+        "task": parent,
+        "subtasks": created_subtasks,
+        "normalization_changes": changes,
+        "memory_os_scope": memory_scope,
+        "memory_os_bound_to_existing_scope": bound_existing_memory_scope,
+    }
 
 
 def mark_task_status(root: Path, task_id: str, status: str, result: str = "") -> dict[str, Any]:
@@ -472,6 +557,7 @@ def main() -> int:
     submit.add_argument("--message", required=True)
     submit.add_argument("--risk", default=None)
     submit.add_argument("--requested-by", default="")
+    submit.add_argument("--conversation-id", default="")
     submit.add_argument("--split", action="store_true")
     submit.add_argument("--no-split", action="store_true")
     submit.add_argument("--worker-eligible", action="store_true")
@@ -513,6 +599,7 @@ def main() -> int:
         priority=args.priority,
         risk=args.risk,
         requested_by=args.requested_by,
+        conversation_id=args.conversation_id,
         split=split,
         worker_eligible=worker_eligible,
     )
