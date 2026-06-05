@@ -656,6 +656,24 @@ class WorkerStatusModelTest(unittest.TestCase):
             self.assertTrue(contracts[group]["contracts"])
             self.assertTrue(all(item["ok"] for item in contracts[group]["contracts"]))
 
+    def test_ack_watchdog_retry_contract_is_non_mutating(self):
+        contract = production_readiness_suite.ack_watchdog_retry_contract()
+
+        self.assertTrue(contract["ok"])
+        self.assertEqual(contract["mode"], "static_and_fixture_non_mutating_contract")
+        self.assertTrue(contract["ack"]["ok"])
+        self.assertTrue(contract["watchdog"]["ok"])
+        self.assertTrue(contract["retryable_classification"]["ok"])
+        self.assertFalse(contract["watchdog"]["output_noise_meaningful"])
+        self.assertTrue(contract["watchdog"]["semantic_output_meaningful"])
+        self.assertTrue(
+            contract["retryable_classification"]["matrix"]["timeout_backoff"]["idempotency_key"].startswith(
+                "READINESS-RETRY:timeout:"
+            )
+        )
+        self.assertFalse(contract["production_deploy_performed"])
+        self.assertFalse(contract["mutating_cloud_operations_performed"])
+
     def test_parallel_worker_regression_contract_has_no_duplicate_claim_or_terminal_event(self):
         contract = production_readiness_suite.parallel_worker_regression_contract()
 
@@ -1948,6 +1966,77 @@ class TelegramAsyncRoutingTest(unittest.TestCase):
         self.assertEqual(calls[0][0], "start_async_job")
         self.assertEqual(calls[1][0], "send_message")
         self.assertIn("JOB-ACK", calls[1][2])
+
+    def test_start_async_job_dedupes_same_telegram_update(self):
+        originals = (telegram_direct_cto.STATE, telegram_direct_cto.APP)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            telegram_direct_cto.STATE = root / "state"
+            telegram_direct_cto.APP = root
+            try:
+                with mock.patch("subprocess.Popen") as popen:
+                    first = telegram_direct_cto.start_async_job("123", "Pipeline başlat", update_id=9001)
+                    second = telegram_direct_cto.start_async_job("123", "Pipeline başlat", update_id=9001)
+            finally:
+                telegram_direct_cto.STATE, telegram_direct_cto.APP = originals
+
+            job_files = sorted((root / "state/direct_cto_jobs").glob("*.json"))
+            payload = json.loads(job_files[0].read_text(encoding="utf-8"))
+
+        self.assertEqual(str(first), str(second))
+        self.assertTrue(telegram_direct_cto.async_job_created(first))
+        self.assertFalse(telegram_direct_cto.async_job_created(second))
+        self.assertEqual(first.ack_correlation_id, "telegram:123:update:9001")
+        self.assertEqual(payload["ack_correlation_id"], "telegram:123:update:9001")
+        self.assertEqual(len(job_files), 1)
+        self.assertEqual(popen.call_count, 2)
+
+    def test_handle_message_skips_duplicate_async_ack(self):
+        calls = []
+
+        def fake_start_async_job(chat_id, text, router_task_id=None, action_command=False, update_id=None):
+            calls.append(("start_async_job", chat_id, update_id))
+            return telegram_direct_cto.AsyncJobId(
+                "JOB-EXISTING",
+                created=False,
+                ack_correlation_id="telegram:123:update:9001",
+            )
+
+        def fake_send_message(token, chat_id, text):
+            calls.append(("send_message", chat_id, text))
+            return True
+
+        originals = (
+            telegram_direct_cto.LOGS,
+            telegram_direct_cto.audit_passthrough,
+            telegram_direct_cto.start_async_job,
+            telegram_direct_cto.send_message,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            telegram_direct_cto.LOGS = Path(tmp)
+            telegram_direct_cto.audit_passthrough = lambda *args, **kwargs: {}
+            telegram_direct_cto.start_async_job = fake_start_async_job
+            telegram_direct_cto.send_message = fake_send_message
+            try:
+                telegram_direct_cto.handle_message(
+                    "TOKEN",
+                    "123",
+                    {
+                        "chat": {"id": "123"},
+                        "from": {"username": "tester"},
+                        "text": "Bana sistem mimarisi için kısa bir öneri hazırla.",
+                    },
+                    update_id=9001,
+                )
+            finally:
+                (
+                    telegram_direct_cto.LOGS,
+                    telegram_direct_cto.audit_passthrough,
+                    telegram_direct_cto.start_async_job,
+                    telegram_direct_cto.send_message,
+                ) = originals
+
+        self.assertEqual(calls, [("start_async_job", "123", 9001)])
 
     def test_handle_message_defers_router_when_summary_is_requested_before_new_tasks(self):
         calls = []

@@ -425,3 +425,13 @@ Production readiness analizi backlog devaminda dashboard ham readiness markdown 
 Bu paket production deploy, staging deploy, runtime state/log mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapmadi.
 
 Bu paket production deploy, staging deploy, gercek health/smoke servis cagrisi, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya Google Ads live mutate islemi yapmadi.
+
+## 2026-06-05 ACK Watchdog Retry Readiness Apply
+
+Production readiness analizi devaminda arka plan ACK, progress-aware watchdog ve retryable hata siniflandirmasi tek gate olarak sabitlendi.
+
+`supervisor/telegram_direct_cto.py` artik Telegram `update_id` varsa `ack_correlation_id` yazar; ayni update tekrar islenirse mevcut job id'sini dondurur, yeni async process baslatmaz ve handler duplicate ACK gondermez. Bu davranis Telegram polling offsetine ek bir idempotency emniyeti saglar.
+
+`supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'ini ekledi. Gate gercek Telegram API cagrisi veya production deploy yapmadan simulator/static/helper sozlesmeleriyle sunlari dogrular: async ACK 3 saniye beklentisi, duplicate ACK suppression markerlari, stdout gürültüsünü anlamli progress saymayan watchdog ayrimi, timeout/usage-limit/gecici worker failure retryable karari, proposal uretmeden tamamlanan veya kritik destructive isteklerin non-retryable/approval kapsaminda kalmasi.
+
+Davranis `tests/test_runtime_status_model.py` icindeki hedefli unit testlerle sabitlendi. Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS ve anayasa kayitlari yeni gate'e hizalandi. Production deploy, staging deploy, runtime state mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.

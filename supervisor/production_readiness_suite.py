@@ -712,6 +712,150 @@ def readiness_simulation_contracts() -> dict[str, Any]:
     }
 
 
+def ack_watchdog_retry_contract() -> dict[str, Any]:
+    try:
+        from . import direct_cto_async_job, progress_aware_runner, retry_policy, telegram_direct_cto_simulator, worker_runner
+        from .critical_operation_policy import critical_operation_findings
+        from .task_status_constants import TASK_STATUS_FAILED_NO_PROPOSAL, TASK_STATUS_FAILED_RETRYABLE
+    except ImportError:
+        import direct_cto_async_job
+        import progress_aware_runner
+        import retry_policy
+        import telegram_direct_cto_simulator
+        import worker_runner
+        from critical_operation_policy import critical_operation_findings
+        from task_status_constants import TASK_STATUS_FAILED_NO_PROPOSAL, TASK_STATUS_FAILED_RETRYABLE
+
+    ack_cases = [
+        telegram_direct_cto_simulator.simulate_case(
+            "readiness_action_ack",
+            "Pipeline başlat ve workerlara dağıt.",
+        ),
+        telegram_direct_cto_simulator.simulate_case(
+            "readiness_long_ack",
+            "Uçtan uca çalış: worker ata, pipeline çalıştır, fail olursa düzelt, gate PASS olunca production'a al.",
+        ),
+    ]
+    ack_contracts = [
+        static_contract(
+            "supervisor/telegram_direct_cto.py",
+            [
+                "class AsyncJobId",
+                "ack_correlation_id",
+                "async_ack_correlation_id",
+                "existing_async_job_id",
+                "async_job_created",
+                "update_id=update_id",
+            ],
+        ),
+    ]
+    ack_ok = (
+        all(item.get("route") == "async_job" for item in ack_cases)
+        and all(item.get("async_ack_expected") is True for item in ack_cases)
+        and all(item.get("ack_deadline_seconds") == 3 for item in ack_cases)
+        and all(item["ok"] for item in ack_contracts)
+    )
+
+    watchdog_contracts = [
+        static_contract(
+            "supervisor/progress_aware_runner.py",
+            [
+                "last_meaningful_progress_seconds_ago",
+                "last_output_activity_seconds_ago",
+                "output_activity_count",
+                "meaningful_event_count",
+                "no_meaningful_progress",
+            ],
+        ),
+        static_contract(
+            "supervisor/worker_runner.py",
+            [
+                "progress_watchdog",
+                "last_meaningful_progress_seconds_ago",
+                "last_output_activity_seconds_ago",
+                "progress_watchdog_stalled_without_meaningful_progress",
+            ],
+        ),
+    ]
+    output_noise_meaningful = progress_aware_runner.output_has_meaningful_marker("heartbeat noise only")
+    semantic_output_meaningful = progress_aware_runner.output_has_meaningful_marker("wrote PLAN.md and tests PASS")
+    watchdog_ok = (
+        output_noise_meaningful is False
+        and semantic_output_meaningful is True
+        and all(item["ok"] for item in watchdog_contracts)
+    )
+
+    worker_retryable_status, worker_retryable_reason = worker_runner.classify_worker_result(1, [], "", False)
+    worker_non_retry_status, worker_non_retry_reason = worker_runner.classify_worker_result(0, [], "", False)
+    usage_failure = direct_cto_async_job.classify_codex_failure("usage limit, try again later", "", {})
+    retry_decision = retry_policy.decide_retry(
+        task_id="READINESS-RETRY",
+        failure_kind="timeout",
+        current_attempt=1,
+        max_attempts=3,
+        jitter_seed="production-readiness",
+    )
+    critical_findings = critical_operation_findings("Production database " + "delete" + " from users çalıştır.")
+    retry_matrix = {
+        "worker_failure_without_proposal": {
+            "status": worker_retryable_status,
+            "reason": worker_retryable_reason,
+            "retryable": worker_retryable_status == TASK_STATUS_FAILED_RETRYABLE,
+        },
+        "usage_limit": {
+            "status": usage_failure.get("status"),
+            "result": usage_failure.get("result"),
+            "retryable": usage_failure.get("status") == TASK_STATUS_FAILED_RETRYABLE,
+        },
+        "timeout_backoff": {
+            "failure_kind": retry_decision.get("failure_kind"),
+            "terminal": retry_decision.get("terminal"),
+            "idempotency_key": retry_decision.get("idempotency_key"),
+            "retryable": retry_decision.get("terminal") is False,
+        },
+        "completed_without_proposal": {
+            "status": worker_non_retry_status,
+            "reason": worker_non_retry_reason,
+            "retryable": worker_non_retry_status == TASK_STATUS_FAILED_RETRYABLE,
+        },
+        "critical_database_mutation": {
+            "findings": critical_findings,
+            "retryable": False,
+        },
+    }
+    retry_ok = (
+        retry_matrix["worker_failure_without_proposal"]["retryable"] is True
+        and retry_matrix["usage_limit"]["retryable"] is True
+        and retry_matrix["timeout_backoff"]["retryable"] is True
+        and worker_non_retry_status == TASK_STATUS_FAILED_NO_PROPOSAL
+        and "database_destructive_operation" in critical_findings
+    )
+
+    return {
+        "ok": ack_ok and watchdog_ok and retry_ok,
+        "mode": "static_and_fixture_non_mutating_contract",
+        "ack": {
+            "ok": ack_ok,
+            "cases": ack_cases,
+            "contracts": ack_contracts,
+            "telegram_api_called": False,
+        },
+        "watchdog": {
+            "ok": watchdog_ok,
+            "output_noise_meaningful": output_noise_meaningful,
+            "semantic_output_meaningful": semantic_output_meaningful,
+            "contracts": watchdog_contracts,
+        },
+        "retryable_classification": {
+            "ok": retry_ok,
+            "matrix": retry_matrix,
+        },
+        "production_deploy_performed": False,
+        "staging_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
 def _task_by_id(tasks: list[dict[str, Any]], task_id: str) -> dict[str, Any]:
     for task in tasks:
         if task.get("id") == task_id:
@@ -908,6 +1052,11 @@ def chaos_simulations(results: dict[str, Any]) -> None:
     record(results, "parallel_worker_regression", parallel_contract["ok"], parallel_contract)
 
 
+def ack_watchdog_retry_readiness(results: dict[str, Any]) -> None:
+    contract = ack_watchdog_retry_contract()
+    record(results, "ack_watchdog_retry_contract", contract["ok"], contract)
+
+
 def unit_and_integration(results: dict[str, Any]) -> None:
     policy = read_json(ROOT / "state_templates/production_policy.json", {})
     ok = bool(policy.get("automatic_production_enabled") or policy.get("production_deploy_channel") == "github_actions_manual")
@@ -932,6 +1081,7 @@ def run_suite() -> dict[str, Any]:
     deploy_script_checks(results)
     security_scans(results)
     staging_and_rollback(results)
+    ack_watchdog_retry_readiness(results)
     chaos_simulations(results)
     telegram_result_report(results)
 

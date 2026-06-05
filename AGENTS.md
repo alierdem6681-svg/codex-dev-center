@@ -204,6 +204,14 @@ Stale veya eksik readiness/health kaynagi `UNKNOWN` sonucudur. Bu gorunurluk pro
 
 Bu kapi gercek Telegram API cagirmaz; diff, stdout/stderr, stack trace, raw payload, Telegram `file_id`, secret/env/token/private key degeri veya runtime path bilgisini Telegram ozetine koyamaz.
 
+## ACK WATCHDOG RETRY READINESS CONTRACT V1
+
+`supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` kapisiyla arka plan ACK, progress-aware watchdog ve retryable hata siniflandirmasini non-mutating fixture/static sozlesme olarak dogrular.
+
+Telegram async ACK akisi `update_id` varsa `ack_correlation_id` ile ayni update icin tek job/tek ACK davranisini korumali; watchdog yalniz stdout gürültüsünü anlamlı progress saymamali; timeout/usage-limit/gecici worker hatalari retryable, tamamlanmis ama proposal uretmemis veya kritik destructive istekler non-retryable/approval kapsaminda kalmalidir.
+
+Bu kapi gercek Telegram API cagirmaz, production/staging deploy yapmaz, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write yetkisi vermez.
+
 ## OBSERVED ISSUE COMPLETION CONTRACT V1
 
 Drift registry/settings farklari tek alert sinyaliyle otomatik eklenmez; `supervisor/drift_checker.py` adaylari kanit kaynaklari ve confidence ile siniflandirir.

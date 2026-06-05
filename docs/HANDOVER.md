@@ -1133,3 +1133,29 @@ Eklenenler:
 Not:
 - Production deploy, staging deploy, runtime `state/`, `logs/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write islemi yapilmadi.
 - Bu apply clone icinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyalari bulunmadigi icin okunamadi/guncellenmedi; `state_templates/` karsiliklari kullanildi.
+
+---
+
+## ACK Watchdog Retry Readiness Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-122316 / CTO-TASK-20260605-075359-082238-PRODUCTION-READINESS-ANALIZI
+Worker: worker-1
+
+Eklenenler:
+- Telegram Direct CTO async ACK akışı `update_id` varsa `ack_correlation_id` yazar; aynı update tekrar işlenirse yeni job başlatmaz ve duplicate ACK gönderimini atlar.
+- `supervisor/production_readiness_suite.py` `ack_watchdog_retry_contract` gate'ini ekledi.
+- Gate async ACK deadline/simulator, duplicate ACK suppression marker'ları, progress-aware watchdog output-gürültüsü ayrımı ve retryable/non-retryable hata matrisini non-mutating olarak doğrular.
+- `tests/test_runtime_status_model.py` ACK idempotency ve readiness contract davranışını unit test ile sabitler.
+- Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa ve memory kayıtları güncellendi.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_ack_watchdog_retry_contract_is_non_mutating tests.test_runtime_status_model.TelegramAsyncRoutingTest.test_start_async_job_dedupes_same_telegram_update tests.test_runtime_status_model.ProgressAwareRunnerTest.test_output_noise_without_meaningful_progress_stalls tests.test_runtime_status_model.WorkerStatusModelTest.test_retry_policy_schedules_same_task_with_idempotency_key` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- `python3 -m unittest tests.test_runtime_status_model` PASS, 221 test.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `ack_watchdog_retry_contract=PASS`; write status `completed_with_write_skipped`.
+
+Not:
+- Production deploy, staging deploy, gerçek Telegram API çağrısı, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
+- Commit/PR tamamlanamadı: `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı. GitHub connector mevcut, ancak yerel commit/tree üretilemediği ve büyük dosya değişiklikleri tam içerik/blob akışı gerektirdiği için güvenli PR açılamadı.

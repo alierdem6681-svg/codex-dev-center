@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T05:51:20+00:00",
+  "updated_at": "2026-06-05T12:33:37+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -26,6 +26,7 @@
     "staging_smoke_test",
     "rollback_simulation",
     "telegram_result_report_flow",
+    "ack_watchdog_retry_contract",
     "restart_simulation",
     "failure_injection_simulation",
     "parallel_worker_regression"
@@ -78,6 +79,17 @@
     "required_duplicate_claim_count": 0,
     "required_duplicate_terminal_count": 0,
     "production_deploy_performed": false,
+    "mutating_cloud_operations_performed": false
+  },
+  "ack_watchdog_retry_contract": {
+    "mode": "static_and_fixture_non_mutating_contract",
+    "ack_deadline_seconds": 3,
+    "requires_ack_correlation_id": true,
+    "requires_duplicate_ack_suppression": true,
+    "requires_progress_signal_separation": true,
+    "requires_retryable_matrix": true,
+    "production_deploy_performed": false,
+    "staging_deploy_performed": false,
     "mutating_cloud_operations_performed": false
   },
   "real_deploy_sequence": [

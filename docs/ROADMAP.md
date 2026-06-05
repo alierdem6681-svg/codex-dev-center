@@ -359,6 +359,13 @@ Faz 19B-10A Model Policy
 - [x] Rapor policy `required_gates` listesini tam icermiyorsa `missing_required_gate` reason code ve eksik gate listesi uretilir.
 - [x] Davranis `web_panel/quality_gate_view.py` helper'i ve runtime status regresyon testleriyle sabitlendi.
 
+## Faz 56 - ACK Watchdog Retry Readiness
+
+- [x] Telegram async ACK akisi `update_id` kaynakli `ack_correlation_id` ile ayni update icin duplicate job/ACK uretmeyecek sekilde idempotent hale getirildi.
+- [x] Production readiness suite `ack_watchdog_retry_contract` kapisiyla ACK, progress-aware watchdog ve retryable hata siniflandirmasini non-mutating fixture/static sozlesme olarak dogrular.
+- [x] Output gürültüsü ile anlamli progress ayrimi, timeout/usage-limit retry karari ve non-retryable proposal/critical operation matrisi unit test ile sabitlendi.
+- [x] Production readiness policy, module registry/settings/action catalog ve living docs yeni gate'e hizalandi.
+
 ## Faz 56 - Worker Bootstrap Pipeline Preflight
 
 - [x] `worker_bootstrap.bootstrap_preflight()` repo checkout, local `.git/` metadata, test yüzeyi ve `rg`/`find` fallback durumunu structured checks olarak raporlar.
