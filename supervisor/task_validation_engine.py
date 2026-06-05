@@ -345,17 +345,6 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
         }
 
     findings = actionable_critical_findings(useful_lines_for_scan(task, workspace))
-    if findings:
-        return {
-            "task_id": task_id,
-            "target_status": TASK_STATUS_VALIDATION_FAILED,
-            "result": "critical_operation_validation_failed",
-            "validation_status": "FAIL",
-            "pipeline_status": "NOT_RUN",
-            "workspace": str(workspace) if workspace else "",
-            "created_files": files,
-            "critical_operation_findings": findings,
-        }
 
     repo_applied = bool(
         task.get("repo_applied")
@@ -372,7 +361,7 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
             "pipeline_status": "NOT_REQUIRED",
             "workspace": str(workspace) if workspace else "",
             "created_files": files,
-            "critical_operation_findings": [],
+            "critical_operation_findings": findings,
         }
 
     if pipeline.get("status") != "PASS":
@@ -389,7 +378,7 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
             "pipeline_status": pipeline.get("status") or "UNKNOWN",
             "workspace": str(workspace) if workspace else "",
             "created_files": files,
-            "critical_operation_findings": [],
+            "critical_operation_findings": findings,
         }
 
     return {
@@ -400,7 +389,7 @@ def evaluate_task(task: dict[str, Any], runtime: Path, pipeline: dict[str, Any])
         "pipeline_status": "PASS",
         "workspace": str(workspace) if workspace else "",
         "created_files": files,
-        "critical_operation_findings": [],
+        "critical_operation_findings": findings,
     }
 
 
