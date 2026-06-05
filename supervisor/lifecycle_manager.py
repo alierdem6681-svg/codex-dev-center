@@ -339,6 +339,14 @@ def child_allows_retry(tasks: list[dict[str, Any]], child_id: str | None) -> boo
         if task.get("id") != child_id:
             continue
         if (
+            normalize_status(task.get("status")) == TASK_STATUS_FAILED_RETRYABLE
+            and (
+                str(task.get("delivery_level") or "").upper() == "PR_CONFLICT"
+                or str(task.get("deployment_status") or "").upper() == "MERGE_CONFLICT"
+            )
+        ):
+            return True
+        if (
             task.get("pull_request_url")
             or task.get("merge_blocked")
             or str(task.get("result") or "") == "repo_apply_pr_ready_pipeline_passed"
@@ -477,7 +485,12 @@ def propagate_parent_progress(queue: dict[str, Any]) -> int:
 
 def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -> bool:
     status = normalize_status(task.get("status"))
-    if status not in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
+    retrying_apply_failure = (
+        status == TASK_STATUS_FAILED_RETRYABLE
+        and str(task.get("result") or "") == "child_task_failed_root_cause_required"
+        and bool(task.get("workspace") or task.get("report_path"))
+    )
+    if status not in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE} and not retrying_apply_failure:
         return False
     if (
         str(task.get("delivery_level") or "").upper() == "PR_READY"
@@ -497,7 +510,7 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
         return False
     if task.get("approval_required") or status == TASK_STATUS_APPROVAL_REQUIRED:
         return False
-    if worker_block_reason(task):
+    if worker_block_reason(task) and not retrying_apply_failure:
         return False
     child_id = task.get("repo_apply_child")
     if active_child_exists(tasks, child_id):
@@ -505,7 +518,8 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
     if not child_allows_retry(tasks, child_id):
         return False
     attempts = int(task.get("repo_apply_attempts", 0) or 0)
-    return attempts < 2
+    max_attempts = 3 if retrying_apply_failure else 2
+    return attempts < max_attempts
 
 def repo_apply_candidate(tasks: list[dict[str, Any]]) -> dict[str, Any] | None:
     for task in tasks:

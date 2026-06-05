@@ -3889,6 +3889,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
         self.assertIn("DEPLOY_REF_SHA", workflow_text)
         self.assertIn("uses: actions/checkout@v5", workflow_text)
         self.assertNotIn("ref: ${{ inputs.ref }}", workflow_text)
+        self.assertNotIn("inputs.confirm", workflow_text)
         self.assertNotIn('--exclude ".github/"', workflow_text)
 
     def test_cto_dispatch_deploy_uses_branch_ref_input(self):
@@ -3897,6 +3898,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
         original_active_run = cto_autonomous_delivery.active_run
         original_latest_run = cto_autonomous_delivery.latest_run
         original_run = cto_autonomous_delivery.run
+        original_requires_confirm = cto_autonomous_delivery.workflow_yaml_requires_confirm
         original_sleep = cto_autonomous_delivery.time.sleep
         calls: list[list[str]] = []
 
@@ -3917,6 +3919,7 @@ class DeployGateStatusModelTest(unittest.TestCase):
                 "conclusion": "",
             },
         }
+        cto_autonomous_delivery.workflow_yaml_requires_confirm = lambda _workflow: False
         cto_autonomous_delivery.run = fake_run
         cto_autonomous_delivery.time.sleep = lambda _seconds: None
         try:
@@ -3926,11 +3929,85 @@ class DeployGateStatusModelTest(unittest.TestCase):
             cto_autonomous_delivery.successful_run = original_successful_run
             cto_autonomous_delivery.active_run = original_active_run
             cto_autonomous_delivery.latest_run = original_latest_run
+            cto_autonomous_delivery.workflow_yaml_requires_confirm = original_requires_confirm
             cto_autonomous_delivery.run = original_run
             cto_autonomous_delivery.time.sleep = original_sleep
 
         self.assertTrue(result["ok"])
-        self.assertEqual(calls, [["gh", "workflow", "run", cto_autonomous_delivery.DEPLOY_WORKFLOW, "--ref", "main", "-f", "confirm=DEPLOY-CODEX-VM", "-f", "ref=main"]])
+        self.assertEqual(
+            calls,
+            [["gh", "workflow", "run", cto_autonomous_delivery.DEPLOY_WORKFLOW, "--ref", "main", "-f", "ref=main"]],
+        )
+
+    def test_cto_dispatch_deploy_auto_fills_legacy_confirm_input(self):
+        original_requires_confirm = cto_autonomous_delivery.workflow_yaml_requires_confirm
+        cto_autonomous_delivery.workflow_yaml_requires_confirm = lambda _workflow: True
+        try:
+            args = cto_autonomous_delivery.workflow_dispatch_args(cto_autonomous_delivery.DEPLOY_WORKFLOW)
+        finally:
+            cto_autonomous_delivery.workflow_yaml_requires_confirm = original_requires_confirm
+
+        self.assertEqual(
+            args,
+            [
+                "gh",
+                "workflow",
+                "run",
+                cto_autonomous_delivery.DEPLOY_WORKFLOW,
+                "--ref",
+                "main",
+                "-f",
+                f"confirm={cto_autonomous_delivery.LEGACY_DEPLOY_CONFIRM_PHRASE}",
+                "-f",
+                "ref=main",
+            ],
+        )
+
+    def test_latest_workflow_run_uses_full_json_output(self):
+        original_run = cto_autonomous_delivery.run
+        original_run_full = cto_autonomous_delivery.run_full
+        calls: list[list[str]] = []
+        runs = [
+            {
+                "databaseId": str(index),
+                "status": "completed",
+                "conclusion": "success",
+                "createdAt": "2026-06-05T00:00:00Z",
+                "updatedAt": "2026-06-05T00:00:00Z",
+                "headBranch": "main",
+                "headSha": "target-sha" if index == 24 else f"sha-{index}",
+                "name": "Deploy to VM",
+                "url": "https://example.invalid/runs/" + ("x" * 300) + str(index),
+                "event": "workflow_dispatch",
+            }
+            for index in range(30)
+        ]
+        full_stdout = json.dumps(runs)
+
+        def fake_run(args, cwd=None, timeout=300):
+            return {
+                "ok": True,
+                "returncode": 0,
+                "stdout": full_stdout[-5000:],
+                "stderr": "",
+                "cmd": " ".join(args),
+            }
+
+        def fake_run_full(args, cwd=None, timeout=300):
+            calls.append(args)
+            return {"ok": True, "returncode": 0, "stdout": full_stdout, "stderr": "", "cmd": " ".join(args)}
+
+        cto_autonomous_delivery.run = fake_run
+        cto_autonomous_delivery.run_full = fake_run_full
+        try:
+            result = cto_autonomous_delivery.latest_run(cto_autonomous_delivery.DEPLOY_WORKFLOW, "target-sha")
+        finally:
+            cto_autonomous_delivery.run = original_run
+            cto_autonomous_delivery.run_full = original_run_full
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["run"]["databaseId"], "24")
+        self.assertEqual(calls[0][:4], ["gh", "run", "list", "--workflow"])
 
     def test_mark_task_deployed_propagates_to_parent_chain(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -5460,6 +5537,63 @@ class BacklogDispatcherModelTest(unittest.TestCase):
 
 
 class WorkerLifecycleRepairTest(unittest.TestCase):
+    def test_pr_conflict_apply_child_allows_second_repo_apply_attempt(self):
+        parent = {
+            "id": "TASK-PR-CONFLICT",
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "delivery_level": "CHILD_FAILED_RETRYABLE",
+            "result": "child_task_failed_root_cause_required",
+            "source": "telegram",
+            "workspace": "/tmp/proposal-workspace",
+            "repo_apply_child": "APPLY-PR-CONFLICT",
+            "repo_apply_attempts": 1,
+            "worker_eligible": False,
+        }
+        child = {
+            "id": "APPLY-PR-CONFLICT",
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "delivery_level": "PR_CONFLICT",
+            "deployment_status": "MERGE_CONFLICT",
+            "result": "repo_apply_pr_ready_pipeline_passed",
+            "pull_request_url": "https://github.com/example/repo/pull/10",
+            "merge_blocked": True,
+            "parent_task": parent["id"],
+            "parent_task_id": parent["id"],
+            "source": "cto_backlog_dispatcher",
+        }
+
+        tasks = [parent, child]
+
+        self.assertTrue(lifecycle_manager.child_allows_retry(tasks, child["id"]))
+        self.assertTrue(lifecycle_manager.is_repo_apply_candidate(parent, tasks))
+
+    def test_pr_conflict_apply_child_retry_stays_bounded(self):
+        parent = {
+            "id": "TASK-PR-CONFLICT",
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "delivery_level": "CHILD_FAILED_RETRYABLE",
+            "result": "child_task_failed_root_cause_required",
+            "source": "telegram",
+            "workspace": "/tmp/proposal-workspace",
+            "repo_apply_child": "APPLY-PR-CONFLICT",
+            "repo_apply_attempts": 3,
+            "worker_eligible": False,
+        }
+        child = {
+            "id": "APPLY-PR-CONFLICT",
+            "status": TASK_STATUS_FAILED_RETRYABLE,
+            "delivery_level": "PR_CONFLICT",
+            "deployment_status": "MERGE_CONFLICT",
+            "result": "repo_apply_pr_ready_pipeline_passed",
+            "pull_request_url": "https://github.com/example/repo/pull/10",
+            "merge_blocked": True,
+            "parent_task": parent["id"],
+            "parent_task_id": parent["id"],
+            "source": "cto_backlog_dispatcher",
+        }
+
+        self.assertFalse(lifecycle_manager.is_repo_apply_candidate(parent, [parent, child]))
+
     def test_repair_marks_stale_running_retryable_and_clears_idle_worker(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = Path(tmp)

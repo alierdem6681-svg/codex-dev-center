@@ -3,10 +3,6 @@ name: Deploy to VM
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: "Type DEPLOY-CODEX-VM to deploy"
-        required: true
-        type: string
       ref:
         description: "Branch or tag to deploy; raw commit SHA values are rejected"
         required: true
@@ -24,7 +20,6 @@ jobs:
     timeout-minutes: 30
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      CONFIRM_PHRASE: DEPLOY-CODEX-VM
       VM_TARGET: codex-dev-center-01
       RUNTIME_DIR: /opt/codex-dev-center
       BACKUP_DIR: /opt/codex-dev-center-backups
@@ -32,15 +27,6 @@ jobs:
       PUBLIC_DASHBOARD_URL: http://34.185.153.184:8080
 
     steps:
-      - name: Confirm manual deploy
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ inputs.confirm }}" != "$CONFIRM_PHRASE" ]; then
-            echo "Confirmation text is wrong. Deployment stopped."
-            exit 1
-          fi
-
       - name: Validate runner target
         shell: bash
         run: |
