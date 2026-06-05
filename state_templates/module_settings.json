@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:03:09+00:00",
   "global": {
     "new_modules_must_register_in_dashboard": true,
     "new_modules_must_have_settings": true,
@@ -307,6 +307,11 @@
     "parallel_worker_regression_duplicate_terminal_count": 0,
     "staging_dry_run_non_mutating_required": true,
     "rollback_dry_run_non_mutating_required": true,
+    "pipeline_gate_rollback_readiness_required": true,
+    "pipeline_gate_rollback_readiness_mode": "static_policy_readiness_contract",
+    "go_no_go_criteria_required": true,
+    "rollback_decision_chain_required": true,
+    "github_actions_final_production_step_required": true,
     "telegram_result_report_flow_required": true,
     "telegram_result_report_mode": "telegram_safe_summary_contract",
     "telegram_result_report_max_chars": 900,

@@ -1211,3 +1211,30 @@ Not:
 - Production deploy, staging deploy, runtime `state/`, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
 - Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.
 - Commit/PR tamamlanamadı: lokal `git add` `.git/index.lock` oluştururken read-only filesystem hatası aldı; GitHub connector branch oluşturma çağrısı `user cancelled MCP tool call` olarak iptal edildi.
+
+---
+
+## Pipeline Gate And Rollback Readiness Review Apply
+
+Tarih: 2026-06-05
+Görev: CTO-APPLY-20260605-135927 / CTO-TASK-20260605-132117-915759-PRODUCTION-READINESS-ANALIZI-SUB3
+Worker: worker-4
+
+Eklenenler:
+- `supervisor/production_readiness_suite.py` `pipeline_gate_rollback_readiness` gate'i required gate listesi, Go/No-Go kriterleri, GitHub Actions manuel production kapısı ve rollback karar zincirini static policy/doküman sözleşmesiyle doğrular.
+- `supervisor/codex_quality_gate.py` standard report simulation dry-run grubuna yeni gate'i dahil eder.
+- `docs/PRODUCTION_READINESS_GATE.md`, `docs/STAGING_ROLLBACK_READINESS_PLAN.md` ve state template kayıtları pipeline gate/rollback readiness sözleşmesine hizalandı.
+
+Test:
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest` PASS, 63 test.
+- `python3 -m unittest tests.test_runtime_status_model.ProductionReadinessSuiteScanTest` PASS, 11 test.
+- `python3 -m unittest tests.test_runtime_status_model.WorkerStatusModelTest.test_pipeline_gate_rollback_readiness_contract_is_non_mutating tests.test_runtime_status_model.WorkerStatusModelTest.test_standard_quality_report_passes_with_required_readiness_artifact tests.test_runtime_status_model.WorkerStatusModelTest.test_standard_quality_report_fails_on_mutating_simulation_flag` PASS.
+- `python3 -m compileall -q supervisor web_panel scripts tests` PASS.
+- JSON validation (`state_templates/production_readiness_policy.json`, `module_registry.json`, `module_settings.json`, `action_catalog.json`) PASS.
+- `git diff --check` PASS.
+- `CHECK_MODE=read_only python3 supervisor/production_readiness_suite.py --json` PASS, 100%; `pipeline_gate_rollback_readiness=PASS`; state/report yazımları read-only modda `write-skipped`.
+- `python3 -m unittest tests.test_runtime_status_model` bu sandbox'ta `/opt/codex-dev-center/state/task_queue.json.lock` read-only hatasına takıldı; hedefli sınıflar ve readiness suite PASS oldu.
+
+Not:
+- Production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime `state/`, `logs/`, `reports/` mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+- Bu apply clone içinde runtime `state/system_state.json` ve STEP 10 runtime `state/*.json` dosyaları bulunmadığı için okunamadı/güncellenmedi; `state_templates/` karşılıkları kullanıldı.

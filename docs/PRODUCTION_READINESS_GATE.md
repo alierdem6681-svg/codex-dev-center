@@ -19,6 +19,7 @@ Canlı ortama otomatik yayına alma yalnızca Codex Dev Center uygulamasının k
 - Ön canlı health/smoke wrapper sözleşmesi PASS
 - Ön canlı smoke test PASS
 - Geri alma simulation PASS
+- Pipeline gate / rollback readiness review PASS
 - Telegram güvenli sonuç raporu akışı PASS
 - ACK / progress-aware watchdog / retryable sınıflandırma kontratı PASS
 - Ön canlı ve geri alma dry-run non-mutating JSON sözleşmesi PASS
@@ -34,10 +35,32 @@ Restart ve failure injection kapıları canlı servis, cloud veya production dep
 - `scripts/staging_health_check.sh` ve `scripts/staging_smoke_test.sh` staging scope'u explicit geçirir; production scope varsayılan wrapperları ön canlı kapısı yerine kullanılmamalıdır.
 - `rollback_simulation` dry-run sonucunda `dry_run=true`, `git_reset_performed=false` ve `data_mutation_performed=false` alanlarını doğrular.
 - `ack_watchdog_retry_contract` aynı Telegram update için ACK correlation id ve duplicate ACK suppression davranışını, output gürültüsünü anlamlı progress saymayan watchdog ayrımını ve retryable/non-retryable hata matrisini doğrular.
+- `pipeline_gate_rollback_readiness` gate'i pipeline gate ve rollback review sözleşmesini statik policy/doküman kanıtıyla doğrular; gerçek deploy, staging deploy veya runtime state mutasyonu yapmaz.
 - `restart_simulation` service watchdog restart yolu ve safe rollback sözleşmesini statik olarak doğrular.
 - `failure_injection_simulation` JSON hata yakalama, güvenlik taraması ve kritik operasyon approval sözleşmesini statik olarak doğrular.
 - `parallel_worker_regression` dört dummy/simülasyon task için dispatch, wake, tek worker claim, tek terminal status ve duplicate claim/terminal olmaması sözleşmesini geçici queue fixture'ı ile doğrular.
 - ACK/watchdog/retry kapısı `static_and_fixture_non_mutating_contract`, restart/failure injection kapıları `static_non_mutating_contract`, paralel worker kapısı `parallel_worker_lifecycle_simulation` modunda çalışır; hepsi `production_deploy_performed=false` beyanını korur.
+
+## Pipeline Gate And Rollback Readiness Review
+
+`pipeline_gate_rollback_readiness` gate'i bu dokümandaki kalite kapıları ile `docs/STAGING_ROLLBACK_READINESS_PLAN.md` içindeki geri alma hazırlığını aynı karar modeline bağlar.
+
+Go/No-Go:
+
+- Go kararı için tüm zorunlu readiness gate'leri PASS olmalı.
+- Go kararı için ön canlı health/smoke ve rollback simulation PASS olmalı.
+- Go kararı için rollback hedef artifact, config uyumluluğu ve bilinen risk durumu kayıtlı olmalı.
+- No-Go kararı başarısız gate, belirsiz rollback hedefi veya kabul edilmemiş kritik riskte otomatik oluşur.
+
+Rollback Karar Zinciri:
+
+- Alarm, smoke failure veya health degradation release owner tarafından sınıflandırılır.
+- Kritik etki varsa yeni deploy durdurulur.
+- Rollback hedef artifact ve config versiyonu doğrulanır.
+- Rollback uygulandıktan sonra post-rollback health check zorunludur.
+- Kapanış notu ve kalıcı aksiyon kaydı tutulur.
+
+GitHub Actions final production step kuralı değişmez: final production deploy sadece manuel `Deploy to VM` workflow gate'i üzerinden ilerleyebilir.
 
 ## Telegram Sonuç Raporu
 

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T13:32:16+00:00",
+  "updated_at": "2026-06-05T14:03:09+00:00",
   "modules": [
     {
       "id": "dashboard",
@@ -308,7 +308,7 @@
       "settings_enabled": true,
       "actions_enabled": true,
       "dashboard_visible": true,
-      "description": "Compile, JSON, import, test, güvenlik, ACK/watchdog/retry kontratı, ön canlı, geri alma, Telegram-safe sonuç özeti, paralel worker regression, dry-run non-mutating, read-only/dry-run write evidence ve simülasyon sözleşmesi kapılarını çalıştırır.",
+      "description": "Compile, JSON, import, test, güvenlik, pipeline gate/rollback readiness, ACK/watchdog/retry kontratı, ön canlı, geri alma, Telegram-safe sonuç özeti, paralel worker regression, dry-run non-mutating, read-only/dry-run write evidence ve simülasyon sözleşmesi kapılarını çalıştırır.",
       "actions": [
         "production_readiness_suite"
       ]

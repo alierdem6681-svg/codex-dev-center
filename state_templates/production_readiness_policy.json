@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T12:33:37+00:00",
+  "updated_at": "2026-06-05T14:03:09+00:00",
   "required_status": "PASS",
   "required_score_percent": 100,
   "production_deploy_channel": "github_actions_manual",
@@ -25,6 +25,7 @@
     "forbidden_operation_scan",
     "staging_smoke_test",
     "rollback_simulation",
+    "pipeline_gate_rollback_readiness",
     "telegram_result_report_flow",
     "ack_watchdog_retry_contract",
     "restart_simulation",
@@ -81,6 +82,30 @@
     "production_deploy_performed": false,
     "mutating_cloud_operations_performed": false
   },
+  "pipeline_gate_rollback_readiness": {
+    "mode": "static_policy_readiness_contract",
+    "go_no_go_criteria": {
+      "go_requires_all_required_gates_pass": true,
+      "go_requires_staging_health_smoke_pass": true,
+      "go_requires_rollback_target_defined": true,
+      "go_requires_accepted_or_resolved_known_risks": true,
+      "no_go_blocks_on_failed_gate": true,
+      "no_go_blocks_on_missing_rollback_target": true,
+      "no_go_blocks_on_critical_unaccepted_risk": true
+    },
+    "rollback_decision_chain": {
+      "alarm_or_smoke_failure_detected": true,
+      "release_owner_classifies_impact": true,
+      "new_deploys_stop_when_critical": true,
+      "rollback_target_artifact_and_config_verified": true,
+      "post_rollback_health_check_required": true,
+      "closure_note_required": true
+    },
+    "github_actions_final_production_step_required": true,
+    "production_deploy_performed": false,
+    "staging_deploy_performed": false,
+    "mutating_cloud_operations_performed": false
+  },
   "ack_watchdog_retry_contract": {
     "mode": "static_and_fixture_non_mutating_contract",
     "ack_deadline_seconds": 3,
@@ -107,6 +132,7 @@
     "staging_health_check",
     "staging_smoke_test",
     "rollback_simulation",
+    "pipeline_gate_rollback_readiness",
     "telegram_result_report_flow",
     "github_actions_production_deploy",
     "production_health_check",

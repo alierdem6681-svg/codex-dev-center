@@ -447,3 +447,11 @@ Davranış `tests/test_dashboard_account_menu_markup.py` içindeki markup regres
 Dashboard Görevler listesi geçmiş görev kalabalığını veri silmeden UI filtre katmanında temizleyecek şekilde güncellendi. Varsayılan görünüm canlıya alınmış, kapalı, arşivlenmiş, iptal edilmiş, no-change ve tamamlanmış kayıtları gizler; `Geçmiş/canlı kayıtları göster` checkbox'ı bu kayıtları geçici olarak dahil eder.
 
 Güncel görev yoksa tablo ve mobil kart görünümünde `Güncel görev yok.` boş durumu görünür. Davranış `tests/test_dashboard_account_menu_markup.py` markup regresyon testiyle sabitlendi ve dashboard state template kayıtları yeni sözleşmeye hizalandı. Production deploy, staging deploy, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapılmadı.
+
+## 2026-06-05 Pipeline Gate And Rollback Readiness Review Apply
+
+Production readiness suite'e `pipeline_gate_rollback_readiness` gate'i eklendi. Gate required readiness gate listesini, Go/No-Go kriterlerini, GitHub Actions manuel production kapısını ve rollback hedef artifact/config/post-rollback health check karar zincirini static policy/doküman sözleşmesiyle doğrular.
+
+`supervisor/codex_quality_gate.py` standard report simulation dry-run grubuna bu gate'i dahil eder. Production readiness policy, module registry/settings/action catalog, onboarding, roadmap, AGENTS, anayasa, handover ve staging/rollback dokümanları yeni sözleşmeye hizalandı.
+
+Bu paket production deploy, staging deploy, gerçek health/smoke servis çağrısı, runtime state/log/report mutasyonu, secret/env/token/private key, IAM, billing, DNS/firewall, destructive database veya reklam platformu live-write işlemi yapmadı.

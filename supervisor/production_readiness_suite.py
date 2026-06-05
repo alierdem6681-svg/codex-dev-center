@@ -74,6 +74,31 @@ TELEGRAM_RESULT_FORBIDDEN_PATTERNS = [
     re.compile(r"/opt/"),
 ]
 
+PIPELINE_GATE_ROLLBACK_GATE = "pipeline_gate_rollback_readiness"
+PIPELINE_GATE_ROLLBACK_REQUIRED_GATES = [
+    "python_compile_check",
+    "json_validation",
+    "yaml_validation",
+    "import_smoke_test",
+    "unit_test",
+    "integration_test",
+    "regression_test",
+    "worker_queue_recovery_test",
+    "dashboard_route_api_test",
+    "memory_os_dashboard_contract",
+    "telegram_bridge_direct_cto_test",
+    "deploy_script_command_check",
+    "secret_leakage_scan",
+    "forbidden_operation_scan",
+    "staging_smoke_test",
+    "rollback_simulation",
+    "telegram_result_report_flow",
+    "ack_watchdog_retry_contract",
+    "restart_simulation",
+    "failure_injection_simulation",
+    "parallel_worker_regression",
+]
+
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -650,6 +675,108 @@ def static_contract(rel: str, markers: list[str]) -> dict[str, Any]:
     }
 
 
+def pipeline_gate_rollback_readiness_contract() -> dict[str, Any]:
+    policy = read_json(ROOT / "state_templates/production_readiness_policy.json", {})
+    required_gates = policy.get("required_gates", []) if isinstance(policy, dict) else []
+    if not isinstance(required_gates, list):
+        required_gates = []
+
+    missing_required_gates = [
+        gate for gate in PIPELINE_GATE_ROLLBACK_REQUIRED_GATES if gate not in required_gates
+    ]
+    self_registered = PIPELINE_GATE_ROLLBACK_GATE in required_gates
+    workflow_guard_ok = (
+        policy.get("production_deploy_channel") == "github_actions_manual"
+        and policy.get("github_actions_workflow_name") == "Deploy to VM"
+        and policy.get("github_actions_confirm_phrase") == "DEPLOY-CODEX-VM"
+        and policy.get("direct_vm_ssh_forbidden") is True
+    )
+    contracts = [
+        static_contract(
+            "docs/PRODUCTION_READINESS_GATE.md",
+            [
+                PIPELINE_GATE_ROLLBACK_GATE,
+                "Pipeline Gate And Rollback Readiness Review",
+                "Go/No-Go",
+                "Rollback Karar Zinciri",
+                "GitHub Actions final production step",
+            ],
+        ),
+        static_contract(
+            "docs/STAGING_ROLLBACK_READINESS_PLAN.md",
+            [
+                "Pipeline Go/No-Go Kaydı",
+                "Rollback hedef artifact",
+                "post-rollback health check",
+            ],
+        ),
+        static_contract(
+            "state_templates/production_readiness_policy.json",
+            [
+                PIPELINE_GATE_ROLLBACK_GATE,
+                "go_no_go_criteria",
+                "rollback_decision_chain",
+            ],
+        ),
+        static_contract(
+            "state_templates/module_settings.json",
+            [
+                "pipeline_gate_rollback_readiness_required",
+                "go_no_go_criteria_required",
+                "rollback_decision_chain_required",
+            ],
+        ),
+        static_contract(
+            "state_templates/action_catalog.json",
+            [
+                "pipeline_gate_rollback_readiness_required",
+                "go_no_go_criteria_required",
+                "rollback_decision_chain_required",
+            ],
+        ),
+    ]
+    go_no_go_criteria = {
+        "go_requires_all_required_gates_pass": True,
+        "go_requires_staging_health_smoke_pass": True,
+        "go_requires_rollback_target_defined": True,
+        "go_requires_accepted_or_resolved_known_risks": True,
+        "no_go_blocks_on_failed_gate": True,
+        "no_go_blocks_on_missing_rollback_target": True,
+        "no_go_blocks_on_critical_unaccepted_risk": True,
+    }
+    rollback_decision_chain = {
+        "alarm_or_smoke_failure_detected": True,
+        "release_owner_classifies_impact": True,
+        "new_deploys_stop_when_critical": True,
+        "rollback_target_artifact_and_config_verified": True,
+        "post_rollback_health_check_required": True,
+        "closure_note_required": True,
+    }
+    ok = (
+        self_registered
+        and not missing_required_gates
+        and workflow_guard_ok
+        and all(item["ok"] for item in contracts)
+        and all(go_no_go_criteria.values())
+        and all(rollback_decision_chain.values())
+    )
+    return {
+        "ok": ok,
+        "mode": "static_policy_readiness_contract",
+        "required_gate": PIPELINE_GATE_ROLLBACK_GATE,
+        "self_registered": self_registered,
+        "required_gates_checked": PIPELINE_GATE_ROLLBACK_REQUIRED_GATES,
+        "missing_required_gates": missing_required_gates,
+        "workflow_guard_ok": workflow_guard_ok,
+        "go_no_go_criteria": go_no_go_criteria,
+        "rollback_decision_chain": rollback_decision_chain,
+        "contracts": contracts,
+        "production_deploy_performed": False,
+        "staging_deploy_performed": False,
+        "mutating_cloud_operations_performed": False,
+    }
+
+
 def readiness_simulation_contracts() -> dict[str, Any]:
     restart_contracts = [
         static_contract(
@@ -1058,6 +1185,11 @@ def ack_watchdog_retry_readiness(results: dict[str, Any]) -> None:
     record(results, "ack_watchdog_retry_contract", contract["ok"], contract)
 
 
+def pipeline_gate_rollback_readiness(results: dict[str, Any]) -> None:
+    contract = pipeline_gate_rollback_readiness_contract()
+    record(results, PIPELINE_GATE_ROLLBACK_GATE, contract["ok"], contract)
+
+
 def unit_and_integration(results: dict[str, Any]) -> None:
     policy = read_json(ROOT / "state_templates/production_policy.json", {})
     ok = bool(policy.get("automatic_production_enabled") or policy.get("production_deploy_channel") == "github_actions_manual")
@@ -1082,6 +1214,7 @@ def run_suite() -> dict[str, Any]:
     deploy_script_checks(results)
     security_scans(results)
     staging_and_rollback(results)
+    pipeline_gate_rollback_readiness(results)
     ack_watchdog_retry_readiness(results)
     chaos_simulations(results)
     telegram_result_report(results)
