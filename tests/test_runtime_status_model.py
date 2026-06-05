@@ -4049,6 +4049,24 @@ class BacklogDispatcherModelTest(unittest.TestCase):
         self.assertTrue(child["repo_apply_allowed"])
         self.assertEqual(queue["tasks"][0]["repo_apply_child"], child["id"])
 
+    def test_pr_ready_repo_apply_output_is_not_reapplied(self):
+        tasks = [
+            {
+                "id": "PARENT",
+                "status": TASK_STATUS_DONE,
+                "risk": "medium",
+                "delivery_level": "PR_READY",
+                "result": "repo_apply_pr_ready_pipeline_passed",
+                "pull_request_number": 112,
+                "pull_request_url": "https://example.invalid/pull/112",
+                "validation_status": "PASS",
+                "pipeline_status": "PASS",
+            }
+        ]
+
+        self.assertFalse(lifecycle_manager.is_repo_apply_candidate(tasks[0], tasks))
+        self.assertIsNone(lifecycle_manager.repo_apply_candidate(tasks))
+
     def test_dispatcher_validation_child_does_not_create_repo_apply_child(self):
         tasks = [
             {

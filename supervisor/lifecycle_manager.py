@@ -479,6 +479,13 @@ def is_repo_apply_candidate(task: dict[str, Any], tasks: list[dict[str, Any]]) -
     status = normalize_status(task.get("status"))
     if status not in {TASK_STATUS_PROPOSAL_DONE, TASK_STATUS_DONE}:
         return False
+    if (
+        str(task.get("delivery_level") or "").upper() == "PR_READY"
+        or task.get("pull_request_url")
+        or task.get("pull_request_number")
+        or str(task.get("result") or "") == "repo_apply_pr_ready_pipeline_passed"
+    ):
+        return False
     if status == TASK_STATUS_DONE and (
         str(task.get("validation_status") or "").upper() != "PASS"
         or str(task.get("pipeline_status") or "").upper() != "PASS"
